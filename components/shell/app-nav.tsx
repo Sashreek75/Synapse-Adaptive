@@ -13,7 +13,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { Home, HeartPulse, Activity, CreditCard, Settings, FileText, BookOpen, Menu, X, LogOut, LogIn } from "lucide-react";
+import { Home, HeartPulse, Activity, CreditCard, Settings, FileText, BookOpen, Menu, X, LogOut, LogIn, Sun, LineChart } from "lucide-react";
 import { SynapseOrb } from "@/components/synapse/orb";
 import { ThemeToggle } from "@/components/shell/theme-toggle";
 import { useAuth } from "@/components/providers/auth-provider";
@@ -24,6 +24,8 @@ type Room = { href: string; label: string; icon: typeof Home; blurb: string };
 
 const rooms: Room[] = [
   { href: "/dashboard", label: "Conversation", icon: Home, blurb: "Where you and Synapse think together" },
+  { href: "/daily", label: "Daily check-in", icon: Sun, blurb: "Tell me about today — it's how I learn your patterns" },
+  { href: "/stats", label: "Your numbers", icon: LineChart, blurb: "See the trends I'm watching, plainly" },
   { href: "/report", label: "Coaching session", icon: FileText, blurb: "The weekly sit-down — what I learned about you" },
   { href: "/playbook", label: "Playbook", icon: BookOpen, blurb: "What I've come to understand about how you work" },
   { href: "/profile", label: "Health profile", icon: HeartPulse, blurb: "The living picture of who you are" },

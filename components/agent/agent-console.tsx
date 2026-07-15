@@ -51,6 +51,8 @@ export function AgentConsole({ embedded = false, immersive = false }: { embedded
       profile.goals.length && `Goals: ${profile.goals.join(", ")}`,
       profile.primaryChallenge && `Hardest right now: ${profile.primaryChallenge}`,
       `Check-ins recorded: ${weeksTracked}`,
+      "App capability: the user CAN see their numbers visually — there is a 'Your numbers' page (path /stats) with trend charts, and the home screen shows what's currently moving. If they ask for a dashboard, charts, or to 'see' their stats, don't say you can't; point them to Your numbers and summarize the key movements in words.",
+      "The daily check-in lives at /daily; if they want to log today or you need fresher data, invite them to do a quick check-in.",
     ].filter(Boolean).join("\n");
     if (!hasData) return who;
     const lines = series.map((s) => {

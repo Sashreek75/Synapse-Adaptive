@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { SynapseOrb } from "@/components/synapse/orb";
 import { RoomsMenu } from "@/components/shell/app-nav";
+import { NotificationsBell } from "@/components/shell/notifications-bell";
 import { HealthProvider } from "@/components/providers/health-store";
 import { SubscriptionProvider } from "@/components/providers/subscription-provider";
 import { AuthGuard } from "@/components/providers/auth-gate";
@@ -30,7 +31,10 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                   <SynapseOrb size={26} />
                   <span>Synapse</span>
                 </Link>
-                <RoomsMenu />
+                <div className="flex items-center gap-1.5">
+                  <NotificationsBell />
+                  <RoomsMenu />
+                </div>
               </div>
             </header>
 

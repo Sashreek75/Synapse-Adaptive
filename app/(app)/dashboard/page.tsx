@@ -13,7 +13,7 @@
 
 import { useMemo } from "react";
 import Link from "next/link";
-import { HeartPulse } from "lucide-react";
+import { HeartPulse, Sun, ArrowRight, LineChart, CheckCircle2 } from "lucide-react";
 import { useHealth } from "@/components/providers/health-store";
 import { Button, Skeleton } from "@/components/ui/primitives";
 import { SynapseOrb } from "@/components/synapse/orb";
@@ -78,10 +78,34 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* Today's one focus (compact) + what's actually moving (only if it is) */}
+      {/* Proactive: it's a new day — lead with the core loop, the check-in */}
       <div className="sa-rise-2 space-y-4">
+        {!dailyDoneToday ? (
+          <section className="overflow-hidden rounded-3xl border bg-surface shadow-soft">
+            <div className="mesh flex flex-col gap-3 p-5 sm:flex-row sm:items-center sm:justify-between sm:p-6">
+              <div className="min-w-0">
+                <p className="inline-flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wider text-orange-600 dark:text-orange-400"><Sun className="h-3.5 w-3.5" /> A new day</p>
+                <h2 className="mt-1 text-lg font-semibold text-ink">Let&apos;s do today&apos;s check-in</h2>
+                <p className="mt-0.5 text-sm text-muted">
+                  {opener.recommendation?.title ? `A minute now, and I'll fold it into today's thinking — ${opener.recommendation.title.toLowerCase()}.` : "A minute now sharpens everything I notice for you."}
+                </p>
+              </div>
+              <Link href="/daily" className="shrink-0"><Button>Check in <ArrowRight className="h-4 w-4" /></Button></Link>
+            </div>
+          </section>
+        ) : (
+          <p className="flex items-center gap-2 px-1 text-sm text-muted"><CheckCircle2 className="h-4 w-4 shrink-0 text-emerald-500" /> You&apos;ve checked in today — I&apos;m folding it into what I know about you.</p>
+        )}
+
         <FocusOfWeek />
         <GeneratedDashboard />
+
+        {hasData && (
+          <Link href="/stats" className="group flex items-center justify-between rounded-2xl border bg-surface/60 px-4 py-3 text-sm text-muted transition hover:text-ink">
+            <span className="inline-flex items-center gap-2"><LineChart className="h-4 w-4 text-navy-500" /> See all your numbers</span>
+            <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-0.5" />
+          </Link>
+        )}
       </div>
 
       {/* The conversation — the interface itself */}

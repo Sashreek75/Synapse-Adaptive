@@ -91,7 +91,10 @@ $pat = [System.Runtime.InteropServices.Marshal]::PtrToStringAuto(
 
 $pushUrl = "https://x-access-token:$pat@github.com/Sashreek75/Synapse-Adaptive.git"
 Write-Host "Pushing branch '$branch'..." -ForegroundColor DarkGray
-git push -u $pushUrl "${branch}:${branch}"
+# No -u: never store the tokenized URL in git config. --force is safe here because
+# this is a dedicated redesign branch (never main) that this script owns; on a
+# re-run it simply mirrors your current files.
+git push --force $pushUrl "${branch}:${branch}"
 $code = $LASTEXITCODE
 $pat = $null; $pushUrl = $null   # scrub token from memory
 
