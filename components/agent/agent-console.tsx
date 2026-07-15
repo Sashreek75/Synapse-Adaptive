@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Send, Eye, BookOpen, Stethoscope, Sparkles, Target, CalendarCheck, Activity } from "lucide-react";
+import { Send, Eye, BookOpen, Stethoscope, Sparkles, Target, CalendarCheck, Activity, SquarePen } from "lucide-react";
 import { preGate, CRISIS_RESPONSE } from "@/ai/safety";
 import { useHealth } from "@/components/providers/health-store";
 import { METRIC_META } from "@/lib/metrics";
@@ -14,6 +14,7 @@ import { useSubscription } from "@/components/providers/subscription-provider";
 import { useAuth } from "@/components/providers/auth-provider";
 import { WaitlistDialog } from "@/components/billing/waitlist-dialog";
 import { SynapseOrb } from "@/components/synapse/orb";
+import { RichText } from "@/components/agent/rich-text";
 import { cn } from "@/lib/utils";
 import { env, flags } from "@/env";
 import type { ChatMessage } from "@/types";
@@ -53,6 +54,7 @@ export function AgentConsole({ embedded = false, immersive = false }: { embedded
       `Check-ins recorded: ${weeksTracked}`,
       "App capability: the user CAN see their numbers visually — there is a 'Your numbers' page (path /stats) with trend charts, and the home screen shows what's currently moving. If they ask for a dashboard, charts, or to 'see' their stats, don't say you can't; point them to Your numbers and summarize the key movements in words.",
       "The daily check-in lives at /daily; if they want to log today or you need fresher data, invite them to do a quick check-in.",
+      "Assessments (short cognitive tasks) live at /assessments — if you recommend one, tell them they can start it there.",
     ].filter(Boolean).join("\n");
     if (!hasData) return who;
     const lines = series.map((s) => {
@@ -148,12 +150,54 @@ export function AgentConsole({ embedded = false, immersive = false }: { embedded
     if (preGate(q).triggered) { setChat([...next, { id: `a_${Date.now()}`, role: "assistant", content: CRISIS_RESPONSE }]); setBusy(false); scrollDown(); return; }
     try {
       const transcript = next.slice(-7, -1).map((m) => `${m.role === "user" ? "User" : "Synapse"}: ${m.content || (m.sections?.map((s) => s.text).join(" ") ?? "")}`).join("\n");
-      const res = await fetch("/api/chat", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ message: q, tier: plan, context: transcript ? `${context}\n\nRecent conversation:\n${transcript}` : context }) });
+      // Synapse remembers everything — even conversations the user cleared from view.
+      let memoryPreamble = "";
+      try {
+        const arch = JSON.parse(localStorage.getItem("synapse.chat.archive") || "[]") as { role: string; content: string }[];
+        const priorUser = arch.filter((m) => m.role === "user").slice(-12).map((m) => `- "${m.content}"`).join("\n");
+        if (priorUser) memoryPreamble = `Things the user has discussed with you in the past (they cleared the visible chat for a fresh start, but you DO remember everything — act like it, reference it naturally when relevant):\n${priorUser}\n\n`;
+      } catch {}
+      const fullContext = `${memoryPreamble}${context}${transcript ? `\n\nRecent conversation:\n${transcript}` : ""}`;
+      const res = await fetch("/api/chat", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ message: q, tier: plan, context: fullContext }) });
       const data = await res.json();
       setChat([...next, { id: `a_${Date.now()}`, role: "assistant", content: data.content ?? "", sections: data.sections, evidenceUsed: data.evidenceUsed }]);
     } catch {
       setChat([...next, { id: `a_${Date.now()}`, role: "assistant", content: "I couldn't reach my reasoning engine just now — give it a moment and try again." }]);
     } finally { setBusy(false); scrollDown(); }
+  }
+
+  // Keep a live handle to send so the drawer's "ask Synapse" items work even
+  // when the console is already mounted.
+  const sendRef = useRef(send);
+  sendRef.current = send;
+  useEffect(() => {
+    const handle = () => {
+      let p: string | null = null;
+      try { p = sessionStorage.getItem("synapse.pendingAsk"); } catch {}
+      if (p) { try { sessionStorage.removeItem("synapse.pendingAsk"); } catch {} sendRef.current(p); }
+    };
+    handle(); // catches the case where we just navigated here with a pending ask
+    window.addEventListener("synapse:ask", handle); // catches the already-mounted case
+    return () => window.removeEventListener("synapse:ask", handle);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // "New conversation" — clear the VISIBLE transcript for a fresh start, but keep
+  // everything: durable memory (playbook, beliefs, notes, trends) is untouched,
+  // and the cleared messages are archived so Synapse can still recall them.
+  function clearChat() {
+    try {
+      const prior = chat
+        .filter((m) => m.id !== "intro")
+        .map((m) => ({ role: m.role, content: m.content || (m.sections?.map((s) => s.text).join(" ") ?? "") }))
+        .filter((m) => m.content);
+      if (prior.length) {
+        const arch = JSON.parse(localStorage.getItem("synapse.chat.archive") || "[]");
+        localStorage.setItem("synapse.chat.archive", JSON.stringify([...arch, ...prior].slice(-80)));
+      }
+    } catch {}
+    setChat([]);
+    setInput("");
   }
 
   // IMMERSIVE MODE — the conversation is the interface. No box, no chrome:
@@ -162,6 +206,14 @@ export function AgentConsole({ embedded = false, immersive = false }: { embedded
   if (immersive) {
     return (
       <div className="flex flex-col">
+        {chat.length > 0 && (
+          <div className="mb-3 flex justify-end">
+            <button onClick={clearChat} title="Start a fresh conversation — I'll still remember everything"
+              className="inline-flex items-center gap-1.5 rounded-full border bg-surface px-3 py-1.5 text-xs text-muted transition hover:-translate-y-0.5 hover:text-ink hover:shadow-soft">
+              <SquarePen className="h-3.5 w-3.5" /> New conversation
+            </button>
+          </div>
+        )}
         <div className="flex-1 space-y-5 pb-4">
           {messages.map((m) =>
             m.role === "user" ? (
@@ -172,7 +224,7 @@ export function AgentConsole({ embedded = false, immersive = false }: { embedded
               <div key={m.id} className="flex gap-3">
                 <SynapseOrb size={30} state={busy ? "thinking" : "idle"} className="mt-1 shrink-0" />
                 <div className="max-w-[85%] space-y-2.5">
-                  {m.content && <div className="text-[15px] leading-relaxed text-ink">{m.content}</div>}
+                  {m.content && <RichText text={m.content} />}
                   {m.sections?.map((s, i) => {
                     const meta = sectionMeta[s.kind]; const Icon = meta.icon;
                     return (
@@ -205,7 +257,7 @@ export function AgentConsole({ embedded = false, immersive = false }: { embedded
             </div>
           )}
           <WaitlistDialog plan="pro" open={waitlistOpen} onClose={() => setWaitlistOpen(false)} defaultEmail={email} />
-          {chat.length === 0 && (
+          {!busy && (
             <div className="mb-2.5 flex flex-wrap gap-2">
               {suggestions.map((s) => (
                 <button key={s} onClick={() => send(s)} disabled={busy}
