@@ -7,9 +7,9 @@ import { useHealth } from "@/components/providers/health-store";
 import { METRIC_META } from "@/lib/metrics";
 import { computeTrend } from "@/lib/stats";
 import { getPath, goalMetricsForPath } from "@/lib/paths";
-import { computeStreak, focusAreas } from "@/lib/intelligence";
+import { computeStreak, focusAreas, sessionOpener } from "@/lib/intelligence";
 import { computeAssociations } from "@/lib/correlations";
-import { reviewExperiment } from "@/lib/focus";
+import { reviewExperiment, currentWeekKey } from "@/lib/focus";
 import { useSubscription } from "@/components/providers/subscription-provider";
 import { useAuth } from "@/components/providers/auth-provider";
 import { WaitlistDialog } from "@/components/billing/waitlist-dialog";
@@ -22,6 +22,10 @@ import type { ChatMessage } from "@/types";
 /** Stripe wired = real checkout; otherwise upgrades open the waitlist. */
 const billingLive = flags.billingLive || !!env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY;
 
+/** Small text helpers for the proactive opener. */
+function lowerFirst(s: string): string { return s ? s.charAt(0).toLowerCase() + s.slice(1) : s; }
+function rankStrength(s: string): number { return s === "strong" ? 2 : s === "moderate" ? 1 : 0; }
+
 const sectionMeta = {
   observation: { label: "What I see", icon: Eye, tint: "text-navy-500", bar: "bg-navy-500" },
   education: { label: "Good to know", icon: BookOpen, tint: "text-orange-600", bar: "bg-orange-500" },
@@ -29,7 +33,7 @@ const sectionMeta = {
 } as const;
 
 export function AgentConsole({ embedded = false, immersive = false }: { embedded?: boolean; immersive?: boolean } = {}) {
-  const { profile, series, hasData, weeksTracked, consistency, weeklyScore, recentChanges, providerQuestions, checkIns, contextNotes, recommendationLog, mind, experiments, chat, setChat } = useHealth();
+  const { profile, series, hasData, weeksTracked, consistency, weeklyScore, recentChanges, providerQuestions, checkIns, contextNotes, recommendationLog, mind, experiments, chat, setChat, dailyDoneToday } = useHealth();
   const { plan, startUpgrade } = useSubscription();
   const { email } = useAuth();
   const [waitlistOpen, setWaitlistOpen] = useState(false);
@@ -117,20 +121,53 @@ export function AgentConsole({ embedded = false, immersive = false }: { embedded
         down ? `Why is my ${down.label.toLowerCase()} slipping?` : "What changed recently?",
         up ? `What's helping my ${up.label.toLowerCase()}?` : "What should I focus on?",
         "What patterns have you noticed?",
-        "What should I ask my provider?",
       ]
     : ["What can you do?", "How does this work?", "Why do daily check-ins help?"];
 
-  // A contextual opening — Synapse arrives already knowing where things stand.
+  // THE PROACTIVE OPENER — Synapse initiates. It doesn't wait to be asked; it
+  // arrives having already looked, and leads with the single most alive thing it
+  // can honestly say (a changed mind, a strengthening belief, a real movement, a
+  // memory, a lingering question), then offers a next step. Deterministic, so it's
+  // always grounded and never invents.
   const introContent = useMemo(() => {
-    const hi = `Hi${profile.displayName ? ` ${profile.displayName}` : ""}`;
-    if (!hasData) return `${hi} — I'm Synapse, your health intelligence companion. Complete a check-in and I'll reason over your real data. Ask me anything in the meantime.`;
-    const bits: string[] = [];
-    if (up) bits.push(`your ${up.label.toLowerCase()} has been trending the right way`);
-    if (down) bits.push(`I'm keeping a gentle eye on your ${down.label.toLowerCase()}`);
-    const state = bits.length ? ` Since we last talked, ${bits.join(", and ")}.` : " Things have been holding steady.";
-    return `${hi} — I've been reading your check-ins.${state} What would you like to unpack?`;
-  }, [hasData, profile.displayName, up, down]);
+    const name = profile.displayName ? ` ${profile.displayName}` : "";
+    if (!hasData) {
+      return `Hi${name} — I'm **Synapse**, your health companion. 👋\n\nI get more useful the more I learn about you. Do a quick check-in and I'll start reasoning over your real patterns — or ask me anything right now.`;
+    }
+
+    const op = sessionOpener(profile, series, recentChanges, contextNotes, checkIns, dailyDoneToday, weeksTracked);
+    const weekly = mind.weekly[currentWeekKey()];
+    const belief = [...mind.beliefs].sort((a, b) => rankStrength(b.strength) - rankStrength(a.strength))[0];
+    const openQ = mind.openQuestions.find((q) => q.status === "open");
+    const learning = mind.playbook[mind.playbook.length - 1];
+
+    const parts: string[] = [`Hi${name} — I've been looking over your check-ins. 👋`];
+
+    // Lead with the most "alive" thing I can honestly say right now.
+    if (weekly?.mindShift) parts.push(`🔄 **I've changed my mind about something.** ${weekly.mindShift}`);
+    else if (belief && belief.strength !== "weak") parts.push(`💡 I'm becoming more confident that ${lowerFirst(belief.statement)}`);
+    else if (up || down) {
+      const bits: string[] = [];
+      if (up) bits.push(`your ${up.label.toLowerCase()} is trending the right way ✅`);
+      if (down) bits.push(`I'm keeping a gentle eye on your ${down.label.toLowerCase()} 👀`);
+      parts.push(`Since we last talked, ${bits.join(", and ")}.`);
+    }
+    else if (learning) parts.push(`📔 Something I've picked up about you: ${lowerFirst(learning.statement)}`);
+    else parts.push(`Things are holding steady — which is its own kind of good news. 🙂`);
+
+    // A memory, so it's clear I actually remember.
+    if (op.memory) parts.push(`💭 ${op.memory}`);
+
+    // Every so often, share a question I'm genuinely still working on (curiosity).
+    if (openQ && checkIns.length % 3 === 0) parts.push(`I'm still trying to understand ${lowerFirst(openQ.question)} — something we could dig into together.`);
+
+    // A soft, optional next step so there's always somewhere to go.
+    if (op.recommendation?.title) parts.push(`**Next step:** ${op.recommendation.title.replace(/\.$/, "")} — want me to explain why it fits you right now?`);
+    else parts.push(`What would you like to unpack?`);
+
+    return parts.join("\n\n");
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [hasData, profile, series, recentChanges, contextNotes, checkIns, dailyDoneToday, weeksTracked, mind, up, down]);
 
   const messages: ChatMessage[] = chat.length ? chat : [{ id: "intro", role: "assistant", content: introContent }];
 
@@ -206,14 +243,13 @@ export function AgentConsole({ embedded = false, immersive = false }: { embedded
   if (immersive) {
     return (
       <div className="flex flex-col">
-        {chat.length > 0 && (
-          <div className="mb-3 flex justify-end">
-            <button onClick={clearChat} title="Start a fresh conversation — I'll still remember everything"
-              className="inline-flex items-center gap-1.5 rounded-full border bg-surface px-3 py-1.5 text-xs text-muted transition hover:-translate-y-0.5 hover:text-ink hover:shadow-soft">
-              <SquarePen className="h-3.5 w-3.5" /> New conversation
-            </button>
-          </div>
-        )}
+        <div className="mb-3 flex items-center justify-between">
+          <span className="text-[11px] font-semibold uppercase tracking-wider text-muted">Conversation</span>
+          <button onClick={clearChat} title="Start a fresh space — Synapse still remembers everything"
+            className="inline-flex items-center gap-1.5 rounded-full border bg-surface px-3 py-1.5 text-xs text-muted transition hover:-translate-y-0.5 hover:text-ink hover:shadow-soft">
+            <SquarePen className="h-3.5 w-3.5" /> New conversation
+          </button>
+        </div>
         <div className="flex-1 space-y-5 pb-4">
           {messages.map((m) =>
             m.role === "user" ? (

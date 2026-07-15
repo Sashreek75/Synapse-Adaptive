@@ -21,6 +21,7 @@ function renderInline(text: string, keyBase: string) {
 
 type Block =
   | { type: "p"; lines: string[] }
+  | { type: "h"; text: string }
   | { type: "ul"; items: string[] }
   | { type: "ol"; items: string[] };
 
@@ -37,9 +38,11 @@ function parse(text: string): Block[] {
   for (const raw of text.replace(/\r/g, "").split("\n")) {
     const line = raw.trimEnd();
     if (!line.trim()) { flushAll(); continue; }
+    const heading = line.match(/^#{1,3}\s+(.*)$/);
     const bullet = line.match(/^\s*[-*]\s+(.*)$/);
     const ordered = line.match(/^\s*\d+\.\s+(.*)$/);
-    if (bullet) { flushPara(); flushOl(); ul.push(bullet[1]); }
+    if (heading) { flushAll(); blocks.push({ type: "h", text: heading[1] }); }
+    else if (bullet) { flushPara(); flushOl(); ul.push(bullet[1]); }
     else if (ordered) { flushPara(); flushUl(); ol.push(ordered[1]); }
     else { flushUl(); flushOl(); para.push(line); }
   }
@@ -52,6 +55,9 @@ export function RichText({ text, className }: { text: string; className?: string
   return (
     <div className={cn("space-y-3 text-[15px] leading-relaxed text-ink", className)}>
       {blocks.map((b, bi) => {
+        if (b.type === "h") return (
+          <p key={bi} className="pt-1 text-[15px] font-semibold text-ink">{renderInline(b.text, `${bi}`)}</p>
+        );
         if (b.type === "ul") return (
           <ul key={bi} className="space-y-1.5">
             {b.items.map((it, i) => (
