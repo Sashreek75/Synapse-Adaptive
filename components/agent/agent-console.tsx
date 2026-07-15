@@ -247,12 +247,13 @@ export function AgentConsole({ embedded = false, immersive = false }: { embedded
           {messages.map((m) =>
             m.role === "user" ? (
               <div key={m.id} className="flex justify-end">
-                <div className="max-w-[85%] rounded-3xl rounded-br-lg bg-navy-900 px-4 py-2.5 text-white shadow-soft">{m.content}</div>
+                <div className="max-w-[88%] rounded-3xl rounded-br-lg bg-navy-900 px-4 py-2.5 text-white shadow-soft sm:max-w-[85%]">{m.content}</div>
               </div>
             ) : (
-              <div key={m.id} className="flex gap-3">
-                <SynapseOrb size={30} state={busy ? "thinking" : "idle"} className="mt-1 shrink-0" />
-                <div className="max-w-[85%] space-y-2.5">
+              <div key={m.id} className="flex gap-2.5 sm:gap-3">
+                <SynapseOrb size={28} state={busy ? "thinking" : "idle"} className="mt-1 shrink-0 sm:hidden" />
+                <SynapseOrb size={30} state={busy ? "thinking" : "idle"} className="mt-1 hidden shrink-0 sm:block" />
+                <div className="min-w-0 flex-1 space-y-2.5">
                   {m.content && <RichText text={m.content} />}
                   {m.sections?.map((s, i) => {
                     const meta = sectionMeta[s.kind]; const Icon = meta.icon;
@@ -278,7 +279,7 @@ export function AgentConsole({ embedded = false, immersive = false }: { embedded
         </div>
 
         {/* Composer — pinned within reach, messages scroll beneath it */}
-        <div className="sticky bottom-0 -mx-5 bg-gradient-to-t from-surface-2 via-surface-2 to-transparent px-5 pb-4 pt-6">
+        <div className="sticky bottom-0 -mx-4 bg-gradient-to-t from-surface-2 via-surface-2 to-transparent px-4 pb-[calc(0.75rem+env(safe-area-inset-bottom))] pt-5 sm:-mx-5 sm:px-5 sm:pb-4 sm:pt-6">
           {free && usedToday >= FREE_CAP - 2 && (
             <div className="mb-2.5 flex items-center justify-between gap-3 rounded-xl border border-orange-200 bg-orange-50 px-3 py-2 text-xs text-orange-800 dark:border-orange-500/20 dark:bg-orange-500/10 dark:text-orange-300">
               <span>Free plan · {Math.max(0, FREE_CAP - usedToday)} messages left today</span>
@@ -303,7 +304,7 @@ export function AgentConsole({ embedded = false, immersive = false }: { embedded
           <div className="flex gap-2 rounded-2xl border bg-surface p-2 shadow-lift">
             <input value={input} onChange={(e) => setInput(e.target.value)} onKeyDown={(e) => e.key === "Enter" && send(input)}
               placeholder="Tell Synapse what's on your mind…"
-              className="flex-1 bg-transparent px-3 py-2 text-ink placeholder:text-muted focus:outline-none" />
+              className="min-w-0 flex-1 bg-transparent px-3 py-2.5 text-base text-ink placeholder:text-muted focus:outline-none" />
             <button onClick={() => send(input)} disabled={busy || !input.trim()} aria-label="Send"
               className="sa-shine grid h-11 w-11 shrink-0 place-items-center rounded-xl bg-gradient-to-br from-orange-500 to-orange-600 text-white transition hover:from-orange-600 hover:to-orange-700 disabled:opacity-50">
               <Send className="h-5 w-5" />

@@ -69,12 +69,13 @@ export default function HomePage() {
   return (
     <div className="flex min-h-[calc(100dvh-9rem)] flex-col">
       {/* Greeting + the one thing worth knowing */}
-      <section className="sa-rise flex flex-col items-center gap-4 pb-6 pt-2 text-center sm:pt-4">
-        <SynapseOrb size={78} />
+      <section className="sa-rise flex flex-col items-center gap-3 pb-5 pt-1 text-center sm:gap-4 sm:pb-6 sm:pt-4">
+        <SynapseOrb size={64} className="sm:hidden" />
+        <SynapseOrb size={78} className="hidden sm:block" />
         <div>
           <p className="text-sm text-muted">{copy.greeting(name)}</p>
-          <h1 className="mt-1 text-2xl font-semibold leading-tight tracking-tight text-ink sm:text-3xl">{opener.lead}</h1>
-          {oneInsight && <p className="mx-auto mt-2 max-w-xl leading-relaxed text-muted">{oneInsight.text}</p>}
+          <h1 className="mt-1 text-[21px] font-semibold leading-tight tracking-tight text-ink sm:text-3xl">{opener.lead}</h1>
+          {oneInsight && <p className="mx-auto mt-2 max-w-xl text-[15px] leading-relaxed text-muted">{oneInsight.text}</p>}
         </div>
       </section>
 

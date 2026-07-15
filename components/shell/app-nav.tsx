@@ -101,7 +101,7 @@ export function RoomsMenu() {
               "fixed inset-y-0 right-0 z-[70] flex h-[100dvh] w-[min(21rem,90vw)] flex-col border-l bg-surface shadow-lift transition-transform duration-300 ease-[cubic-bezier(.16,1,.3,1)]",
               open ? "translate-x-0" : "translate-x-full",
             )}>
-            <div className="flex shrink-0 items-center justify-between px-5 pt-5">
+            <div className="flex shrink-0 items-center justify-between px-5 pt-[calc(1.25rem+env(safe-area-inset-top))]">
           <div className="flex items-center gap-3">
             <SynapseOrb size={34} />
             <div>
@@ -125,7 +125,7 @@ export function RoomsMenu() {
           {manage.map((r) => <RoomLink key={r.href} room={r} active={isActive(pathname, r.href)} />)}
         </nav>
 
-        <div className="shrink-0 border-t px-5 py-4">
+        <div className="shrink-0 border-t px-5 pb-[calc(1rem+env(safe-area-inset-bottom))] pt-4">
           <div className="flex items-center justify-between">
             <div className="min-w-0 text-xs text-muted">
               {email ? <>Signed in as<br /><span className="truncate font-medium text-ink">{email}</span></> : "Using Synapse on this device"}

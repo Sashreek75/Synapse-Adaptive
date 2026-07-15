@@ -25,21 +25,21 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
           <AnimatedBackground />
           <OnboardingGate />
           <div className="flex h-[100dvh] flex-col">
-            <header className="sticky top-0 z-40 shrink-0 border-b glass">
-              <div className="mx-auto flex h-16 max-w-3xl items-center justify-between px-5">
+            <header className="sticky top-0 z-40 shrink-0 border-b glass pt-[env(safe-area-inset-top)]">
+              <div className="mx-auto flex h-14 max-w-3xl items-center justify-between px-4 sm:h-16 sm:px-5">
                 <Link href="/dashboard" className="flex items-center gap-2.5 font-semibold text-ink">
                   <SynapseOrb size={26} />
                   <span>Synapse</span>
                 </Link>
-                <div className="flex items-center gap-1.5">
+                <div className="flex items-center gap-1">
                   <NotificationsBell />
                   <RoomsMenu />
                 </div>
               </div>
             </header>
 
-            <main className="min-h-0 flex-1 overflow-y-auto">
-              <div className="mx-auto w-full max-w-3xl px-5 py-7 sm:py-9">
+            <main className="min-h-0 flex-1 overflow-y-auto overscroll-none">
+              <div className="mx-auto w-full max-w-3xl px-4 py-5 sm:px-5 sm:py-9">
                 {children}
               </div>
             </main>

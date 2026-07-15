@@ -170,7 +170,7 @@ function Kpi({ icon: Icon, label, value, suffix, tone }: { icon: typeof Gauge; l
         <div className={cn("inline-flex h-8 w-8 items-center justify-center rounded-lg", tone === "orange" ? "bg-orange-100 text-orange-600 dark:bg-orange-500/15 dark:text-orange-300" : "bg-navy-100 text-navy-600 dark:bg-navy-500/15 dark:text-navy-300")}>
           <Icon className="h-4 w-4" />
         </div>
-        <p className="mt-2.5 text-2xl font-semibold tracking-tight text-ink">{value}<span className="ml-1 text-xs font-normal text-muted">{suffix}</span></p>
+        <p className="mt-2.5 text-xl font-semibold tracking-tight text-ink sm:text-2xl">{value}<span className="ml-1 text-xs font-normal text-muted">{suffix}</span></p>
         <p className="text-[12px] text-muted">{label}</p>
       </CardBody>
     </Card>
