@@ -1,150 +1,82 @@
 "use client";
 
 /**
- * ORB-LED FEATURE TOUR
- * --------------------
- * Synapse itself walks new users through the product: the orb sits above a
- * speech bubble and narrates every stop in first person. Shows once, on the
- * first visit after onboarding (onboardedAt set, has data, tour not done),
- * and can be replayed from Settings via resetTour(). Skippable at any time.
+ * FIRST-RUN GUIDE — a short, friendly walkthrough of how to get around the new
+ * Synapse. It runs once, right after onboarding, so a first-time user never has
+ * to guess where things are. Deliberately not anchored to specific DOM nodes
+ * (which move as the UI evolves) — it's a calm, self-contained set of cards.
+ * Replayable from Settings via resetTour().
  */
 
-import { useEffect, useRef, useState } from "react";
-import {
-  Sparkles, Home, Activity, FileText, HeartPulse,
-  ArrowRight, ArrowLeft, MapPin, BookOpen,
-} from "lucide-react";
-import { Button } from "@/components/ui/primitives";
-import { SynapseOrb } from "@/components/synapse/orb";
+import { useState } from "react";
+import { ArrowRight, Menu, Sun, LineChart, Eraser, MessageCircle } from "lucide-react";
 import { useHealth } from "@/components/providers/health-store";
+import { SynapseOrb } from "@/components/synapse/orb";
+import { Button } from "@/components/ui/primitives";
 import { cn } from "@/lib/utils";
 
-interface TourStep {
-  icon: typeof Sparkles;
-  title: string;
-  body: string;       // Synapse's own words, first person
-  where?: string;     // where to find it later
-}
-
-const STEPS: TourStep[] = [
+const steps = [
   {
-    icon: Sparkles,
-    title: "This is me",
-    body: "Hi — I'm Synapse. This glowing thing? That's me. I read your check-ins, learn a little more about you every week, and turn it into something you can actually use. Let me show you around — one minute, and you can skip anytime.",
+    icon: MessageCircle,
+    title: "This is a conversation",
+    body: "Synapse is the product — not a dashboard. Just talk to it like a coach who knows you. It reasons over your own history and always ends with one clear next step.",
   },
   {
-    icon: Home,
-    title: "Home is a conversation",
-    body: "Every day I bring you one focus, one thing worth knowing, and our current experiment — then we just talk. Say \"my knee hurts today\" or \"why am I so tired?\" and I'll reason over your own history, not people in general. Everything ends with one concrete next step, never a list of ten.",
-    where: "Sidebar → Home",
+    icon: Menu,
+    title: "The menu is how you ask",
+    body: "Tap the menu (top-right). Most items — your health profile, playbook, weekly session, an assessment — drop a question straight into the chat and Synapse answers right away.",
   },
   {
-    icon: FileText,
-    title: "Our weekly coaching session",
-    body: "On Sundays we sit down together: how I saw your week, your biggest win, what concerns me, what I learned about you, whether I changed my mind — and the ONE thing to focus on next week, framed as a small experiment we run together.",
-    where: "Sidebar → Coaching session",
+    icon: Sun,
+    title: "Check in to get smarter",
+    body: "A 20-second daily check-in is how Synapse learns your patterns. The more you check in, the more personal — and more useful — it becomes each week.",
   },
   {
-    icon: BookOpen,
-    title: "Your Playbook grows with us",
-    body: "As we run experiments and I watch your patterns, I build your Playbook — durable things I've learned about how YOU work, like \"you perform better after 7.5-8 hours of sleep\" — plus the questions I'm still working on. It gets more valuable every month, and it's yours.",
-    where: "Sidebar → Playbook",
+    icon: LineChart,
+    title: "Your numbers, when you want them",
+    body: "Open “Your numbers” from the menu for the visual dashboard. But the coaching is the point — the charts are just there when you want to look.",
   },
   {
-    icon: HeartPulse,
-    title: "Watch me learn you",
-    body: "Your health profile is my living summary of you — your goal, your biggest challenge, the patterns I've found, and what's still open. It reads like notes from someone who knows you, and it evolves as we talk.",
-    where: "Sidebar → Health profile",
-  },
-  {
-    icon: Activity,
-    title: "Assessments, only with a reason",
-    body: "I'll never ask you to take a test just because it's Tuesday. When a short task would genuinely answer a question about you — like whether today's fog fits your pattern — I'll suggest one and tell you why.",
-    where: "Sidebar → Assessments",
+    icon: Eraser,
+    title: "Start fresh anytime",
+    body: "Hit “Clear chat” for a clean space whenever you like. Synapse still remembers everything that matters — clearing is just for you.",
   },
 ];
 
 export function FeatureTour() {
-  const { profile, hydrated, hasData, tourDone, completeTour } = useHealth();
+  const { hydrated, profile, tourDone, completeTour } = useHealth();
   const [i, setI] = useState(0);
-  const [thinking, setThinking] = useState(false);
-  const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // Fresh start whenever the tour is (re)opened — e.g. "Replay tour" in Settings.
-  useEffect(() => { if (!tourDone) setI(0); }, [tourDone]);
-  useEffect(() => () => { if (timer.current) clearTimeout(timer.current); }, []);
+  // Only after onboarding, and only once.
+  if (!hydrated || !profile.onboardedAt || tourDone) return null;
 
-  if (!hydrated || !profile.onboardedAt || !hasData || tourDone) return null;
-
-  const step = STEPS[i];
+  const step = steps[i];
   const Icon = step.icon;
-  const last = i === STEPS.length - 1;
-
-  function go(next: number) {
-    setI(next);
-    // Brief "thinking" pulse while Synapse moves to the next thought.
-    if (typeof window !== "undefined" && window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
-    setThinking(true);
-    if (timer.current) clearTimeout(timer.current);
-    timer.current = setTimeout(() => setThinking(false), 650);
-  }
+  const last = i === steps.length - 1;
 
   return (
-    <div
-      className="fixed inset-0 z-50 grid place-items-center overflow-y-auto bg-navy-950/60 p-4 backdrop-blur-sm"
-      role="dialog"
-      aria-modal="true"
-      aria-label="Synapse tour"
-    >
-      <div className="sa-rise w-full max-w-md">
-        {/* Synapse itself gives the tour. */}
-        <div className="mb-3 flex items-end justify-between px-1">
-          <SynapseOrb size={72} state={thinking ? "thinking" : "idle"} />
-          <button
-            onClick={completeTour}
-            className="rounded-full px-3 py-1.5 text-xs font-medium text-white/75 transition-colors hover:bg-white/10 hover:text-white"
-          >
-            Skip tour
-          </button>
+    <div className="fixed inset-0 z-[80] flex items-end justify-center bg-navy-950/50 p-4 backdrop-blur-sm sm:items-center">
+      <div className="w-full max-w-md overflow-hidden rounded-3xl border bg-surface shadow-lift">
+        <div className="mesh flex flex-col items-center gap-3 px-6 pt-8 text-center">
+          <SynapseOrb size={64} />
+          <span className="grid h-11 w-11 place-items-center rounded-2xl bg-orange-100 text-orange-600 dark:bg-orange-500/15 dark:text-orange-300">
+            <Icon className="h-5 w-5" />
+          </span>
+          <h2 className="text-xl font-semibold tracking-tight text-ink">{step.title}</h2>
+          <p className="max-w-sm leading-relaxed text-muted">{step.body}</p>
         </div>
 
-        {/* Speech bubble */}
-        <div className="relative">
-          <span aria-hidden className="absolute -top-1.5 left-8 z-10 h-4 w-4 rotate-45 border-l border-t bg-surface" />
-          <div className="overflow-hidden rounded-3xl border bg-surface shadow-lift">
-            <div className="mesh px-6 pb-5 pt-6">
-              <div className="mb-2 inline-flex items-center gap-2 rounded-full bg-surface/70 px-2.5 py-1 text-[11px] font-semibold text-muted">
-                <Icon className="h-3.5 w-3.5 text-orange-500" /> Synapse · {i + 1} of {STEPS.length}
-              </div>
-              <h2 className="text-xl font-semibold tracking-tight text-ink">{step.title}</h2>
-              <p className="mt-2 leading-relaxed text-muted">{step.body}</p>
-              {step.where && (
-                <p className="mt-3 inline-flex items-center gap-1.5 rounded-xl bg-surface/70 px-3 py-2 text-sm text-ink">
-                  <MapPin className="h-3.5 w-3.5 shrink-0 text-orange-500" />
-                  <span><span className="font-medium">Find it later: </span>{step.where}</span>
-                </p>
-              )}
-            </div>
-
-            <div className="flex items-center justify-between gap-3 border-t px-6 py-4">
-              <div className="flex gap-1.5" aria-label={`Step ${i + 1} of ${STEPS.length}`}>
-                {STEPS.map((_, idx) => (
-                  <span key={idx} className={cn("h-1.5 rounded-full transition-all", idx === i ? "w-5 bg-orange-500" : "w-1.5 bg-line")} />
-                ))}
-              </div>
-              <div className="flex items-center gap-2">
-                {i > 0 && (
-                  <Button variant="ghost" size="sm" onClick={() => go(i - 1)}>
-                    <ArrowLeft className="h-4 w-4" /> Back
-                  </Button>
-                )}
-                {last ? (
-                  <Button size="sm" onClick={completeTour}>Let&apos;s go <ArrowRight className="h-4 w-4" /></Button>
-                ) : (
-                  <Button size="sm" onClick={() => go(i + 1)}>Next <ArrowRight className="h-4 w-4" /></Button>
-                )}
-              </div>
-            </div>
+        <div className="flex items-center justify-between gap-3 px-6 pb-[calc(1.5rem+env(safe-area-inset-bottom))] pt-6">
+          <div className="flex gap-1.5">
+            {steps.map((_, idx) => (
+              <span key={idx} className={cn("h-1.5 rounded-full transition-all", idx === i ? "w-5 bg-orange-500" : "w-1.5 bg-line")} />
+            ))}
+          </div>
+          <div className="flex items-center gap-2">
+            {!last && <button onClick={completeTour} className="rounded-full px-3 py-2 text-sm text-muted hover:text-ink">Skip</button>}
+            <Button size="sm" onClick={() => (last ? completeTour() : setI((n) => n + 1))}>
+              {last ? "Start talking" : "Next"} <ArrowRight className="h-4 w-4" />
+            </Button>
           </div>
         </div>
       </div>

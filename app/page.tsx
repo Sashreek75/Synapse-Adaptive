@@ -1,6 +1,5 @@
 import Link from "next/link";
 import {
-  Activity,
   ArrowRight,
   Brain,
   CalendarCheck,
@@ -88,18 +87,18 @@ function Hero() {
               <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-orange-400 opacity-60" />
               <span className="relative inline-flex h-2 w-2 rounded-full bg-orange-500" />
             </span>
-            Clarity between healthcare appointments
+            An AI health companion that learns you
           </div>
 
           <h1 className="animate-fade-up mt-6 text-balance text-5xl font-bold leading-[1.05] tracking-tight text-ink sm:text-6xl xl:text-7xl">
-            Understand your health.
-            <span className="block sa-gradient-text">Not just track it.</span>
+            A health companion
+            <span className="block sa-gradient-text">that actually knows you.</span>
           </h1>
 
           <p className="animate-fade-up mx-auto mt-6 max-w-xl text-lg leading-relaxed text-muted lg:mx-0">
-            Between appointments, you&apos;re on your own with the numbers. Synapse learns
-            your baseline, notices what changed, and explains what it might mean — calmly,
-            with its reasoning shown.
+            Talk to Synapse like a coach who remembers everything. It learns how you
+            work over time, notices what changed, and helps you decide what to do next —
+            one clear step at a time, with its reasoning shown.
           </p>
 
           <div className="animate-fade-up mt-9 flex flex-col items-center justify-center gap-3 sm:flex-row lg:justify-start">
@@ -112,8 +111,8 @@ function Hero() {
           </div>
 
           <div className="animate-fade-up mt-8 flex flex-wrap items-center justify-center gap-x-6 gap-y-2 text-sm text-muted lg:justify-start">
-            <span className="inline-flex items-center gap-1.5"><Timer className="h-4 w-4 text-navy-400" /> 5 minutes a week</span>
-            <span className="inline-flex items-center gap-1.5"><ShieldCheck className="h-4 w-4 text-navy-400" /> Shows its evidence</span>
+            <span className="inline-flex items-center gap-1.5"><Timer className="h-4 w-4 text-navy-400" /> Smarter every week</span>
+            <span className="inline-flex items-center gap-1.5"><ShieldCheck className="h-4 w-4 text-navy-400" /> Remembers you</span>
             <span className="inline-flex items-center gap-1.5"><Lock className="h-4 w-4 text-navy-400" /> Private by design</span>
           </div>
 
@@ -144,10 +143,10 @@ function Hero() {
           <div className="absolute -left-4 bottom-16 w-60 sa-float-slow">
             <div className="rounded-2xl border bg-surface/85 p-4 text-left shadow-lift glass">
               <div className="flex items-center justify-between">
-                <span className="text-[11px] font-semibold uppercase tracking-wider text-muted">Weekly report</span>
-                <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-semibold text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-300">Ready</span>
+                <span className="text-[11px] font-semibold uppercase tracking-wider text-muted">Today&apos;s focus</span>
+                <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-semibold text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-300">1 step</span>
               </div>
-              <p className="mt-2 text-sm text-ink">Two positive trends, one thing to watch, one question for your provider.</p>
+              <p className="mt-2 text-sm text-ink">Protect tonight&apos;s sleep — on your data, it&apos;s what lifts your focus tomorrow.</p>
               <div className="mt-3 flex items-center gap-1.5">
                 {[62, 78, 70, 84, 88, 92].map((v, i) => (
                   <span key={i} className="w-6 rounded-full bg-navy-200 dark:bg-navy-700" style={{ height: `${Math.max(8, v / 6)}px` }} />
@@ -201,17 +200,17 @@ function Solution() {
       <div className="relative mx-auto max-w-6xl px-5 py-20 sm:py-28">
         <Reveal>
           <Eyebrow className="text-orange-300">The shift</Eyebrow>
-          <H2 className="text-white">From a dashboard of numbers to an intelligence that explains.</H2>
+          <H2 className="text-white">From a chatbot that forgets to a companion that remembers.</H2>
           <p className="mt-4 max-w-2xl text-lg text-navy-100/80">
-            We don&apos;t hand you another chart to interpret. We give you a clear read of
-            your own health — what moved, the most likely reason, and a calm next step —
-            with the reasoning shown and uncertainty stated honestly.
+            A generic AI answers your question and forgets you the moment you close it.
+            Synapse builds an evolving understanding of one person — you — so every answer
+            fits your life, and every week it knows you a little better.
           </p>
           <div className="mt-12 grid gap-5 md:grid-cols-3">
             {[
-              { icon: Compass, t: "Understanding, not numbers", d: "Every screen leads with what it means for you." },
-              { icon: ShieldCheck, t: "Shows its work", d: "Observation, reasoning, focus, and an honest confidence level." },
-              { icon: HeartPulse, t: "Calm by design", d: "Built to reduce uncertainty, never to create anxiety." },
+              { icon: Brain, t: "Remembers you", d: "Your goals, habits, and what's worked before — you never have to explain yourself twice." },
+              { icon: Compass, t: "Helps you decide", d: "Every answer ends with one clear next step, personalized to you — and the reason for it." },
+              { icon: HeartPulse, t: "Honest & calm", d: "Shows its reasoning, states its confidence, and routes you to a provider when it should." },
             ].map(({ icon: Icon, t, d }) => (
               <div key={t} className="rounded-2xl border border-white/10 bg-white/5 p-7 backdrop-blur transition-colors hover:bg-white/[0.08]">
                 <span className="grid h-11 w-11 place-items-center rounded-xl bg-orange-500/15">
@@ -230,14 +229,14 @@ function Solution() {
 
 function HowItWorks() {
   const steps = [
-    { icon: CalendarCheck, t: "Short adaptive assessments", d: "Synapse composes a few quick, game-like assessments from your goals and history — usually under five minutes — then tells you what they mean." },
-    { icon: Brain, t: "Synapse notices what matters", d: "It compares this week to your history, finds the meaningful changes, and — this is the magic — tells you before you ask." },
-    { icon: MessageCircleQuestion, t: "You walk in prepared", d: "A calm report plus a ready list of questions for your provider, so your next appointment counts." },
+    { icon: MessageCircleQuestion, t: "Just talk to it", d: "Tell Synapse what's going on, or do a 20-second check-in. It reasons over your own history — no forms, no fixed surveys." },
+    { icon: Brain, t: "It learns how you work", d: "Every conversation and check-in updates its understanding, building a private playbook of what genuinely helps you." },
+    { icon: CalendarCheck, t: "You get one clear next step", d: "Not ten. A specific, personalized action with the reason behind it — plus what's worth raising with your provider." },
   ];
   return (
     <Section id="how">
       <Eyebrow>How it works</Eyebrow>
-      <H2>Assess. Notice. Understand.</H2>
+      <H2>Talk. Learn. Decide.</H2>
       <div className="relative mt-12 grid gap-6 md:grid-cols-3">
         <div className="absolute left-[16%] right-[16%] top-11 hidden border-t border-dashed border-line md:block" />
         {steps.map(({ icon: Icon, t, d }, i) => (
@@ -265,15 +264,15 @@ function AgentSpotlight() {
           <Eyebrow>The heart of the product</Eyebrow>
           <H2>Synapse notices things — before you ask.</H2>
           <p className="mt-4 text-lg leading-relaxed text-muted">
-            Synapse reasons like a health analyst who knows you, not a
-            chatbot. It watches for meaningful patterns across weeks and brings the
-            important ones to you, calmly and in plain language.
+            Synapse reasons like a coach who knows you, not a chatbot. It remembers what
+            you&apos;ve told it, watches for meaningful patterns across weeks, and opens the
+            conversation when something matters — calmly, in plain language.
           </p>
           <ul className="mt-7 space-y-3.5 text-ink">
             {[
-              "Reads longitudinal trends, not single readings",
-              "Separates observation, education, and what to ask your provider",
-              "States its confidence — and lowers it honestly when data is thin",
+              "Remembers your goals, habits, and what's worked before",
+              "Tailors every recommendation to your life — not a generic health-site tip",
+              "Ends with one clear next step, and states its confidence honestly",
             ].map((x) => (
               <li key={x} className="flex gap-3">
                 <span className="mt-1 grid h-5 w-5 shrink-0 place-items-center rounded-full bg-orange-100 dark:bg-orange-500/15">
@@ -317,12 +316,12 @@ function AgentSpotlight() {
 
 function Features() {
   const f = [
-    { icon: Activity, t: "Adaptive assessments", d: "Synapse picks short, relevant tasks each week — never a fixed, tiring battery." },
-    { icon: Sparkles, t: "Proactive notices", d: "Important patterns surface on their own, rate-limited so it never nags." },
-    { icon: LineChart, t: "Health timeline", d: "A narrative of milestones, with charts as supporting evidence." },
-    { icon: MessageCircleQuestion, t: "Ask anything", d: "“Why did my attention dip?” — answered from your own data, honestly." },
-    { icon: CalendarCheck, t: "Provider prep", d: "A ready one-pager and question list for your next appointment." },
-    { icon: ShieldCheck, t: "Privacy first", d: "Your data is isolated per-user, never sold, and yours to export or delete." },
+    { icon: Sparkles, t: "Conversation-first", d: "The whole app is a conversation with Synapse. Ask anything — it answers from your own history." },
+    { icon: Brain, t: "A memory that compounds", d: "Your Personal Playbook grows every week: what helps you, what sets you back, what you've tried." },
+    { icon: HeartPulse, t: "Advice that fits your life", d: "Two people with the same numbers get different guidance — yours accounts for your goals, work, and schedule." },
+    { icon: MessageCircleQuestion, t: "Proactive, never spammy", d: "It opens the conversation when it notices something that matters — and stays quiet when nothing does." },
+    { icon: LineChart, t: "Your numbers, on demand", d: "A clean dashboard whenever you want to see the trends — but the coaching is the point, not the charts." },
+    { icon: ShieldCheck, t: "Private, synced, yours", d: "Follows you across devices in your account, never sold, and yours to export or delete." },
   ];
   return (
     <Section id="features">
@@ -372,7 +371,7 @@ function Testimonials() {
 
 function Roadmap() {
   const r = [
-    { phase: "Now", t: "The weekly loop", d: "Adaptive assessments, proactive notices, weekly reports, and chat." },
+    { phase: "Now", t: "The companion", d: "Conversation-first coaching, a memory that compounds, proactive insights, and your numbers on demand." },
     { phase: "Next", t: "Deeper context", d: "Optional wearable & sleep imports to enrich the picture." },
     { phase: "Later", t: "Care collaboration", d: "Shareable provider summaries and, eventually, clinician tools." },
   ];
@@ -395,10 +394,11 @@ function Roadmap() {
 
 function FAQ() {
   const faqs = [
-    { q: "Is this a medical device or a replacement for my care team?", a: "No. Synapse Adaptive is a general wellness and education tool. It never diagnoses, prescribes, or replaces your healthcare provider — it helps you understand your own data and prepare for your appointments." },
-    { q: "How does it handle uncertainty?", a: "Honestly. Synapse states a confidence level on every insight and lowers it when data is thin or noisy. We'd rather say 'worth keeping an eye on' than overclaim." },
-    { q: "What data do I need?", a: "Just a few minutes a week for short assessments. Insights get sharper the more consistently you check in." },
-    { q: "Who can see my data?", a: "Only you. Data is isolated per user, never sold, and you can export or delete it at any time." },
+    { q: "How is this different from ChatGPT or Apple Health's AI?", a: "A general AI answers your question and forgets you. Apple Health shows you numbers. Synapse continuously learns how you specifically live — your goals, habits, and what's worked before — then gives personalized, evidence-informed guidance that gets sharper every week. It remembers; they don't." },
+    { q: "Is this a medical device or a replacement for my care team?", a: "No. Synapse Adaptive is a general wellness and education tool. It never diagnoses, prescribes, or replaces your healthcare provider — it helps you understand your own patterns and decide what to do between appointments." },
+    { q: "How does it handle uncertainty?", a: "Honestly. Synapse states a confidence level, admits when it's unsure, and would rather say 'worth keeping an eye on' than overclaim. When something's beyond it, it points you to your provider." },
+    { q: "What do I actually do in the app?", a: "Mostly just talk to it — like texting a coach. A quick daily check-in (about 20 seconds) sharpens what it knows. The more you use it, the better it understands you." },
+    { q: "Who can see my data, and does it follow me across devices?", a: "Only you. Your data syncs privately to your account so it follows you between phone and computer, is never sold, and you can export or delete it anytime." },
   ];
   return (
     <Section id="faq" className="bg-surface">
@@ -428,14 +428,14 @@ function CTA() {
         <div className="relative">
           <div className="mx-auto mb-7 w-fit"><SynapseOrb size={72} /></div>
           <h2 className="mx-auto max-w-2xl text-balance text-3xl font-semibold tracking-tight sm:text-4xl">
-            Make the weeks between appointments count.
+            Meet a health companion that learns you.
           </h2>
           <p className="mx-auto mt-4 max-w-xl text-navy-100/80">
-            Meet the health companion built to explain, not just track — and the longer
-            you use it, the better it understands you.
+            Not another tracker — a companion that remembers, personalizes, and helps you
+            decide what to do next. The longer you use it, the better it knows you.
           </p>
           <Link href="/login" className="mt-9 inline-block">
-            <Button size="lg" className="sa-shine">Open the demo <ArrowRight className="h-4 w-4" /></Button>
+            <Button size="lg" className="sa-shine">Meet Synapse <ArrowRight className="h-4 w-4" /></Button>
           </Link>
         </div>
       </div>
@@ -454,7 +454,7 @@ function Footer() {
               Synapse Adaptive
             </div>
             <p className="mt-3 max-w-sm text-sm leading-relaxed text-muted">
-              AI health intelligence between healthcare appointments.
+              An AI health companion that learns you and helps you decide what to do next.
             </p>
           </div>
           <div className="text-sm text-muted">
@@ -480,16 +480,16 @@ function Footer() {
 
 function AppleHealth() {
   const rows = [
-    ["When you open it", "A wall of numbers and charts", "A plain-language read of how you're doing"],
-    ["A change in your data", "“Here's the graph.”", "“Here's what moved, and the most likely reason.”"],
-    ["Its core job", "Store and display metrics", "Interpret metrics into understanding"],
-    ["What you leave with", "More data", "A focus for the week and a question for your provider"],
+    ["When you open it", "A wall of numbers and charts", "A companion that greets you and knows where things stand"],
+    ["A change in your data", "“Here's the graph.”", "“Here's what moved, the likely reason, and what I'd do.”"],
+    ["Does it know you?", "No — every user sees the same app", "Yes — it learns how you specifically work over time"],
+    ["What you leave with", "More data", "One clear next step, personalized to your life"],
   ];
   return (
     <Section>
       <Eyebrow>The difference</Eyebrow>
-      <H2>Apple Health tells you what happened. Synapse tells you what it means.</H2>
-      <p className="mt-3 max-w-2xl text-lg text-muted">Trackers are repositories. Synapse Adaptive is a reasoning layer on top of your health.</p>
+      <H2>Apple Health tells you what happened. Synapse helps you decide what to do next.</H2>
+      <p className="mt-3 max-w-2xl text-lg text-muted">Trackers are repositories. Synapse Adaptive is a companion that learns you and reasons on your behalf.</p>
       <div className="mt-12 overflow-hidden rounded-2xl border bg-surface shadow-soft">
         <div className="grid grid-cols-3 border-b bg-surface-2 text-sm font-semibold text-ink">
           <div className="p-4" />

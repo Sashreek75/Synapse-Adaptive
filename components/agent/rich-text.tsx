@@ -53,10 +53,10 @@ function parse(text: string): Block[] {
 export function RichText({ text, className }: { text: string; className?: string }) {
   const blocks = parse(text);
   return (
-    <div className={cn("space-y-3 text-[15px] leading-relaxed text-ink", className)}>
+    <div className={cn("space-y-3.5 text-[15px] leading-7 text-ink", className)}>
       {blocks.map((b, bi) => {
         if (b.type === "h") return (
-          <p key={bi} className="pt-1 text-[15px] font-semibold text-ink">{renderInline(b.text, `${bi}`)}</p>
+          <p key={bi} className="pt-1.5 text-[15px] font-semibold text-ink first:pt-0">{renderInline(b.text, `${bi}`)}</p>
         );
         if (b.type === "ul") return (
           <ul key={bi} className="space-y-1.5">

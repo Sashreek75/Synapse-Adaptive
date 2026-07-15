@@ -7,6 +7,7 @@ import { SubscriptionProvider } from "@/components/providers/subscription-provid
 import { AuthGuard } from "@/components/providers/auth-gate";
 import { AnimatedBackground } from "@/components/ui/animated-background";
 import { OnboardingGate } from "@/components/providers/onboarding-gate";
+import { FeatureTour } from "@/components/tour/feature-tour";
 
 /**
  * THE FRAME — deliberately almost nothing.
@@ -24,6 +25,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
         <AuthGuard>
           <AnimatedBackground />
           <OnboardingGate />
+          <FeatureTour />
           <div className="flex h-[100dvh] flex-col">
             <header className="sticky top-0 z-40 shrink-0 border-b glass pt-[env(safe-area-inset-top)]">
               <div className="mx-auto flex h-14 max-w-3xl items-center justify-between px-4 sm:h-16 sm:px-5">
