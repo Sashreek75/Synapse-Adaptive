@@ -12,6 +12,7 @@
  */
 
 import { useEffect, useState } from "react";
+import { createPortal } from "react-dom";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { Home, HeartPulse, Activity, CreditCard, Settings, FileText, BookOpen, Menu, X, LogOut, LogIn, Sun, LineChart, Target, Sparkles, MessageCircle } from "lucide-react";
@@ -55,10 +56,15 @@ const manage: Room[] = [
 
 export function RoomsMenu() {
   const [open, setOpen] = useState(false);
+  const [mounted, setMounted] = useState(false);
   const pathname = usePathname();
   const router = useRouter();
   const { email, signOut, configured } = useAuth();
 
+  // The drawer must portal to <body>: the header uses backdrop-filter (glass),
+  // which turns it into the containing block for position:fixed children — that
+  // was clamping the drawer to the header's height and overlapping the footer.
+  useEffect(() => { setMounted(true); }, []);
   useEffect(() => { setOpen(false); }, [pathname]);
   useEffect(() => {
     if (!open) return;
@@ -84,16 +90,18 @@ export function RoomsMenu() {
         <Menu className="h-5 w-5" />
       </button>
 
-      <div onClick={() => setOpen(false)}
-        className={cn("fixed inset-0 z-50 bg-navy-950/30 backdrop-blur-sm transition-opacity duration-300", open ? "opacity-100" : "pointer-events-none opacity-0")}
-        aria-hidden />
+      {mounted && createPortal((
+        <>
+          <div onClick={() => setOpen(false)}
+            className={cn("fixed inset-0 z-[60] bg-navy-950/40 backdrop-blur-sm transition-opacity duration-300", open ? "opacity-100" : "pointer-events-none opacity-0")}
+            aria-hidden />
 
-      <aside role="dialog" aria-modal="true"
-        className={cn(
-          "fixed right-0 top-0 z-50 flex h-full w-[min(21rem,90vw)] flex-col border-l bg-surface shadow-lift transition-transform duration-300 ease-[cubic-bezier(.16,1,.3,1)]",
-          open ? "translate-x-0" : "translate-x-full",
-        )}>
-        <div className="flex items-center justify-between px-5 pt-5">
+          <aside role="dialog" aria-modal="true"
+            className={cn(
+              "fixed inset-y-0 right-0 z-[70] flex h-[100dvh] w-[min(21rem,90vw)] flex-col border-l bg-surface shadow-lift transition-transform duration-300 ease-[cubic-bezier(.16,1,.3,1)]",
+              open ? "translate-x-0" : "translate-x-full",
+            )}>
+            <div className="flex shrink-0 items-center justify-between px-5 pt-5">
           <div className="flex items-center gap-3">
             <SynapseOrb size={34} />
             <div>
@@ -106,7 +114,7 @@ export function RoomsMenu() {
           </button>
         </div>
 
-        <nav className="mt-5 flex-1 space-y-1 overflow-y-auto px-3 pb-4">
+        <nav className="mt-5 min-h-0 flex-1 space-y-1 overflow-y-auto px-3 pb-4">
           <p className="flex items-center gap-1.5 px-3 pb-1 pt-2 text-[11px] font-semibold uppercase tracking-wider text-muted/70"><Sparkles className="h-3 w-3 text-orange-500" /> Ask Synapse</p>
           {asks.map((a) => <AskButton key={a.label} ask={a} onClick={() => askSynapse(a.prompt)} />)}
 
@@ -117,7 +125,7 @@ export function RoomsMenu() {
           {manage.map((r) => <RoomLink key={r.href} room={r} active={isActive(pathname, r.href)} />)}
         </nav>
 
-        <div className="border-t px-5 py-4">
+        <div className="shrink-0 border-t px-5 py-4">
           <div className="flex items-center justify-between">
             <div className="min-w-0 text-xs text-muted">
               {email ? <>Signed in as<br /><span className="truncate font-medium text-ink">{email}</span></> : "Using Synapse on this device"}
@@ -137,8 +145,10 @@ export function RoomsMenu() {
             )}
           </div>
           <p className="mt-3 text-[11px] leading-relaxed text-muted">{copy.disclaimer}</p>
-        </div>
-      </aside>
+            </div>
+          </aside>
+        </>
+      ), document.body)}
     </>
   );
 }

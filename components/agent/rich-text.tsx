@@ -1,4 +1,5 @@
 import { Fragment } from "react";
+import { Search } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 /**
@@ -71,6 +72,20 @@ export function RichText({ text, className }: { text: string; className?: string
             ))}
           </ol>
         );
+        // Investigation mode gets a distinct callout — Synapse is genuinely curious.
+        const plain = b.lines.join(" ").replace(/\*/g, "").trim();
+        if (/^let['’]?s investigate/i.test(plain)) {
+          return (
+            <div key={bi} className="flex gap-2.5 rounded-2xl border border-orange-200 bg-orange-50/70 p-3 dark:border-orange-500/25 dark:bg-orange-500/10">
+              <Search className="mt-0.5 h-4 w-4 shrink-0 text-orange-500" />
+              <p className="min-w-0">
+                {b.lines.map((l, i) => (
+                  <Fragment key={i}>{i > 0 && <br />}{renderInline(l, `${bi}-${i}`)}</Fragment>
+                ))}
+              </p>
+            </div>
+          );
+        }
         return (
           <p key={bi}>
             {b.lines.map((l, i) => (
