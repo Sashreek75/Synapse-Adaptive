@@ -24,13 +24,10 @@ function fallback(message: string, hasData: boolean): { content?: string; sectio
   if (!hasData) {
     return { content: "I'd love to dig in, but I don't have any check-ins from you yet — so I'd just be guessing, and I'd rather be honest than do that. Complete your first check-in and I'll start reasoning over your real data. In the meantime, is there anything about how Synapse works you'd like to know?" };
   }
-  return {
-    sections: [
-      { kind: "observation", text: "I can see your check-ins, and I'm building a picture of your trends." },
-      { kind: "education", text: "I reason best over several weeks — the more consistently you check in, the clearer the patterns I can explain." },
-      { kind: "ask_provider", text: "Ask me things like “what changed this week?” or “what should I focus on?” and I'll work from your own history." },
-    ],
-  };
+  // The model didn't return a usable answer (usually a transient error or daily
+  // free-tier quota). Be HONEST rather than showing canned coaching that ignores
+  // the question — that erodes trust far more than a brief, truthful hiccup.
+  return { content: "I couldn't fully think that through just now — I don't want to give you a half-answer, so give me a moment and ask again. (If it keeps happening, my daily AI limit may have been reached and it resets automatically.)" };
 }
 
 type Tier = "free" | "pro" | "max";

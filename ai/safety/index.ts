@@ -36,13 +36,22 @@ const CRISIS_PATTERNS: RegExp[] = [
   /\b(overdose|took too many|too many pills)\b/i,
 ];
 
-/** Output patterns that would cross from education into medical advice. */
+/**
+ * Output patterns that would cross from education into medical advice.
+ * IMPORTANT: these must be PRECISE. Broad patterns like "you have" or "you should
+ * start" wrongly flag ordinary, useful coaching ("you have been sleeping better",
+ * "you should start winding down earlier") — and a flagged answer is discarded
+ * entirely, which makes Synapse look like it ignored the question. So each pattern
+ * targets genuinely out-of-lane content: dosing, medication changes, prescribing,
+ * naming a diagnosis, or false certainty.
+ */
 const PROHIBITED_OUTPUT_PATTERNS: RegExp[] = [
-  /\byou (have|are developing|likely have)\b/i,
-  /\byou should (take|stop|start|increase|decrease|adjust)\b/i,
-  /\b(diagnos|prescrib)\w*/i,
-  /\b(\d+\s?mg|milligrams|dosage|dose of)\b/i,
-  /\b(this is|it'?s) (definitely|certainly|clearly) (a|an|your)\b/i,
+  /\b\d+\s?mg\b/i,                                   // explicit dosing, e.g. "50 mg"
+  /\bdose of \d/i,
+  /\b(increase|decrease|double|halve|adjust|change|stop|start|skip)\s+(your |the |taking )?(medication|meds|dose|dosage|prescription|pills?)\b/i,
+  /\bprescrib(e|ing)\b/i,                            // acting as a prescriber
+  /\byou (?:have|'ve got|are developing|likely have|probably have)\s+(?:a |an )?(?:depression|anxiety disorder|adhd|bipolar|ptsd|a concussion|concussion|diabetes|cancer|a tumou?r|tumou?rs?|a disorder|disorder|a disease|disease|an illness|illness|a condition|condition)\b/i,
+  /\b(this is|it'?s) (definitely|certainly|clearly) (a |an )?(depression|anxiety|adhd|concussion|diagnosis|disorder|disease|condition)\b/i,
 ];
 
 export interface CrisisResult {

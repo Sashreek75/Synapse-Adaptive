@@ -145,9 +145,18 @@ export async function generateProactiveNotices(serieses: MetricSeries[], goals: 
 export async function answerChat(message: string, context: string, tier: PlanId = "pro"): Promise<{ text: string; source: "model" | "fallback" }> {
   // Thinking is off, so the whole budget is the visible reply. Max gets room to
   // reason at length; free stays concise; pro sits in between.
-  const maxTokens = tier === "free" ? 900 : tier === "max" ? 2400 : 1500;
-  const raw = await callModel({ system: CHAT_PROMPT.system, user: `Context about the user:\n${context}\n\nUser question: ${message}`, maxTokens });
+  const maxTokens = tier === "free" ? 1100 : tier === "max" ? 2600 : 1800;
+  // Put the user's message FIRST and LAST so the (large) context can't bury it.
+  // The model's #1 job is to answer THIS message.
+  const user = `The person just sent you this message — answer it directly and specifically:\n"""\n${message}\n"""\n\nEVERYTHING YOU KNOW ABOUT THEM (context for grounding — do not just summarize it; use it to answer the message above):\n${context}\n\nNow reply to their message: "${message}"`;
+  const raw = await callModel({ system: CHAT_PROMPT.system, user, maxTokens });
   if (raw && postGate(raw).ok) return { text: raw, source: "model" };
+  // One clean retry: a flagged/empty first attempt is often recoverable, and we'd
+  // rather retry than fall back to a generic answer that ignores the question.
+  if (!raw) {
+    const retry = await callModel({ system: CHAT_PROMPT.system, user, maxTokens, temperature: 0.5 });
+    if (retry && postGate(retry).ok) return { text: retry, source: "model" };
+  }
   return { text: "", source: "fallback" };
 }
 
