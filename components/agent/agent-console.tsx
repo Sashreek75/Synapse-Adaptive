@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Send, Eye, BookOpen, Stethoscope, Sparkles, Target, CalendarCheck, Activity, SquarePen } from "lucide-react";
+import { Send, Eye, BookOpen, Stethoscope, Sparkles, Target, CalendarCheck, Activity, Eraser } from "lucide-react";
 import { preGate, CRISIS_RESPONSE } from "@/ai/safety";
 import { useHealth } from "@/components/providers/health-store";
 import { METRIC_META } from "@/lib/metrics";
@@ -243,13 +243,6 @@ export function AgentConsole({ embedded = false, immersive = false }: { embedded
   if (immersive) {
     return (
       <div className="flex flex-col">
-        <div className="mb-3 flex items-center justify-between">
-          <span className="text-[11px] font-semibold uppercase tracking-wider text-muted">Conversation</span>
-          <button onClick={clearChat} title="Start a fresh space — Synapse still remembers everything"
-            className="inline-flex items-center gap-1.5 rounded-full border bg-surface px-3 py-1.5 text-xs text-muted transition hover:-translate-y-0.5 hover:text-ink hover:shadow-soft">
-            <SquarePen className="h-3.5 w-3.5" /> New conversation
-          </button>
-        </div>
         <div className="flex-1 space-y-5 pb-4">
           {messages.map((m) =>
             m.role === "user" ? (
@@ -293,14 +286,20 @@ export function AgentConsole({ embedded = false, immersive = false }: { embedded
             </div>
           )}
           <WaitlistDialog plan="pro" open={waitlistOpen} onClose={() => setWaitlistOpen(false)} defaultEmail={email} />
-          {!busy && (
-            <div className="mb-2.5 flex flex-wrap gap-2">
-              {suggestions.map((s) => (
+          <div className="mb-2.5 flex items-center justify-between gap-2">
+            <div className="flex flex-1 flex-wrap gap-2">
+              {!busy && suggestions.map((s) => (
                 <button key={s} onClick={() => send(s)} disabled={busy}
                   className="rounded-full border bg-surface px-3 py-1.5 text-sm text-muted transition-all hover:-translate-y-0.5 hover:text-ink hover:shadow-soft disabled:opacity-50">{s}</button>
               ))}
             </div>
-          )}
+            {chat.length > 0 && (
+              <button onClick={clearChat} title="Clear this space for a fresh start — Synapse still remembers everything"
+                className="inline-flex shrink-0 items-center gap-1.5 rounded-full border bg-surface px-3 py-1.5 text-xs font-medium text-muted transition hover:-translate-y-0.5 hover:text-ink hover:shadow-soft">
+                <Eraser className="h-3.5 w-3.5" /> Clear chat
+              </button>
+            )}
+          </div>
           <div className="flex gap-2 rounded-2xl border bg-surface p-2 shadow-lift">
             <input value={input} onChange={(e) => setInput(e.target.value)} onKeyDown={(e) => e.key === "Enter" && send(input)}
               placeholder="Tell Synapse what's on your mind…"

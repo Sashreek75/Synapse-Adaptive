@@ -24,24 +24,36 @@ export interface CloudState {
   updatedAt: string;
 }
 
+/** Point at the setup file when the cause is a missing/blocked table. */
+function warnSync(where: string, msg?: string) {
+  const hint = /relation .* does not exist|could not find the table|schema cache/i.test(msg || "")
+    ? " → the 'synapse_state' table is missing. Run supabase/schema.sql in your Supabase SQL Editor to enable cross-device sync."
+    : "";
+  console.warn(`[synapse-sync] ${where} failed: ${msg || "unknown error"}${hint}`);
+}
+
 export async function loadCloud(sb: SupabaseClient, userId: string): Promise<CloudState | null> {
   try {
     const { data, error } = await sb.from(TABLE).select("data, updated_at").eq("user_id", userId).maybeSingle();
-    if (error || !data) return null;
+    if (error) { warnSync("load", error.message); return null; }
+    if (!data) return null;
     const row = data as { data?: Record<string, unknown>; updated_at?: string };
     return { data: row.data ?? {}, updatedAt: row.updated_at ?? "" };
-  } catch {
+  } catch (e) {
+    warnSync("load", e instanceof Error ? e.message : String(e));
     return null;
   }
 }
 
 export async function saveCloud(sb: SupabaseClient, userId: string, data: Record<string, unknown>): Promise<void> {
   try {
-    await sb.from(TABLE).upsert(
+    const { error } = await sb.from(TABLE).upsert(
       { user_id: userId, data, updated_at: new Date().toISOString() },
       { onConflict: "user_id" },
     );
-  } catch {
-    /* offline / table missing — localStorage remains the source of truth */
+    if (error) warnSync("save", error.message);
+  } catch (e) {
+    // offline / table missing — localStorage remains the source of truth
+    warnSync("save", e instanceof Error ? e.message : String(e));
   }
 }
