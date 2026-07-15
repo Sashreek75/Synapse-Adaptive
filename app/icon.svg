@@ -1,0 +1,37 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64" role="img" aria-label="Synapse Adaptive">
+  <defs>
+    <!-- deep navy sphere base -->
+    <radialGradient id="s-base" cx="50%" cy="50%" r="62%">
+      <stop offset="0%" stop-color="#0b1f3a"/>
+      <stop offset="100%" stop-color="#061224"/>
+    </radialGradient>
+    <!-- orange luminous glow biased to lower-right, fading through blue to navy edge -->
+    <radialGradient id="s-glow" cx="68%" cy="72%" r="78%">
+      <stop offset="0%" stop-color="#f97316"/>
+      <stop offset="26%" stop-color="#e8823c"/>
+      <stop offset="58%" stop-color="#5a7fa6"/>
+      <stop offset="82%" stop-color="#16406e"/>
+      <stop offset="100%" stop-color="#0b1f3a"/>
+    </radialGradient>
+    <!-- top-left specular highlight -->
+    <radialGradient id="s-hi" cx="34%" cy="30%" r="40%">
+      <stop offset="0%" stop-color="#ffffff" stop-opacity="0.92"/>
+      <stop offset="60%" stop-color="#ffffff" stop-opacity="0"/>
+    </radialGradient>
+    <!-- soft ambient bloom behind the orb -->
+    <radialGradient id="s-bloom" cx="50%" cy="50%" r="50%">
+      <stop offset="55%" stop-color="#5a7fa6" stop-opacity="0.28"/>
+      <stop offset="78%" stop-color="#f97316" stop-opacity="0.12"/>
+      <stop offset="100%" stop-color="#f97316" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+
+  <!-- bloom halo -->
+  <circle cx="32" cy="32" r="31" fill="url(#s-bloom)"/>
+  <!-- orb body -->
+  <circle cx="32" cy="32" r="27" fill="url(#s-base)"/>
+  <circle cx="32" cy="32" r="27" fill="url(#s-glow)"/>
+  <circle cx="32" cy="32" r="27" fill="url(#s-hi)"/>
+  <!-- subtle inner rim for depth -->
+  <circle cx="32" cy="32" r="27" fill="none" stroke="#f97316" stroke-opacity="0.28" stroke-width="0.75"/>
+</svg>

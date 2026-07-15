@@ -1,0 +1,120 @@
+"use client";
+
+/**
+ * THE HOMEPAGE — not a dashboard; the beginning of a conversation.
+ * Structure (founding doc): Greeting → Today's Focus → one meaningful insight
+ * → current experiment (inside the focus) → Conversation. Everything else
+ * lives deeper.
+ */
+
+import { useEffect, useState } from "react";
+import Link from "next/link";
+import { HeartPulse, MessageCircle, Sparkles } from "lucide-react";
+import { useHealth } from "@/components/providers/health-store";
+import { useSubscription } from "@/components/providers/subscription-provider";
+import { Button, Skeleton, SectionLabel } from "@/components/ui/primitives";
+import { SynapseOrb } from "@/components/synapse/orb";
+import { FocusOfWeek } from "@/components/dashboard/focus-of-week";
+import { InsightCard } from "@/components/dashboard/insight-card";
+import { ProactiveNoticeCard } from "@/components/dashboard/proactive-notice";
+import { AgentConsole } from "@/components/agent/agent-console";
+import { copy } from "@/lib/copy";
+import type { ProactiveNotice, HealthReport } from "@/types";
+
+/** Week key = the date of the Sunday that ends the current week (matches /report). */
+function currentWeekKey(): string {
+  const s = new Date();
+  s.setDate(s.getDate() + ((7 - s.getDay()) % 7));
+  const p = (n: number) => String(n).padStart(2, "0");
+  return `${s.getFullYear()}-${p(s.getMonth() + 1)}-${p(s.getDate())}`;
+}
+
+export default function HomePage() {
+  const { hydrated, profile, series, hasData, weeksTracked, checkIns } = useHealth();
+  const { plan } = useSubscription();
+  const [report, setReport] = useState<HealthReport | null>(null);
+  const [notices, setNotices] = useState<ProactiveNotice[]>([]);
+
+  // The ONE meaningful insight needs this week's read; cached like /report.
+  const sig = `${checkIns.length}:${checkIns[checkIns.length - 1]?.id ?? ""}`;
+  useEffect(() => {
+    if (!hasData) { setReport(null); setNotices([]); return; }
+    const CACHE = "synapse.report.v2";
+    const wk = currentWeekKey();
+    try {
+      const cached = JSON.parse(localStorage.getItem(CACHE) || "null");
+      if (cached && cached.report && ((cached.publishedAt && cached.weekKey === wk) || cached.sig === sig)) {
+        setReport(cached.report); setNotices(cached.notices ?? []); return;
+      }
+    } catch {}
+    let active = true;
+    fetch("/api/report", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ profile: { ...profile, weeksTracked }, series, tier: plan }) })
+      .then((r) => r.json())
+      .then((d) => {
+        if (!active) return;
+        setReport(d.report); setNotices(d.notices ?? []);
+        try {
+          const prev = JSON.parse(localStorage.getItem(CACHE) || "null");
+          if (!(prev?.publishedAt && prev.weekKey === wk)) {
+            localStorage.setItem(CACHE, JSON.stringify({ sig, report: d.report, notices: d.notices ?? [] }));
+          }
+        } catch {}
+      })
+      .catch(() => {});
+    return () => { active = false; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sig, hasData]);
+
+  if (!hydrated) return <div className="space-y-4"><Skeleton className="h-10 w-64" /><Skeleton className="h-28 w-full rounded-2xl" /><Skeleton className="h-64 w-full rounded-2xl" /></div>;
+
+  const name = profile.displayName || "there";
+
+  // Cold start: Synapse introduces itself and earns the first conversation.
+  if (!hasData && !profile.onboardedAt) {
+    return (
+      <div className="space-y-6">
+        <section className="sa-rise overflow-hidden rounded-3xl border bg-surface shadow-lift">
+          <div className="mesh">
+            <div className="flex flex-col items-center gap-5 px-6 py-12 text-center">
+              <SynapseOrb size={108} />
+              <div>
+                <p className="text-sm text-muted">{copy.greeting(name)}</p>
+                <h1 className="mt-1 text-2xl font-semibold tracking-tight text-ink sm:text-3xl">I&apos;m Synapse. Let&apos;s start understanding you.</h1>
+                <p className="mx-auto mt-2 max-w-md text-muted">
+                  Tell me your name and what you&apos;re focused on — that&apos;s it. Everything else I&apos;ll learn as we talk.
+                </p>
+              </div>
+              <Link href="/onboarding"><Button size="lg">Say hello <HeartPulse className="h-4 w-4" /></Button></Link>
+            </div>
+          </div>
+        </section>
+      </div>
+    );
+  }
+
+  // ONE meaningful insight — a proactive notice wins; otherwise the report's best.
+  const insight = notices[0] ?? report?.insights?.[0] ?? null;
+
+  return (
+    <div className="space-y-8">
+      {/* Greeting + Today's Focus + current experiment — the whole point */}
+      <FocusOfWeek />
+
+      {/* One meaningful insight. One. */}
+      {insight && (
+        <section className="sa-rise-2 space-y-3">
+          <SectionLabel className="mb-0 flex items-center gap-1.5"><Sparkles className="h-3.5 w-3.5 text-orange-500" /> One thing worth knowing</SectionLabel>
+          {notices[0]
+            ? <ProactiveNoticeCard notice={notices[0]} />
+            : <InsightCard insight={insight} />}
+        </section>
+      )}
+
+      {/* The conversation — the interface itself */}
+      <section id="conversation" className="sa-rise-3 space-y-3 scroll-mt-24">
+        <SectionLabel className="mb-0 flex items-center gap-1.5"><MessageCircle className="h-3.5 w-3.5 text-orange-500" /> Talk it through</SectionLabel>
+        <AgentConsole embedded />
+      </section>
+    </div>
+  );
+}
