@@ -38,11 +38,33 @@ function pearson(xs: number[], ys: number[]): number {
   return den === 0 ? 0 : num / den;
 }
 
+/** Standard normal CDF (Abramowitz & Stegun 7.1.26). */
+function normCdf(x: number): number {
+  const t = 1 / (1 + 0.2316419 * Math.abs(x));
+  const d = 0.3989422804014327 * Math.exp((-x * x) / 2);
+  const pp = d * t * (0.319381530 + t * (-0.356563782 + t * (1.781477937 + t * (-1.821255978 + t * 1.330274429))));
+  return x >= 0 ? 1 - pp : pp;
+}
+
+/** Two-sided p-value for a Pearson r via a t-approximation (df = n - 2). This is
+ * how we stop calling coincidences "discoveries": a relationship must be unlikely
+ * to have arisen by chance BEFORE it is allowed to surface. */
+function pValue(r: number, n: number): number {
+  if (n < 4) return 1;
+  const df = n - 2;
+  const rr = Math.min(0.999999, Math.abs(r));
+  const t = rr * Math.sqrt(df / Math.max(1e-9, 1 - rr * rr));
+  const z = (t * (1 - 1 / (4 * df))) / Math.sqrt(1 + (t * t) / (2 * df));
+  return Math.max(0, Math.min(1, 2 * (1 - normCdf(z))));
+}
+
 export interface Association {
   kind: "lag" | "contrast" | "same_day" | "event";
   metrics: MetricKey[];
   r?: number;
   n: number;
+  /** Two-sided p-value (after multiple-comparison control) — how likely this is noise. */
+  p?: number;
   strength: number; // 0..1 salience for ranking
   confidence: Confidence;
   /** Compact machine description handed to the model. */
@@ -74,9 +96,9 @@ function buildMatrix(serieses: MetricSeries[]): DayMatrix {
   return m;
 }
 
-function corrConfidence(n: number, absR: number): Confidence {
-  if (n < 5) return "low";
-  if (n >= 8 && absR >= 0.7) return "high";
+function corrConfidence(n: number, absR: number, p: number): Confidence {
+  if (p > 0.05 || n < 8) return "low";       // not significant, or too little data
+  if (p < 0.01 && n >= 12 && absR >= 0.6) return "high";
   return "moderate";
 }
 
@@ -96,65 +118,97 @@ function relate(a: MetricKey, b: MetricKey, r: number, lead = "tend to move toge
 
 const clamp01 = (x: number) => Math.max(0, Math.min(1, x));
 
+interface CorrCandidate {
+  kind: "same_day" | "lag";
+  lead: MetricKey; follow: MetricKey; // for same_day, order is cosmetic
+  r: number; n: number; p: number;
+}
+
+/** Minimum sample sizes: we require enough paired days before a correlation is
+ * even a candidate. Small samples are where spurious "discoveries" come from. */
+const MIN_SAMEDAY_N = 8;
+const MIN_LAG_N = 8;
+const R_FLOOR = 0.45;          // practical-relevance floor on effect size
+const BH_Q = 0.10;             // Benjamini-Hochberg false-discovery rate
+
 /**
- * Same-day and next-day correlations across all metric pairs.
+ * Same-day and next-day correlations across all metric pairs, with statistical
+ * discipline. We scan every pair (that's dozens of tests), so we compute a
+ * p-value for each candidate and apply a Benjamini-Hochberg correction: only the
+ * relationships that survive multiple-comparison control are allowed to surface.
+ * This is the core defense against "eye-opening" noise.
  */
 function correlationAssociations(matrix: DayMatrix, goals: Set<MetricKey>): Association[] {
   const days = [...matrix.keys()].sort();
   const metrics = new Set<MetricKey>();
   for (const row of matrix.values()) for (const k of Object.keys(row) as MetricKey[]) metrics.add(k);
   const list = [...metrics];
-  const out: Association[] = [];
+  const cands: CorrCandidate[] = [];
 
   for (let i = 0; i < list.length; i++) {
     for (let j = i + 1; j < list.length; j++) {
       const A = list[i], B = list[j];
-
-      // --- same-day ---
+      // same-day
       const xs: number[] = [], ys: number[] = [];
       for (const d of days) {
         const row = matrix.get(d)!;
         if (row[A] != null && row[B] != null) { xs.push(row[A]!); ys.push(row[B]!); }
       }
-      if (xs.length >= 5) {
+      if (xs.length >= MIN_SAMEDAY_N) {
         const r = pearson(xs, ys);
-        if (Math.abs(r) >= 0.5) {
-          const rel = goals.has(A) || goals.has(B) ? 0.2 : 0;
-          out.push({
-            kind: "same_day", metrics: [A, B], r, n: xs.length,
-            strength: clamp01(Math.abs(r) * 0.8 + rel),
-            confidence: corrConfidence(xs.length, Math.abs(r)),
-            evidence: `same-day correlation ${metricLabel(A)}~${metricLabel(B)}: r=${r.toFixed(2)}, n=${xs.length}.`,
-            plain: relate(A, B, r),
-          });
-        }
+        cands.push({ kind: "same_day", lead: A, follow: B, r, n: xs.length, p: pValue(r, xs.length) });
       }
-
-      // --- next-day lag, both directions (A today -> B tomorrow, B today -> A tomorrow) ---
+      // next-day lag, both directions
       for (const [lead, follow] of [[A, B], [B, A]] as [MetricKey, MetricKey][]) {
         const lx: number[] = [], ly: number[] = [];
         for (let k = 0; k < days.length - 1; k++) {
           const d0 = days[k], d1 = days[k + 1];
-          // require truly consecutive calendar days for a "next-day" claim
           if ((Date.parse(d1) - Date.parse(d0)) !== 864e5) continue;
           const r0 = matrix.get(d0)!, r1 = matrix.get(d1)!;
           if (r0[lead] != null && r1[follow] != null) { lx.push(r0[lead]!); ly.push(r1[follow]!); }
         }
-        if (lx.length >= 5) {
+        if (lx.length >= MIN_LAG_N) {
           const r = pearson(lx, ly);
-          if (Math.abs(r) >= 0.5) {
-            const rel = goals.has(follow) ? 0.25 : goals.has(lead) ? 0.15 : 0;
-            const dir = r > 0 ? "higher" : "lower";
-            out.push({
-              kind: "lag", metrics: [lead, follow], r, n: lx.length,
-              strength: clamp01(Math.abs(r) * 0.9 + rel + 0.1), // lag effects are the most useful
-              confidence: corrConfidence(lx.length, Math.abs(r)),
-              evidence: `next-day lag ${metricLabel(lead)}(d)->${metricLabel(follow)}(d+1): r=${r.toFixed(2)}, n=${lx.length}.`,
-              plain: `When your ${metricLabel(lead).toLowerCase()} is higher one day, your ${metricLabel(follow).toLowerCase()} the next day tends to be ${dir} — it looks like ${metricLabel(lead).toLowerCase()} runs a day ahead of your ${metricLabel(follow).toLowerCase()}.`,
-            });
-          }
+          cands.push({ kind: "lag", lead, follow, r, n: lx.length, p: pValue(r, lx.length) });
         }
       }
+    }
+  }
+
+  // Benjamini-Hochberg: sort by p ascending; the largest rank k with p(k) <= (k/m)*q
+  // sets the cutoff. Everything at or below that p-value is a "real" discovery.
+  const m = cands.length;
+  const bySig = [...cands].sort((a, b) => a.p - b.p);
+  let cutoff = 0;
+  for (let k = 0; k < m; k++) {
+    if (bySig[k].p <= ((k + 1) / m) * BH_Q) cutoff = bySig[k].p;
+  }
+
+  const out: Association[] = [];
+  for (const c of cands) {
+    if (c.p > cutoff || Math.abs(c.r) < R_FLOOR) continue; // failed FDR control or too weak to matter
+    const conf = corrConfidence(c.n, Math.abs(c.r), c.p);
+    if (c.kind === "same_day") {
+      const A = c.lead, B = c.follow;
+      const rel = goals.has(A) || goals.has(B) ? 0.2 : 0;
+      out.push({
+        kind: "same_day", metrics: [A, B], r: c.r, n: c.n, p: c.p,
+        strength: clamp01(Math.abs(c.r) * 0.8 + rel),
+        confidence: conf,
+        evidence: `same-day correlation ${metricLabel(A)}~${metricLabel(B)}: r=${c.r.toFixed(2)}, n=${c.n}, p=${c.p.toFixed(3)} (FDR-controlled).`,
+        plain: relate(A, B, c.r),
+      });
+    } else {
+      const lead = c.lead, follow = c.follow;
+      const rel = goals.has(follow) ? 0.25 : goals.has(lead) ? 0.15 : 0;
+      const dir = c.r > 0 ? "higher" : "lower";
+      out.push({
+        kind: "lag", metrics: [lead, follow], r: c.r, n: c.n, p: c.p,
+        strength: clamp01(Math.abs(c.r) * 0.9 + rel + 0.1),
+        confidence: conf,
+        evidence: `next-day lag ${metricLabel(lead)}(d)->${metricLabel(follow)}(d+1): r=${c.r.toFixed(2)}, n=${c.n}, p=${c.p.toFixed(3)} (FDR-controlled).`,
+        plain: `When your ${metricLabel(lead).toLowerCase()} is higher one day, your ${metricLabel(follow).toLowerCase()} the next day tends to be ${dir} — it looks like ${metricLabel(lead).toLowerCase()} runs a day ahead of your ${metricLabel(follow).toLowerCase()}.`,
+      });
     }
   }
   return out;
@@ -178,7 +232,7 @@ function contrastAssociations(matrix: DayMatrix, goals: Set<MetricKey>): Associa
     if (seenAnchor.has(anchor) || !metrics.has(anchor)) continue;
     seenAnchor.add(anchor);
     const withAnchor = days.filter((d) => matrix.get(d)![anchor] != null);
-    if (withAnchor.length < 6) continue;
+    if (withAnchor.length < 10) continue;
     const sorted = [...withAnchor].sort((a, b) => matrix.get(a)![anchor]! - matrix.get(b)![anchor]!);
     const k = Math.max(2, Math.floor(sorted.length / 3));
     const low = sorted.slice(0, k), high = sorted.slice(-k);
@@ -192,7 +246,7 @@ function contrastAssociations(matrix: DayMatrix, goals: Set<MetricKey>): Associa
       const diff = mean(hv) - mean(lv);
       if (!best || Math.abs(diff) > Math.abs(best.diff)) best = { metric: m, diff };
     }
-    if (best && Math.abs(best.diff) >= 8) {
+    if (best && Math.abs(best.diff) >= 10) {
       const anchorHigherIsBetter = METRIC_META[anchor].direction === "higher_is_better";
       const goodWord = anchorHigherIsBetter ? "best" : "toughest"; // high anchor value
       const dir = best.diff > 0 ? "higher" : "lower";
@@ -214,7 +268,7 @@ function contrastAssociations(matrix: DayMatrix, goals: Set<MetricKey>): Associa
  */
 export function computeAssociations(serieses: MetricSeries[], goals: MetricKey[] = [], limit = 4): Association[] {
   const matrix = buildMatrix(serieses);
-  if (matrix.size < 5) return []; // not enough days to say anything honest
+  if (matrix.size < 8) return []; // not enough days to say anything honest
   const goalSet = new Set(goals);
   const all = [
     ...correlationAssociations(matrix, goalSet),

@@ -30,6 +30,8 @@ export const reportSchema = z.object({
   insights: z.array(insightSchema),
   /** 2-3 concrete, behavioral priorities for next week. */
   nextWeek: z.array(z.string()).optional(),
+  /** The single most eye-opening pattern this week — the thing to lead with. */
+  mostSurprising: z.string().optional(),
 });
 
 export const proactiveNoticeSchema = insightSchema.extend({
@@ -67,6 +69,57 @@ export const dailyPlanSchema = z.object({
 });
 
 /**
+ * ADAPTIVE DAILY CHECK-IN (v2) — Synapse composes the WHOLE check-in fresh each
+ * day. Items are a discriminated union so the format itself can change: sliders,
+ * multiple-choice, open notes, or a quick reaction mini-game. Any item may map to
+ * a metric (so trends keep updating); items without a metric are remembered as
+ * context notes. Code owns the metric set + the "capture enough data" rule; the
+ * model owns what to ask and how, driven by the person's playbook and history.
+ */
+export const DAILY_METRICS = ["sleep_quality", "fatigue", "stress", "mood", "symptoms", "reaction_time"] as const;
+export const dailyMetricEnum = z.enum(DAILY_METRICS);
+
+const scaleItemSchema = z.object({
+  type: z.literal("scale"),
+  metric: dailyMetricEnum,
+  question: z.string().min(1),
+  lowLabel: z.string().min(1),   // corresponds to slider value 0
+  highLabel: z.string().min(1),  // corresponds to slider value 100
+  invert: z.boolean().optional(), // true => store (100 - value) for this metric
+});
+const choiceOptionSchema = z.object({
+  label: z.string().min(1),
+  metric: dailyMetricEnum.optional(),
+  value: z.number().min(0).max(100).optional(), // metric value if this option is picked
+});
+const choiceItemSchema = z.object({
+  type: z.literal("choice"),
+  question: z.string().min(1),
+  options: z.array(choiceOptionSchema).min(2).max(6),
+});
+const noteItemSchema = z.object({
+  type: z.literal("note"),
+  question: z.string().min(1),
+  chips: z.array(z.string().min(1)).max(6).optional(),
+});
+const reactionItemSchema = z.object({
+  type: z.literal("reaction"),
+  question: z.string().min(1), // why we're doing a quick reaction game today
+});
+
+export const dailyItemSchema = z.discriminatedUnion("type", [
+  scaleItemSchema, choiceItemSchema, noteItemSchema, reactionItemSchema,
+]);
+
+export const dailyCheckinSchema = z.object({
+  greeting: z.string().min(1),
+  items: z.array(dailyItemSchema).min(3).max(6),
+  closing: z.string().optional(),
+});
+export type DailyItemOutput = z.infer<typeof dailyItemSchema>;
+export type DailyCheckinOutput = z.infer<typeof dailyCheckinSchema>;
+
+/**
  * CLINICAL REASONING output — Synapse thinks before it speaks. The model weighs
  * multiple hypotheses, commits to the strongest, chooses ONE priority, and shows
  * its working. Code owns the metric set + confidence ceilings; the model owns the
@@ -95,18 +148,36 @@ export const reasoningSchema = z.object({
     measure: z.string().min(1),
     confidence: confidenceSchema,
   }),
+  /** The small test — include ONLY when an experiment is genuinely the right move
+   * this week. Omit it entirely for reassurance/explanation/encouragement weeks. */
   experiment: z.object({
     hypothesis: z.string().min(1),
     behavior: z.string().min(1),
     expectedOutcome: z.string().min(1),
     followUp: z.string().min(1),
-  }),
+  }).optional(),
+  /** What kind of help this week calls for — do NOT default to "experiment". */
+  interventionType: z.enum(["reassure", "explain", "encourage", "advise", "experiment", "observe", "ask"]).optional(),
   challenge: z.string().optional(),
   biggestWin: z.string().optional(),
   biggestConcern: z.string().optional(),
   watchFor: z.string().optional(),
   providerNote: z.string().optional(),
   mindShift: z.string().optional(),
+  /** The one "I never realized that" — the non-obvious discovery to lead with. */
+  surprise: z.object({
+    observation: z.string().min(1),
+    whyNonObvious: z.string().min(1),
+    confidence: confidenceSchema,
+    recurrence: z.string().min(1),
+  }).optional(),
+  /** How the model narrates the theory movements the code computed this week. */
+  hypothesisUpdates: z.array(z.object({
+    statement: z.string().min(1),
+    status: z.enum(["forming", "testing", "supported", "confirmed", "weakened", "rejected", "dormant"]),
+    movement: z.enum(["formed", "strengthened", "weakened", "confirmed", "rejected", "unchanged"]),
+    inPlainWords: z.string().min(1),
+  })).optional(),
   beliefs: z.array(z.object({ statement: z.string().min(1), strength: z.enum(["weak", "moderate", "strong"]) })).optional(),
   conclusions: z.array(z.string().min(1)).optional(),
   openQuestions: z.array(z.object({

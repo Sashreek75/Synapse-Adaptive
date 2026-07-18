@@ -10,7 +10,8 @@
 
 import { metricLabel, METRIC_META } from "@/lib/metrics";
 import { computeTrend, detectPatterns, SALIENCE_THRESHOLD, type PatternCandidate, type TrendStat } from "@/lib/stats";
-import { computeAssociations, type Association } from "@/lib/correlations";
+import { type Association } from "@/lib/correlations";
+import { computeSurprises } from "@/lib/surprise";
 import { goalMetricsForPath } from "@/lib/paths";
 import type {
   Confidence,
@@ -177,11 +178,14 @@ export function renderReport(serieses: MetricSeries[], profile: HealthProfile & 
   const improving = trends.filter(isImprovement).map((t) => metricLabel(t.metric).toLowerCase());
   const watch = trends.filter((t) => !isImprovement(t) && Math.abs(t.delta) >= 4).map((t) => metricLabel(t.metric).toLowerCase());
 
-  // The relationships in the data — the non-obvious, most valuable insights.
-  const associations = computeAssociations(serieses, goalMetricsForPath(profile.path), 3);
+  // The relationships in the data, RANKED BY SURPRISE — lead with the most
+  // eye-opening one, not merely the strongest (sleep↔fatigue is strong but obvious).
+  const findings = computeSurprises(serieses, goalMetricsForPath(profile.path), [], 3);
+  const associations = findings.map((f) => f.association);
   const assocInsights = associations.map(associationInsight);
   const lead = associations[0];
-  const leadLine = lead ? ` The most useful thing I see: ${lead.plain}` : "";
+  const leadLine = lead ? ` The most surprising thing I see: ${lead.plain}` : "";
+  const mostSurprising = lead ? `${lead.plain} (${findings[0].recurrenceLabel})` : undefined;
 
   const goodPart = improving.length ? `your ${improving.slice(0, 2).join(" and ")} ${improving.length === 1 ? "is" : "are"} trending the right way` : "you're holding steady";
   const watchPart = watch.length ? ` I'm keeping a gentle eye on your ${watch[0]}.` : "";
@@ -221,6 +225,7 @@ export function renderReport(serieses: MetricSeries[], profile: HealthProfile & 
     overallConfidence: overallConfidence(trends),
     insights,
     nextWeek,
+    ...(mostSurprising ? { mostSurprising } : {}),
     createdAt: new Date().toISOString(),
   };
 }
@@ -271,7 +276,7 @@ function associationNotice(a: Association): ProactiveNotice {
 
 export function renderProactiveNotices(serieses: MetricSeries[], goals: MetricKey[]): ProactiveNotice[] {
   const fromPatterns = detectPatterns(serieses, goals).filter((p) => p.salience >= SALIENCE_THRESHOLD).map(patternNotice);
-  const fromAssoc = computeAssociations(serieses, goals, 3).filter((a) => a.strength >= 0.55).map(associationNotice);
+  const fromAssoc = computeSurprises(serieses, goals, [], 3).map((f) => f.association).filter((a) => a.strength >= 0.55).map(associationNotice);
   const seen = new Set<string>();
   const out: ProactiveNotice[] = [];
   for (const n of [...fromAssoc, ...fromPatterns].sort((a, b) => b.salience - a.salience)) {

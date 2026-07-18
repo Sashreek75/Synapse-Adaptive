@@ -18,7 +18,7 @@ import { reportSchema, insightSchema } from "@/ai/schemas";
 import { renderProactiveNotices, renderReport } from "@/ai/render";
 import { getPath, goalMetricsForPath } from "@/lib/paths";
 import { computeTrend } from "@/lib/stats";
-import { computeAssociations } from "@/lib/correlations";
+import { computeSurprises } from "@/lib/surprise";
 import type { PlanId } from "@/lib/billing/plans";
 import type {
   Confidence,
@@ -56,16 +56,18 @@ function buildEvidence(serieses: MetricSeries[], profile: HealthProfile & { path
         flags: t.flags,
       };
     }),
-    // The RELATIONSHIPS in the data — the non-obvious material. Pre-computed here
-    // so the model reasons over real correlations/lags, not guesses. Each carries
-    // its own confidence; the model must not exceed it.
-    associations: computeAssociations(serieses, goalMetrics, 5).map((a) => ({
-      kind: a.kind,
-      metrics: a.metrics,
-      r: a.r != null ? Number(a.r.toFixed(2)) : undefined,
-      n: a.n,
-      confidence: a.confidence,
-      detail: a.evidence,
+    // The RELATIONSHIPS in the data, RANKED BY SURPRISE — the non-obvious material
+    // the user can't see on a dashboard, so the model leads with the eye-opening one.
+    associations: computeSurprises(serieses, goalMetrics, [], 5).map((f) => ({
+      kind: f.association.kind,
+      metrics: f.association.metrics,
+      r: f.association.r != null ? Number(f.association.r.toFixed(2)) : undefined,
+      n: f.association.n,
+      confidence: f.association.confidence,
+      detail: f.association.evidence,
+      surprise: Number(f.surprise.toFixed(2)),
+      whySurprising: f.whySurprising,
+      recurrence: f.recurrenceLabel,
     })),
   };
 }
@@ -122,6 +124,7 @@ export async function generateReport(serieses: MetricSeries[], profile: HealthPr
           overallConfidence: parsed.data.overallConfidence,
           insights,
           ...(nextWeek.length ? { nextWeek } : {}),
+          ...(parsed.data.mostSurprising && postGate(parsed.data.mostSurprising).ok ? { mostSurprising: parsed.data.mostSurprising } : {}),
           createdAt: new Date().toISOString(),
           generationMeta: { promptId: REPORT_PROMPT.id, source: "model" },
         } as HealthReport;

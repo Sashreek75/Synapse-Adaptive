@@ -69,7 +69,7 @@ const DEFAULT_PROFILE: Profile = {
 // Legacy storage key from the Recovery-era branding. Do NOT change the string —
 // existing users' on-device data lives under it.
 const KEY = "synapse.recovery.v3";
-const DEFAULT_MIND: Mind = { beliefs: [], conclusions: [], openQuestions: [], weekly: {}, playbook: [] };
+const DEFAULT_MIND: Mind = { beliefs: [], conclusions: [], openQuestions: [], weekly: {}, playbook: [], hypotheses: [], associationHistory: [], habits: [] };
 const dayKey = (iso: string) => iso.slice(0, 10);
 const todayKey = () => new Date().toISOString().slice(0, 10);
 

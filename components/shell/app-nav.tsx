@@ -44,6 +44,7 @@ const asks: Ask[] = [
 // Items that OPEN a real, interactive surface.
 const rooms: Room[] = [
   { href: "/dashboard", label: "Conversation", icon: Home, blurb: "Back to talking with Synapse" },
+  { href: "/playbook", label: "What I\u2019ve learned", icon: Sparkles, blurb: "The patterns, theories, and habits I\u2019ve found in you" },
   { href: "/daily", label: "Daily check-in", icon: Sun, blurb: "Tell me about today" },
   { href: "/stats", label: "Your numbers", icon: LineChart, blurb: "The visual dashboard" },
   { href: "/assessments", label: "Assessments", icon: Activity, blurb: "Run a quick cognitive check" },

@@ -101,16 +101,23 @@ export function AgentConsole({ embedded = false, immersive = false }: { embedded
       ? `Questions I'm still trying to answer about you (steer conversation toward these when natural):\n${mind.openQuestions.filter((q) => q.status === "open").slice(0, 5).map((q) => `- ${q.question}${q.whyItMatters ? ` (${q.whyItMatters})` : ""}`).join("\n")}`
       : "";
     const wk = Object.keys(mind.weekly).sort().pop();
-    const currentFocus = wk && mind.weekly[wk]
-      ? `This week's focus (the ONE priority — connect advice back to it): "${mind.weekly[wk].title}" — ${mind.weekly[wk].action}\nCurrent experiment: ${mind.weekly[wk].experiment.hypothesis} Expected: ${mind.weekly[wk].experiment.expectedOutcome}`
+    const wr = wk ? mind.weekly[wk] : undefined;
+    const currentFocus = wr
+      ? `This week's focus (the ONE priority — connect advice back to it): "${wr.title}" — ${wr.action}${wr.experiment ? `\nCurrent experiment: ${wr.experiment.hypothesis} Expected: ${wr.experiment.expectedOutcome}` : ""}`
       : "";
     const playbook = mind.playbook.length
       ? `Your Playbook — durable things I've learned about how you work:\n${mind.playbook.slice(-8).map((p) => `- ${p.statement}`).join("\n")}`
       : "";
+    const theories = mind.hypotheses.length
+      ? `What I'm learning about you — my working theories (status + confidence in brackets). Reference and REVISE these; prefer surfacing a non-obvious one over restating a metric, and turn one into something to test when it fits:\n${mind.hypotheses.slice(0, 6).map((h) => `- [${h.status}, ${h.confidence}] ${h.statement}${h.suggestedExperiment ? ` — to test: ${h.suggestedExperiment}` : ""}`).join("\n")}`
+      : "";
+    const habitsCtx = mind.habits.filter((h) => h.status !== "lapsed").length
+      ? `Habits they've built (reinforce these; don't re-test what's already settled):\n${mind.habits.filter((h) => h.status !== "lapsed").slice(-5).map((h) => `- [${h.status}] ${h.statement}`).join("\n")}`
+      : "";
     const expHistory = experiments.length
       ? `Experiments we've run together (reference these naturally):\n${experiments.slice(-5).map((e) => { const r = reviewExperiment(e, series); return `- "${e.title}" — tried ${e.behavior} → ${r.outcome}`; }).join("\n")}`
       : "";
-    return `${who}\n\nMetric trends (0-100):\n${lines.join("\n")}\n\n${activity}${currentFocus ? `\n\n${currentFocus}` : ""}${connections ? `\n\n${connections}` : ""}${beliefs ? `\n\n${beliefs}` : ""}${conclusions ? `\n\n${conclusions}` : ""}${openQuestionsCtx ? `\n\n${openQuestionsCtx}` : ""}${playbook ? `\n\n${playbook}` : ""}${expHistory ? `\n\n${expHistory}` : ""}`;
+    return `${who}\n\nMetric trends (0-100):\n${lines.join("\n")}\n\n${activity}${currentFocus ? `\n\n${currentFocus}` : ""}${connections ? `\n\n${connections}` : ""}${beliefs ? `\n\n${beliefs}` : ""}${conclusions ? `\n\n${conclusions}` : ""}${openQuestionsCtx ? `\n\n${openQuestionsCtx}` : ""}${theories ? `\n\n${theories}` : ""}${habitsCtx ? `\n\n${habitsCtx}` : ""}${playbook ? `\n\n${playbook}` : ""}${expHistory ? `\n\n${expHistory}` : ""}`;
   }, [hasData, profile, series, weeksTracked, focus, consistency, weeklyScore, recentChanges, providerQuestions, checkIns, contextNotes, recommendationLog, mind, experiments]);
 
   // Data-aware conversation starters — Synapse suggests what IT would ask about.

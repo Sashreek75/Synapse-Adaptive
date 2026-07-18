@@ -33,7 +33,13 @@ export interface WeeklyFocusReasoning {
   reasoningSummary: string;
   /** The explanations it considered and weighed (not just the winner). */
   hypotheses: Hypothesis[];
-  experiment: { hypothesis: string; behavior: string; expectedOutcome: string; followUp: string };
+  /** The small test to run — ONLY when an experiment is genuinely the right move
+   * this week. Most weeks this is absent: the right response is reassurance,
+   * explanation, encouragement, or a single small suggestion, not homework. */
+  experiment?: { hypothesis: string; behavior: string; expectedOutcome: string; followUp: string };
+  /** What KIND of help this week calls for — the engine picks the right intervention,
+   * it does not default to an experiment. */
+  interventionType?: InterventionType;
   /** A polite, evidence-based challenge to something the user assumed (optional). */
   challenge?: string;
   /** Coaching report fields — the flagship weekly experience. */
@@ -43,6 +49,8 @@ export interface WeeklyFocusReasoning {
   providerNote?: string;    // what to raise with a provider if the trend continues
   /** A visible learning moment: "I've changed my mind…" (only when it really shifted). */
   mindShift?: string;
+  /** The one "I never realized that" — the non-obvious discovery to lead with. */
+  surprise?: Surprise;
   /** True when this is a first-session read from onboarding alone (label it as early). */
   early?: boolean;
   /** True when Synapse is stepping back from coaching to urge provider discussion. */
@@ -52,6 +60,61 @@ export interface WeeklyFocusReasoning {
 
 /** A durable belief Synapse holds about this person — evolves with evidence. */
 export interface Belief { statement: string; strength: "weak" | "moderate" | "strong"; updatedAt: string; }
+
+/** The kind of help a moment calls for. A good coach doesn't always assign homework —
+ * sometimes they reassure, explain, encourage, notice, ask, or give one small nudge.
+ * Experiments are a special, rare tool, used only when evidence can actually be moved. */
+export type InterventionType =
+  | "reassure" | "explain" | "encourage" | "advise" | "experiment" | "observe" | "ask";
+
+/** A confirmed theory that has graduated into a lasting behavior — the END of the
+ * loop. Discovery → experiment → repeated success → habit → measurable improvement. */
+export interface Habit {
+  id: string;
+  statement: string;              // "Keeping bedtime within ~30 min lifts your next-day focus"
+  metric?: MetricKey;
+  fromHypothesisId?: string;
+  status: "building" | "established" | "lapsed";
+  reinforcements: number;         // times evidence/experiments have re-confirmed it
+  establishedAt: string;
+  updatedAt: string;
+}
+
+/** The one non-obvious finding worth leading with — an "I never realized that" moment.
+ * Deliberately something a dashboard, a spreadsheet, or a generic chatbot could NOT
+ * surface, because it only emerges from watching THIS person over time. */
+export interface Surprise {
+  observation: string;
+  whyNonObvious: string;
+  confidence: Confidence;
+  recurrence: string;
+}
+
+/** Where a hypothesis sits in its life — the product is the LOOP: form → test → revise. */
+export type HypothesisStatus =
+  | "forming" | "testing" | "supported" | "confirmed" | "weakened" | "rejected" | "dormant";
+
+/** A working theory Synapse holds about one person and actively tests over time. The
+ * implementation is scientific; the language shown to the user is warm (lib/hypotheses.ts). */
+export interface TrackedHypothesis {
+  id: string;
+  statement: string;
+  metrics: MetricKey[];
+  status: HypothesisStatus;
+  confidence: Confidence;
+  supportingObservations: number;
+  contradictingObservations: number;
+  firstFormedAt: string;
+  updatedAt: string;
+  prediction?: string;
+  suggestedExperiment?: string;
+  originAssociationKey?: string;
+  evidenceLog: { weekKey: string; direction: "support" | "contradict"; note: string }[];
+}
+
+/** Compact record of which relationships appeared in a week — the substrate for
+ * recurrence ("four weeks running"), also our guard against one-week spurious links. */
+export interface AssociationSnapshot { weekKey: string; key: string; r?: number; n: number; }
 
 /** A learned "how you work" statement — the Personal Playbook. Built over months
  * from experiments, assessments, and conversations. This is the thing a data
@@ -86,6 +149,12 @@ export interface Mind {
   openQuestions: OpenQuestion[];
   weekly: Record<string, WeeklyFocusReasoning>;
   playbook: PlaybookEntry[];
+  /** The working theories Synapse is actively testing about this person. */
+  hypotheses: TrackedHypothesis[];
+  /** Rolling record of which relationships appeared each week (for recurrence). */
+  associationHistory: AssociationSnapshot[];
+  /** Confirmed theories that have become lasting habits — the loop's payoff. */
+  habits: Habit[];
 }
 
 export interface Insight {
@@ -128,6 +197,8 @@ export interface HealthReport {
   insights: Insight[];
   /** 2-3 concrete priorities for next week (model-authored when available). */
   nextWeek?: string[];
+  /** The single most eye-opening pattern this week — the thing to lead with. */
+  mostSurprising?: string;
   createdAt: string;
   generationMeta?: { promptId: string; source: "model" | "fallback" };
 }

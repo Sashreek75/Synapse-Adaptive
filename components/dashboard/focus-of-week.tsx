@@ -21,7 +21,7 @@ import { useSubscription } from "@/components/providers/subscription-provider";
 import { selectWeeklyFocus, currentWeekKey, detectEscalation, escalationReasoning, earlyImpression } from "@/lib/focus";
 import { computeTrend } from "@/lib/stats";
 import { cn } from "@/lib/utils";
-import type { WeeklyFocusReasoning, PlaybookEntry } from "@/types";
+import type { WeeklyFocusReasoning, PlaybookEntry, Mind } from "@/types";
 
 /** Merge new playbook learnings into the existing set (by id), newest kept. */
 function mergePlaybook(existing: PlaybookEntry[], additions: PlaybookEntry[]): PlaybookEntry[] {
@@ -58,6 +58,7 @@ export function FocusOfWeek() {
         },
         series, recentChanges, experiments,
         beliefs: mind.beliefs, conclusions: mind.conclusions, openQuestions: mind.openQuestions,
+        hypotheses: mind.hypotheses, associationHistory: mind.associationHistory, habits: mind.habits,
         notes: contextNotes.slice(-6).map((n) => ({ prompt: n.prompt, answer: n.answer })),
         tier: plan,
       }),
@@ -65,16 +66,28 @@ export function FocusOfWeek() {
       .then((r) => r.json())
       .then((d) => {
         const reasoning: WeeklyFocusReasoning | undefined = d?.reasoning;
-        if (reasoning && reasoning.source === "model") {
-          const conclusions = Array.from(new Set([...mind.conclusions, ...(d.conclusions ?? [])])).slice(-20);
-          saveMind({
-            beliefs: d.beliefs?.length ? d.beliefs : mind.beliefs,
-            conclusions,
-            openQuestions: d.openQuestions?.length ? d.openQuestions : mind.openQuestions,
-            weekly: { ...mind.weekly, [wk]: reasoning },
-            playbook: mergePlaybook(mind.playbook, d.playbook ?? []),
-          });
+        if (!reasoning) return;
+        const next: Mind = { ...mind };
+        let changed = false;
+        // The LOOP's memory — revised theories + relationship history. Apply once per
+        // week (guard on associationHistory) so evidence counts don't double if this
+        // effect re-runs on a remount.
+        const recordedThisWeek = mind.associationHistory.some((s) => s.weekKey === wk);
+        if (!recordedThisWeek && (d.hypotheses || d.associationHistory || d.habits)) {
+          if (d.hypotheses) next.hypotheses = d.hypotheses;
+          if (d.associationHistory) next.associationHistory = d.associationHistory;
+          if (d.habits) next.habits = d.habits;
+          changed = true;
         }
+        if (reasoning.source === "model") {
+          next.beliefs = d.beliefs?.length ? d.beliefs : mind.beliefs;
+          next.conclusions = Array.from(new Set([...mind.conclusions, ...(d.conclusions ?? [])])).slice(-20);
+          next.openQuestions = d.openQuestions?.length ? d.openQuestions : mind.openQuestions;
+          next.weekly = { ...mind.weekly, [wk]: reasoning };
+          next.playbook = mergePlaybook(mind.playbook, d.playbook ?? []);
+          changed = true;
+        }
+        if (changed) saveMind(next);
       })
       .catch(() => {})
       .finally(() => setThinking(false));
@@ -91,7 +104,6 @@ export function FocusOfWeek() {
       why: det.why, whyItMatters: det.whyItMatters, measure: det.measure, confidence: det.confidence,
       reasoningSummary: det.whatChanged,
       hypotheses: [{ explanation: det.title, support: det.whatChanged, confidence: det.confidence }],
-      experiment: { hypothesis: det.experiment.hypothesis, behavior: det.experiment.behavior, expectedOutcome: det.experiment.expectedOutcome, followUp: det.experiment.followUp },
       source: "fallback" as const,
     };
     if (profile.onboardedAt) return earlyImpression(profile);
@@ -101,12 +113,13 @@ export function FocusOfWeek() {
   // Record this week's experiment once, from whatever the current view is.
   useEffect(() => {
     if (!view || view.escalate || view.early) return;
+    if (!view.experiment) return; // experiments are rare — only record when one was actually proposed
     if (experiments.some((e) => e.weekKey === view.weekKey)) return;
     const s = series.find((x) => x.metric === view.metric);
     const baseline = s && s.points.length ? Math.round(computeTrend(s).latest) : 0;
     saveExperiments([...experiments, {
       id: `focus_${view.weekKey}_${view.metric}`, weekKey: view.weekKey, metric: view.metric,
-      title: view.title, behavior: view.action, hypothesis: view.experiment.hypothesis,
+      title: view.title, behavior: view.action, hypothesis: view.experiment!.hypothesis,
       mode: "monitor" as const, baseline, startedAt: new Date().toISOString(),
     }].slice(-12));
     // eslint-disable-next-line react-hooks/exhaustive-deps
