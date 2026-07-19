@@ -1,7 +1,9 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Send, Eye, BookOpen, Stethoscope, Sparkles, Target, CalendarCheck, Activity, Eraser } from "lucide-react";
+import { useRouter } from "next/navigation";
+import { detectFocusIntent } from "@/lib/focus-intent";
+import { Send, Eye, BookOpen, Stethoscope, Sparkles, Target, CalendarCheck, Activity, Eraser, Timer, Play } from "lucide-react";
 import { preGate, CRISIS_RESPONSE } from "@/ai/safety";
 import { useHealth } from "@/components/providers/health-store";
 import { METRIC_META } from "@/lib/metrics";
@@ -45,6 +47,18 @@ export function AgentConsole({ embedded = false, immersive = false }: { embedded
   const [input, setInput] = useState("");
   const [busy, setBusy] = useState(false);
   const endRef = useRef<HTMLDivElement>(null);
+  const router = useRouter();
+
+  // Entering focus mode from natural language: if the person says they're starting
+  // a work session, offer to start a real one on the spot (roles are entered, not clicked).
+  function startFocus(goal: string | undefined, minutes: number) {
+    const dur = Math.max(60, minutes * 60);
+    try {
+      localStorage.setItem("synapse.tools.timer.v1", JSON.stringify({ mode: "focus", durationSec: dur, endsAt: Date.now() + dur * 1000, remainingSec: dur, running: true }));
+      if (goal) localStorage.setItem("synapse.tools.focusGoal", goal); else localStorage.removeItem("synapse.tools.focusGoal");
+    } catch {}
+    router.push("/tools");
+  }
 
   const focus = getPath(profile.path).focusNoun;
 
@@ -56,7 +70,7 @@ export function AgentConsole({ embedded = false, immersive = false }: { embedded
       profile.goals.length && `Goals: ${profile.goals.join(", ")}`,
       profile.primaryChallenge && `Hardest right now: ${profile.primaryChallenge}`,
       `Check-ins recorded: ${weeksTracked}`,
-      "App capability: the user CAN see their numbers visually — there is a 'Your numbers' page (path /stats) with trend charts, and the home screen shows what's currently moving. If they ask for a dashboard, charts, or to 'see' their stats, don't say you can't; point them to Your numbers and summarize the key movements in words.",
+      "App capability: the underlying numbers still exist (a stats view at /stats with trend charts), but lead with what they MEAN for the person and where they're headed — not the charts. If they ask to 'see' their stats, point them there, then summarize the key movements in plain words.",
       "The daily check-in lives at /daily; if they want to log today or you need fresher data, invite them to do a quick check-in.",
       "Assessments (short cognitive tasks) live at /assessments — if you recommend one, tell them they can start it there.",
     ].filter(Boolean).join("\n");
@@ -129,7 +143,7 @@ export function AgentConsole({ embedded = false, immersive = false }: { embedded
         up ? `What's helping my ${up.label.toLowerCase()}?` : "What should I focus on?",
         "What patterns have you noticed?",
       ]
-    : ["What can you do?", "How does this work?", "Why do daily check-ins help?"];
+    : ["How do you learn about me?", "What should I focus on first?", "What can we work on?"];
 
   // THE PROACTIVE OPENER — Synapse initiates. It doesn't wait to be asked; it
   // arrives having already looked, and leads with the single most alive thing it
@@ -139,7 +153,7 @@ export function AgentConsole({ embedded = false, immersive = false }: { embedded
   const introContent = useMemo(() => {
     const name = profile.displayName ? ` ${profile.displayName}` : "";
     if (!hasData) {
-      return `Hi${name} — I'm **Synapse**, your health companion. 👋\n\nI get more useful the more I learn about you. Do a quick check-in and I'll start reasoning over your real patterns — or ask me anything right now.`;
+      return `Hi${name} — I'm **Synapse**, your adaptive AI partner. 👋\n\nI get more useful the more I learn about how you work. Tell me what you're working on, or do a quick check-in, and I'll start finding your patterns.`;
     }
 
     const op = sessionOpener(profile, series, recentChanges, contextNotes, checkIns, dailyDoneToday, weeksTracked);
@@ -170,13 +184,19 @@ export function AgentConsole({ embedded = false, immersive = false }: { embedded
 
     // A soft, optional next step so there's always somewhere to go.
     if (op.recommendation?.title) parts.push(`**Next step:** ${op.recommendation.title.replace(/\.$/, "")} — want me to explain why it fits you right now?`);
-    else parts.push(`What would you like to unpack?`);
+    else parts.push(`What do you want to make progress on today?`);
 
     return parts.join("\n\n");
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [hasData, profile, series, recentChanges, contextNotes, checkIns, dailyDoneToday, weeksTracked, mind, up, down]);
 
   const messages: ChatMessage[] = chat.length ? chat : [{ id: "intro", role: "assistant", content: introContent }];
+
+  // Read the latest user message for "I'm starting a work session" intent.
+  const focusHint = useMemo(() => {
+    const lastUser = [...messages].reverse().find((m) => m.role === "user");
+    return lastUser ? detectFocusIntent(lastUser.content) : { focus: false as const };
+  }, [messages]);
 
   function scrollDown() { requestAnimationFrame(() => endRef.current?.scrollIntoView({ behavior: "smooth" })); }
 
@@ -294,11 +314,19 @@ export function AgentConsole({ embedded = false, immersive = false }: { embedded
             </div>
           )}
           <WaitlistDialog plan="pro" open={waitlistOpen} onClose={() => setWaitlistOpen(false)} defaultEmail={email} />
+          {focusHint.focus && !busy && (
+            <button onClick={() => startFocus(focusHint.goal, focusHint.minutes ?? 25)}
+              className="mb-2.5 flex w-full items-center gap-2.5 rounded-xl border border-orange-300/60 bg-orange-500/10 px-3 py-2.5 text-left text-sm text-ink transition hover:bg-orange-500/15">
+              <Timer className="h-4 w-4 shrink-0 text-orange-500" />
+              <span className="min-w-0 flex-1">Start a {focusHint.minutes ?? 25}-minute focus session{focusHint.goal ? ` on ${focusHint.goal}` : ""} — I&apos;ll keep time with you.</span>
+              <Play className="h-4 w-4 shrink-0 text-orange-500" />
+            </button>
+          )}
           <div className="mb-2.5 flex items-center justify-between gap-2">
             <div className="flex flex-1 flex-wrap gap-2">
-              {!busy && suggestions.map((s) => (
+              {!busy && suggestions.map((s, i) => (
                 <button key={s} onClick={() => send(s)} disabled={busy}
-                  className="rounded-full border bg-surface px-3 py-1.5 text-sm text-muted transition-all hover:-translate-y-0.5 hover:text-ink hover:shadow-soft disabled:opacity-50">{s}</button>
+                  className={cn("rounded-full border bg-surface px-3 py-1.5 text-sm text-muted transition-all hover:-translate-y-0.5 hover:text-ink hover:shadow-soft disabled:opacity-50", i >= 2 && "hidden sm:inline-flex")}>{s}</button>
               ))}
             </div>
             {chat.length > 0 && (
@@ -310,7 +338,7 @@ export function AgentConsole({ embedded = false, immersive = false }: { embedded
           </div>
           <div className="flex gap-2 rounded-2xl border bg-surface p-2 shadow-lift">
             <input value={input} onChange={(e) => setInput(e.target.value)} onKeyDown={(e) => e.key === "Enter" && send(input)}
-              placeholder="Tell Synapse what's on your mind…"
+              placeholder="What do you want to make progress on?"
               className="min-w-0 flex-1 bg-transparent px-3 py-2.5 text-base text-ink placeholder:text-muted focus:outline-none" />
             <button onClick={() => send(input)} disabled={busy || !input.trim()} aria-label="Send"
               className="sa-shine grid h-11 w-11 shrink-0 place-items-center rounded-xl bg-gradient-to-br from-orange-500 to-orange-600 text-white transition hover:from-orange-600 hover:to-orange-700 disabled:opacity-50">
@@ -339,7 +367,7 @@ export function AgentConsole({ embedded = false, immersive = false }: { embedded
                 <h1 className="text-xl font-semibold tracking-tight text-ink">Synapse</h1>
                 <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-[11px] font-medium text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-300">{busy ? "thinking…" : "ready"}</span>
               </div>
-              <p className="truncate text-sm text-muted">Your health intelligence companion · focused on your {focus}</p>
+              <p className="truncate text-sm text-muted">Learning how you work · through your {focus}</p>
             </div>
           </div>
           {/* What Synapse knows about you */}
@@ -410,7 +438,7 @@ export function AgentConsole({ embedded = false, immersive = false }: { embedded
         </div>
         <div className="flex gap-2 rounded-2xl border bg-surface p-2 shadow-soft">
           <input value={input} onChange={(e) => setInput(e.target.value)} onKeyDown={(e) => e.key === "Enter" && send(input)}
-            placeholder="Ask Synapse about your health…"
+            placeholder="What are you working on? Talk to me."
             className="flex-1 bg-transparent px-3 py-2 text-ink placeholder:text-muted focus:outline-none" />
           <button onClick={() => send(input)} disabled={busy || !input.trim()} aria-label="Send"
             className="sa-shine grid h-11 w-11 shrink-0 place-items-center rounded-xl bg-gradient-to-br from-orange-500 to-orange-600 text-white transition hover:from-orange-600 hover:to-orange-700 disabled:opacity-50">

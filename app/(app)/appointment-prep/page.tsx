@@ -1,7 +1,7 @@
 import { redirect } from "next/navigation";
 
-/** Folded into the coaching session (founding-doc pivot): provider questions
- * live where the weekly reasoning is. */
+/** Retired in the v2 pivot: provider prep is no longer a product surface. The
+ * conversation handles "worth raising with a provider" when it matters. */
 export default function AppointmentPrepPage() {
-  redirect("/report");
+  redirect("/dashboard");
 }

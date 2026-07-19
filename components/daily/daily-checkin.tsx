@@ -17,7 +17,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Moon, Battery, Activity, Check, Smile, Stethoscope, CalendarDays, Sparkles, Zap, HelpCircle } from "lucide-react";
+import { Moon, Battery, Activity, Check, Smile, Stethoscope, CalendarDays, Sparkles, Zap, HelpCircle, Flag } from "lucide-react";
 import { Card, CardBody, Button, Skeleton } from "@/components/ui/primitives";
 import { SynapseOrb } from "@/components/synapse/orb";
 import { useHealth } from "@/components/providers/health-store";
@@ -98,6 +98,7 @@ export function DailyCheckIn() {
   const [symptoms, setSymptoms] = useState(40);
   const [lifeEvent, setLifeEvent] = useState("");
   const [fallbackAnswer, setFallbackAnswer] = useState("");
+  const [progress, setProgress] = useState("");
 
   const [saved, setSaved] = useState(false);
   const [reflection, setReflection] = useState<DailyReflection | null>(null);
@@ -168,6 +169,7 @@ export function DailyCheckIn() {
         if (a.reaction != null) metrics.reaction_time = a.reaction;
       }
     });
+    if (progress.trim()) addContextNote("What I moved forward today", progress.trim());
     addCheckIn({ date, kind: "daily", metrics, note: "Daily check-in" });
     for (const n of notes) addContextNote(n.prompt, n.answer);
     try { setReflection(dailyReflection(seriesWithToday(series, metrics, date), profile.path)); } catch { setReflection(null); }
@@ -178,6 +180,7 @@ export function DailyCheckIn() {
     const date = new Date().toISOString();
     const metrics: Partial<Record<MetricKey, number>> = { sleep_quality: sleep, fatigue: 100 - energy, stress, mood };
     if (hasSymptoms) metrics.symptoms = symptoms;
+    if (progress.trim()) addContextNote("What I moved forward today", progress.trim());
     addCheckIn({ date, kind: "daily", metrics, note: "Daily check-in" });
     if (fallbackAnswer.trim()) addContextNote(fq.event, fallbackAnswer.trim());
     if (lifeEvent.trim()) addContextNote(fq.event, lifeEvent.trim());
@@ -244,8 +247,8 @@ export function DailyCheckIn() {
         <SynapseOrb size={44} className="shrink-0" />
         <div>
           <h1 className="text-2xl font-semibold tracking-tight text-ink">Today&apos;s check-in</h1>
-          <p className="text-muted">I put today&apos;s questions together for you.</p>
-          <p className="mt-0.5 text-xs text-muted">Different day, different check-in — I tune it as I learn you.</p>
+          <p className="text-muted">A moment to reflect on your day — what you moved forward, and how you&apos;re doing.</p>
+          <p className="mt-0.5 text-xs text-muted">I tune this as I learn you. It only takes a moment.</p>
         </div>
       </header>
 
@@ -253,6 +256,14 @@ export function DailyCheckIn() {
         {dailyDoneToday && (
           <p className="rounded-xl bg-surface-2 p-3 text-sm text-muted">You&apos;ve already checked in today — adding another just updates today.</p>
         )}
+
+        <div>
+          <p className="mb-1.5 flex items-center gap-2 text-sm font-medium text-ink"><Flag className="h-4 w-4 text-orange-500" /> What did you move forward today?</p>
+          <input value={progress} onChange={(e) => setProgress(e.target.value)}
+            placeholder="Even a small step — a task, a workout, a page written, a hard conversation…"
+            className="w-full rounded-xl border bg-surface px-3 py-2.5 text-base text-ink placeholder:text-muted focus:outline-none" />
+          <p className="mt-1.5 text-xs text-muted">This is the heart of it — whatever you&apos;re working toward. The rest below is just how you&apos;re feeling: one lens, not the point.</p>
+        </div>
 
         {plan ? (
           <>

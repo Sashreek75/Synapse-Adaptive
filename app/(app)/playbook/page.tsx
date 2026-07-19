@@ -15,6 +15,7 @@ import { Sparkles, GitBranch, Lightbulb, RefreshCw, Trophy, HelpCircle, Check, C
 import { Card, CardBody, Button, SectionLabel, ConfidenceChip } from "@/components/ui/primitives";
 import { SynapseOrb } from "@/components/synapse/orb";
 import { useHealth } from "@/components/providers/health-store";
+import { UnderstandingEvolution } from "@/components/profile/understanding-evolution";
 import type { TrackedHypothesis, Habit, HypothesisStatus, WeeklyFocusReasoning } from "@/types";
 
 /* ── Lifecycle presentation — warm headings, ordered as a story ─────────────── */
@@ -54,7 +55,7 @@ const HABIT_STYLE: Record<Habit["status"], { chip: string; label: string }> = {
 };
 
 export default function PlaybookPage() {
-  const { hydrated, mind, weeksTracked } = useHealth();
+  const { hydrated, mind, weeksTracked, profile } = useHealth();
 
   const weekly = useMemo(() => {
     const wk = Object.keys(mind.weekly).sort().pop();
@@ -86,10 +87,24 @@ export default function PlaybookPage() {
       <header className="flex items-center gap-3">
         <SynapseOrb size={44} className="shrink-0" />
         <div>
-          <h1 className="text-2xl font-semibold tracking-tight text-ink">What I&apos;ve learned about you</h1>
-          <p className="text-sm text-muted">{"Everything here is earned from your own check-ins — it gets sharper the longer we work together."}</p>
+          <h1 className="text-2xl font-semibold tracking-tight text-ink">You</h1>
+          <p className="text-sm text-muted">{"Everything I learn about you here has one purpose: helping you make better calls, day to day."}</p>
         </div>
       </header>
+
+      {profile.goals && profile.goals.length > 0 && (
+        <Card className="overflow-hidden"><div className="mesh"><CardBody className="sm:p-6">
+          <SectionLabel className="mb-2 flex items-center gap-1.5"><Compass className="h-3.5 w-3.5 text-orange-500" /> Who you&apos;re becoming</SectionLabel>
+          <ul className="space-y-1.5">
+            {profile.goals.map((g, i) => (
+              <li key={i} className="flex items-start gap-2 text-ink">
+                <span className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-orange-500" />{g}
+              </li>
+            ))}
+          </ul>
+          {profile.definitionOfBetter && <p className="mt-3 text-sm text-muted">{`What better looks like: ${profile.definitionOfBetter}`}</p>}
+        </CardBody></div></Card>
+      )}
 
       {nothingYet ? (
         <Card><CardBody className="py-10 text-center">
@@ -137,7 +152,7 @@ export default function PlaybookPage() {
                 <div className="space-y-2">
                   {items.map((h) => (
                     <Card key={h.id}><CardBody className="p-4">
-                      <div className="flex items-start justify-between gap-3">
+                      <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
                         <p className={muted ? "text-muted line-through decoration-slate-300" : "text-ink"}>{h.statement}</p>
                         {!muted && <div className="shrink-0"><ConfidenceChip level={h.confidence} /></div>}
                       </div>
@@ -161,7 +176,7 @@ export default function PlaybookPage() {
                   const st = HABIT_STYLE[h.status];
                   return (
                     <Card key={h.id}><CardBody className="p-4">
-                      <div className="flex items-start justify-between gap-3">
+                      <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
                         <p className={h.status === "lapsed" ? "text-muted" : "text-ink"}>{h.statement}</p>
                         <span className={`shrink-0 rounded-full px-2.5 py-1 text-xs font-medium ${st.chip}`}>{st.label}</span>
                       </div>
@@ -220,12 +235,16 @@ export default function PlaybookPage() {
             </CardBody></Card>
           )}
 
+          {/* HOW MY UNDERSTANDING HAS EVOLVED — folded in from the old profile;
+              also records today's understanding snapshot (memory capture). */}
+          <UnderstandingEvolution />
+
           {/* PROGRESS — growth, stated in words, not charts. */}
           <p className="flex items-start gap-2 rounded-2xl bg-surface-2 p-3 text-xs text-muted">
             <Sparkles className="mt-0.5 h-3.5 w-3.5 shrink-0 text-orange-500" />
             {weeksTracked > 0
-              ? `We've been at this across ${weeksTracked} check-in${weeksTracked === 1 ? "" : "s"}${confirmedCount ? ` — ${confirmedCount} idea${confirmedCount === 1 ? "" : "s"} confirmed so far` : ""}. This is yours, it compounds, and it follows you.`
-              : "This is yours and it compounds — the longer we work together, the sharper it gets."}
+              ? `We've been at this across ${weeksTracked} check-in${weeksTracked === 1 ? "" : "s"}${confirmedCount ? ` — ${confirmedCount} idea${confirmedCount === 1 ? "" : "s"} confirmed so far` : ""}. It compounds, it follows you, and it's all in service of one thing: better decisions, day to day.`
+              : "This compounds the longer we work together — so the calls I help you make keep getting sharper."}
           </p>
         </>
       )}

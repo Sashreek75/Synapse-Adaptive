@@ -54,7 +54,7 @@ export default function StatsPage() {
     return (
       <div className="mx-auto max-w-md py-10 text-center">
         <SynapseOrb size={72} className="mx-auto" />
-        <h1 className="mt-5 text-2xl font-semibold tracking-tight text-ink">Your dashboard lives here</h1>
+        <h1 className="mt-5 text-2xl font-semibold tracking-tight text-ink">Your numbers live here</h1>
         <p className="mt-2 leading-relaxed text-muted">Once you&apos;ve done a check-in or two, I&apos;ll chart everything you&apos;re tracking and show you the connections between them.</p>
         <Link href="/daily" className="mt-6 inline-block"><Button>Start today&apos;s check-in <Sun className="h-4 w-4" /></Button></Link>
       </div>
@@ -140,9 +140,9 @@ export default function StatsPage() {
             </div>
             <ul className="mt-3 space-y-3">
               {connections.map((a, i) => (
-                <li key={i} className="flex items-start justify-between gap-3 rounded-xl bg-surface-2 p-3">
+                <li key={i} className="flex flex-col gap-2 rounded-xl bg-surface-2 p-3 sm:flex-row sm:items-start sm:justify-between sm:gap-3">
                   <p className="text-sm leading-relaxed text-ink">{a.plain}</p>
-                  <ConfidenceChip level={a.confidence} />
+                  <div className="shrink-0"><ConfidenceChip level={a.confidence} /></div>
                 </li>
               ))}
             </ul>

@@ -94,13 +94,13 @@ export default function LoginPage() {
           <h1 className="mt-5 text-2xl font-semibold tracking-tight text-ink">
             {mode === "signup" ? "Create your account" : mode === "reset" ? "Reset your password" : "Welcome back"}
           </h1>
-          <p className="mt-2 text-sm text-muted">Your health intelligence companion — accessible anywhere you sign in.</p>
+          <p className="mt-2 text-sm text-muted">Your adaptive AI partner — with you anywhere you sign in.</p>
         </div>
 
         {signedIn ? (
           <div className="mt-6 text-center">
             <p className="text-sm text-muted">Signed in as <span className="font-medium text-ink">{signedIn}</span></p>
-            <Button className="mt-3 w-full" onClick={() => router.push("/dashboard")}>Go to dashboard <ArrowRight className="h-4 w-4" /></Button>
+            <Button className="mt-3 w-full" onClick={() => router.push("/dashboard")}>Continue <ArrowRight className="h-4 w-4" /></Button>
             <button onClick={signOut} className="mt-3 w-full text-sm text-muted hover:text-ink">Sign out / use a different account</button>
           </div>
         ) : (

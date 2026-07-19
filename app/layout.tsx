@@ -6,7 +6,7 @@ import { AuthProvider } from "@/components/providers/auth-provider";
 const inter = Inter({ subsets: ["latin"], variable: "--font-sans", display: "swap" });
 
 const appUrl = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
-const title = "Synapse Adaptive — AI Health Intelligence";
+const title = "Synapse Adaptive — Your adaptive AI partner";
 const description =
   "Synapse Adaptive helps you understand how your body and mind are functioning over time — what changed, why it might have changed, and what's worth discussing with your provider. Not another tracker.";
 
@@ -15,7 +15,7 @@ export const metadata: Metadata = {
   title: { default: title, template: "%s · Synapse Adaptive" },
   description,
   applicationName: "Synapse Adaptive",
-  keywords: ["health intelligence", "recovery", "AI health", "cognitive performance", "wellness", "rehabilitation"],
+  keywords: ["adaptive AI", "AI coach", "self-understanding", "habits", "focus", "personal growth"],
   openGraph: {
     type: "website",
     siteName: "Synapse Adaptive",

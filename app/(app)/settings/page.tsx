@@ -69,7 +69,7 @@ export default function SettingsPage() {
       <Card className="sa-rise-2"><CardBody>
         <SectionLabel className="flex items-center gap-1.5"><Bell className="h-3.5 w-3.5" /> Notifications</SectionLabel>
         <p className="mb-4 text-sm text-muted">Calm reminders only — never anxiety-inducing alerts.</p>
-        <Toggle label="Assessment is ready" desc="A gentle nudge when your next assessment opens." on={notifs.weekly} onClick={() => setNotifs((n) => ({ ...n, weekly: !n.weekly }))} />
+        <Toggle label="Weekly review is ready" desc="A gentle nudge when your weekly review is ready." on={notifs.weekly} onClick={() => setNotifs((n) => ({ ...n, weekly: !n.weekly }))} />
         <Toggle label="Milestones" desc="Quiet celebration when you reach one." on={notifs.milestones} onClick={() => setNotifs((n) => ({ ...n, milestones: !n.milestones }))} />
         <Toggle label="Encouragement nudges" desc="Occasional notes that consistency sharpens your insights." on={notifs.nudges} onClick={() => setNotifs((n) => ({ ...n, nudges: !n.nudges }))} />
       </CardBody></Card>

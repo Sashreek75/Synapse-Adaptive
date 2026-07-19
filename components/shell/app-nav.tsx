@@ -15,7 +15,7 @@ import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { Home, HeartPulse, Activity, CreditCard, Settings, FileText, BookOpen, Menu, X, LogOut, LogIn, Sun, LineChart, Target, Sparkles, MessageCircle } from "lucide-react";
+import { Home, CreditCard, Settings, FileText, BookOpen, Menu, X, LogOut, LogIn, Target, Sparkles, MessageCircle, Timer } from "lucide-react";
 import { SynapseOrb } from "@/components/synapse/orb";
 import { ThemeToggle } from "@/components/shell/theme-toggle";
 import { useAuth } from "@/components/providers/auth-provider";
@@ -27,32 +27,29 @@ type Room = { href: string; label: string; icon: typeof Home; blurb: string };
 
 // Items that START A CONVERSATION — they inject a detailed prompt and send it.
 const asks: Ask[] = [
-  { label: "What should I focus on?", icon: Target, blurb: "The one thing that matters most today",
-    prompt: "Based on everything you know about me and my recent check-ins, what is the single most important thing I should focus on right now, and why? Give me one clear next step." },
-  { label: "Explain my numbers", icon: LineChart, blurb: "Make sense of my trends, plainly",
-    prompt: "Walk me through my latest numbers — what's moving, what it actually means for me, and what I should do about it. Keep it plain and point out anything I might have missed." },
-  { label: "My health profile", icon: HeartPulse, blurb: "Everything you understand about me",
-    prompt: "Show me my health profile as you understand it right now: my goals, my habits and lifestyle, the patterns you've noticed, my strengths and challenges, and what you're still trying to figure out about me." },
-  { label: "My playbook", icon: BookOpen, blurb: "What you've learned about how I work",
-    prompt: "Walk me through my playbook — the durable things you've learned about how I work, what tends to help me and what sets me back, with the evidence behind each one." },
-  { label: "My weekly session", icon: FileText, blurb: "This week's coaching sit-down",
-    prompt: "Give me my weekly coaching session: how you read my week, my biggest win, what concerns you most, the one thing to focus on next, and the small experiment we should run." },
-  { label: "Recommend an assessment", icon: Activity, blurb: "Only if it'd actually help",
-    prompt: "Do you think I should take an assessment right now? If so, which one and exactly why it would help you understand me better. If not, tell me what you'd want to see first." },
+  { label: "What matters today?", icon: Target, blurb: "The one thing worth your energy",
+    prompt: "Based on everything you know about me, what's the single most important thing I should focus on today, and why? Give me one clear next step." },
+  { label: "Help me plan today", icon: BookOpen, blurb: "Turn it into a realistic plan",
+    prompt: "Help me plan today. Look at what I'm working toward and my recent days, then propose a short, realistic plan — the few things that would actually make today count." },
+  { label: "Help me think this through", icon: MessageCircle, blurb: "Reason through a decision",
+    prompt: "I have a decision to think through. Ask me what it is, then help me reason it out — the tradeoffs, what fits my patterns, and your honest recommendation. Leave the choice to me." },
+  { label: "What have you learned about me?", icon: Sparkles, blurb: "How you understand me",
+    prompt: "Show me how you understand me right now: what I'm working toward, the patterns you've noticed, what tends to help me and what sets me back, and what you're still figuring out." },
+  { label: "My weekly review", icon: FileText, blurb: "Our coaching sit-down",
+    prompt: "Give me my weekly review: how you read my week, my biggest win, what concerns you most, the one thing to focus on next, and the small experiment we should run." },
 ];
 
 // Items that OPEN a real, interactive surface.
 const rooms: Room[] = [
-  { href: "/dashboard", label: "Conversation", icon: Home, blurb: "Back to talking with Synapse" },
-  { href: "/playbook", label: "What I\u2019ve learned", icon: Sparkles, blurb: "The patterns, theories, and habits I\u2019ve found in you" },
-  { href: "/daily", label: "Daily check-in", icon: Sun, blurb: "Tell me about today" },
-  { href: "/stats", label: "Your numbers", icon: LineChart, blurb: "The visual dashboard" },
-  { href: "/assessments", label: "Assessments", icon: Activity, blurb: "Run a quick cognitive check" },
+  { href: "/dashboard", label: "Talk", icon: Home, blurb: "Think it through with Synapse" },
+  { href: "/tools", label: "Focus", icon: Timer, blurb: "Timer, checklist \u2014 get moving" },
+  { href: "/playbook", label: "You", icon: Sparkles, blurb: "What Synapse understands about you" },
 ];
 
 const manage: Room[] = [
-  { href: "/billing", label: "Plan & billing", icon: CreditCard, blurb: "How deeply I get to reason" },
-  { href: "/settings", label: "Settings", icon: Settings, blurb: "Preferences, data, privacy" },
+  { href: "/report", label: "Weekly review", icon: FileText, blurb: "Our coaching sit-down" },
+  { href: "/settings", label: "Settings", icon: Settings, blurb: "Preferences, data & privacy" },
+  { href: "/billing", label: "Plan & billing", icon: CreditCard, blurb: "How deeply I reason" },
 ];
 
 export function RoomsMenu() {
@@ -122,7 +119,7 @@ export function RoomsMenu() {
           <p className="px-3 pb-1 pt-4 text-[11px] font-semibold uppercase tracking-wider text-muted/70">Go to</p>
           {rooms.map((r) => <RoomLink key={r.href} room={r} active={isActive(pathname, r.href)} />)}
 
-          <p className="px-3 pb-1 pt-4 text-[11px] font-semibold uppercase tracking-wider text-muted/70">Manage</p>
+          <p className="px-3 pb-1 pt-4 text-[11px] font-semibold uppercase tracking-wider text-muted/70">More</p>
           {manage.map((r) => <RoomLink key={r.href} room={r} active={isActive(pathname, r.href)} />)}
         </nav>
 

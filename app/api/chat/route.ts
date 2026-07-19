@@ -16,10 +16,10 @@ function fallback(message: string, hasData: boolean): { content?: string; sectio
   const aboutSynapse = /\b(your name|like the name|who are you|what are you|synapse|founder|created you|do you like)\b/.test(m);
 
   if (aboutSynapse) {
-    return { content: "I'm Synapse — your health intelligence companion. And yes, I'm fond of the name: a synapse is where signals connect, which is exactly my job — connecting the dots in your health over time so things make more sense. It's good to meet you. Whenever you're ready, complete a check-in and I'll start learning your patterns." };
+    return { content: "I'm Synapse — your adaptive AI partner. I'm fond of the name: a synapse is where signals connect, which is exactly my job — connecting the dots in how you work over time so you can act on them. Good to meet you. Tell me what you're working on, or do a quick check-in, and I'll start learning how you tick." };
   }
   if (isGreeting) {
-    return { content: "Hi — I'm Synapse. Good to see you. I'm here to help you understand how you're doing over time. Ask me anything, or complete a check-in and I'll start spotting what's changing for you." };
+    return { content: "Hi — I'm Synapse, your adaptive AI partner. Good to see you. I learn how you work and help you act on it. Tell me what you're working on, or do a quick check-in, and I'll start spotting what's changing for you." };
   }
   if (!hasData) {
     return { content: "I'd love to dig in, but I don't have any check-ins from you yet — so I'd just be guessing, and I'd rather be honest than do that. Complete your first check-in and I'll start reasoning over your real data. In the meantime, is there anything about how Synapse works you'd like to know?" };

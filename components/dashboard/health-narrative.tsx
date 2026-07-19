@@ -29,7 +29,7 @@ export function HealthNarrative() {
     <Card className="sa-rise overflow-hidden">
       <div className="mesh"><CardBody>
         <div className="mb-2 inline-flex items-center gap-2 rounded-full bg-surface/70 px-3 py-1 text-xs font-semibold text-navy-600">
-          <Sparkles className="h-3.5 w-3.5 text-orange-500" /> Your Health Profile
+          <Sparkles className="h-3.5 w-3.5 text-orange-500" /> How Synapse sees you
         </div>
         <p className="text-lg leading-relaxed text-ink">{profile.aiSummary}</p>
       </CardBody></div>

@@ -71,10 +71,10 @@ export const PATHS: PathDef[] = [
     summaryLead: (p) => `Your goal is ${p.goals[0]?.toLowerCase() || "performing at your best"}. We'll monitor readiness, fatigue, reaction time, and sleep across your training.`,
   },
   {
-    id: "general", label: "I just want to understand my health over time",
-    focusNoun: "health", scoreLabel: "Weekly Health Score",
+    id: "general", label: "I want to grow and get more out of my days",
+    focusNoun: "progress", scoreLabel: "Weekly Progress Score",
     goalMetrics: ["sleep_quality", "fatigue", "mood", "stress"], isRecovery: false, asksCondition: false, asksSport: false,
-    summaryLead: () => `Your goal is to understand your health over time. We'll build a baseline first and let what matters most to you emerge as you check in. ${focusLine}`,
+    summaryLead: () => `Your goal is to make steady progress toward what matters to you. We'll build a baseline first and let what matters most emerge as you check in. ${focusLine}`,
   },
 ];
 

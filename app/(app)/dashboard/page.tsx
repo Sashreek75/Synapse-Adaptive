@@ -13,12 +13,13 @@
 
 import { useMemo } from "react";
 import Link from "next/link";
-import { HeartPulse, Sun, ArrowRight, LineChart, CheckCircle2 } from "lucide-react";
+import { HeartPulse, Sun, ArrowRight, CheckCircle2 } from "lucide-react";
 import { useHealth } from "@/components/providers/health-store";
 import { Button, Skeleton } from "@/components/ui/primitives";
 import { SynapseOrb } from "@/components/synapse/orb";
 import { FocusOfWeek } from "@/components/dashboard/focus-of-week";
 import { GeneratedDashboard } from "@/components/dashboard/generated-dashboard";
+import { FirstWeek } from "@/components/dashboard/first-week";
 import { AgentConsole } from "@/components/agent/agent-console";
 import { sessionOpener } from "@/lib/intelligence";
 import { copy } from "@/lib/copy";
@@ -30,6 +31,11 @@ export default function HomePage() {
     () => sessionOpener(profile, series, recentChanges, contextNotes, checkIns, dailyDoneToday, weeksTracked),
     [profile, series, recentChanges, contextNotes, checkIns, dailyDoneToday, weeksTracked],
   );
+
+  // The first seven days are their own experience — an unfolding investigation —
+  // shown in place of the engine strips until there's enough data for a real read.
+  const distinctDays = useMemo(() => new Set(checkIns.map((c) => c.date.slice(0, 10))).size, [checkIns]);
+  const inFirstWeek = !!profile.onboardedAt && distinctDays < 7;
 
   if (!hydrated) {
     return (
@@ -98,14 +104,13 @@ export default function HomePage() {
           <p className="flex items-center gap-2 px-1 text-sm text-muted"><CheckCircle2 className="h-4 w-4 shrink-0 text-emerald-500" /> You&apos;ve checked in today — I&apos;m folding it into what I know about you.</p>
         )}
 
-        <FocusOfWeek />
-        <GeneratedDashboard />
-
-        {hasData && (
-          <Link href="/stats" className="group flex items-center justify-between rounded-2xl border bg-surface/60 px-4 py-3 text-sm text-muted transition hover:text-ink">
-            <span className="inline-flex items-center gap-2"><LineChart className="h-4 w-4 text-navy-500" /> See all your numbers</span>
-            <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-0.5" />
-          </Link>
+        {inFirstWeek ? (
+          <FirstWeek />
+        ) : (
+          <>
+            <FocusOfWeek />
+            <GeneratedDashboard />
+          </>
         )}
       </div>
 

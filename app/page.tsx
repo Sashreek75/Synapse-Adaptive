@@ -87,12 +87,12 @@ function Hero() {
               <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-orange-400 opacity-60" />
               <span className="relative inline-flex h-2 w-2 rounded-full bg-orange-500" />
             </span>
-            An AI health companion that learns you
+            An adaptive AI partner that learns how you work
           </div>
 
           <h1 className="animate-fade-up mt-6 text-balance text-5xl font-bold leading-[1.05] tracking-tight text-ink sm:text-6xl xl:text-7xl">
-            A health companion
-            <span className="block sa-gradient-text">that actually knows you.</span>
+            The AI partner that learns how you work
+            <span className="block sa-gradient-text">and helps you become who you want to be.</span>
           </h1>
 
           <p className="animate-fade-up mx-auto mt-6 max-w-xl text-lg leading-relaxed text-muted lg:mx-0">
@@ -320,7 +320,7 @@ function Features() {
     { icon: Brain, t: "A memory that compounds", d: "Your Personal Playbook grows every week: what helps you, what sets you back, what you've tried." },
     { icon: HeartPulse, t: "Advice that fits your life", d: "Two people with the same numbers get different guidance — yours accounts for your goals, work, and schedule." },
     { icon: MessageCircleQuestion, t: "Proactive, never spammy", d: "It opens the conversation when it notices something that matters — and stays quiet when nothing does." },
-    { icon: LineChart, t: "Your numbers, on demand", d: "A clean dashboard whenever you want to see the trends — but the coaching is the point, not the charts." },
+    { icon: LineChart, t: "See what Synapse has learned about you", d: "Your evolving understanding, whenever you want it — the understanding is the point, not the charts." },
     { icon: ShieldCheck, t: "Private, synced, yours", d: "Follows you across devices in your account, never sold, and yours to export or delete." },
   ];
   return (
@@ -328,8 +328,7 @@ function Features() {
       <Eyebrow>Features</Eyebrow>
       <H2>Everything in service of one question.</H2>
       <p className="mt-3 max-w-2xl text-lg text-muted">
-        Does this help you make a better-informed health decision between
-        appointments? If not, it isn&apos;t here.
+        Does this help you become who you&apos;re trying to become? If not, it isn&apos;t here.
       </p>
       <div className="mt-12 grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
         {f.map(({ icon: Icon, t, d }) => (
@@ -371,9 +370,9 @@ function Testimonials() {
 
 function Roadmap() {
   const r = [
-    { phase: "Now", t: "The companion", d: "Conversation-first coaching, a memory that compounds, proactive insights, and your numbers on demand." },
-    { phase: "Next", t: "Deeper context", d: "Optional wearable & sleep imports to enrich the picture." },
-    { phase: "Later", t: "Care collaboration", d: "Shareable provider summaries and, eventually, clinician tools." },
+    { phase: "Now", t: "The partner", d: "Conversation-first coaching, a memory that compounds, proactive insights, and a picture of how you work that deepens every week." },
+    { phase: "Next", t: "Deeper context", d: "Optional imports — calendar, wearables — to enrich the picture." },
+    { phase: "Later", t: "Alongside your world", d: "Working with the people and tools you already rely on." },
   ];
   return (
     <Section>
@@ -428,7 +427,7 @@ function CTA() {
         <div className="relative">
           <div className="mx-auto mb-7 w-fit"><SynapseOrb size={72} /></div>
           <h2 className="mx-auto max-w-2xl text-balance text-3xl font-semibold tracking-tight sm:text-4xl">
-            Meet a health companion that learns you.
+            Meet the AI partner that learns how you work.
           </h2>
           <p className="mx-auto mt-4 max-w-xl text-navy-100/80">
             Not another tracker — a companion that remembers, personalizes, and helps you
@@ -454,7 +453,7 @@ function Footer() {
               Synapse Adaptive
             </div>
             <p className="mt-3 max-w-sm text-sm leading-relaxed text-muted">
-              An AI health companion that learns you and helps you decide what to do next.
+              An adaptive AI partner that learns how you work and helps you become who you want to be.
             </p>
           </div>
           <div className="text-sm text-muted">
@@ -527,7 +526,7 @@ function Pricing() {
         <p className="mt-2 text-lg leading-relaxed text-muted">
           The real difference with <b className="text-ink">Pro</b> and <b className="text-ink">Max</b>?
           You get that same &ldquo;here&apos;s what I noticed, here&apos;s what I&apos;d do&rdquo; guidance
-          <b className="text-ink"> every single day</b> — proactively, on your dashboard — plus the ability
+          <b className="text-ink"> every single day</b> — proactively, right in the conversation — plus the ability
           to reason it through with Synapse anytime. Daily guidance is the upgrade.
         </p>
       </div>

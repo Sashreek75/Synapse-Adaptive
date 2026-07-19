@@ -24,7 +24,7 @@ const steps = [
   {
     icon: Menu,
     title: "The menu is how you ask",
-    body: "Tap the menu (top-right). Most items — your health profile, playbook, weekly session, an assessment — drop a question straight into the chat and Synapse answers right away.",
+    body: "Tap the menu (top-right): Talk, Focus, and You, plus your weekly review. Most items drop a question straight into the chat and Synapse answers right away.",
   },
   {
     icon: Sun,
@@ -33,8 +33,8 @@ const steps = [
   },
   {
     icon: LineChart,
-    title: "Your numbers, when you want them",
-    body: "Open “Your numbers” from the menu for the visual dashboard. But the coaching is the point — the charts are just there when you want to look.",
+    title: "You — how Synapse sees you",
+    body: "Open You any time to see what Synapse has learned about how you work — your patterns, what's helping, and what it's still figuring out.",
   },
   {
     icon: Eraser,

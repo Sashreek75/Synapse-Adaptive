@@ -1,7 +1,6 @@
 import { redirect } from "next/navigation";
 
-/** Folded into the Health Profile (founding-doc pivot): the profile narrates
- * how Synapse's understanding evolved, which is what the timeline was for. */
+/** Folded into You — how Synapse's understanding of you has evolved lives there. */
 export default function TimelinePage() {
-  redirect("/profile");
+  redirect("/playbook");
 }

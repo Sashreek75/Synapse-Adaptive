@@ -191,7 +191,7 @@ export default function WeeklyReportPage() {
               )}
             </div>
           </div>
-          <Button variant="outline" size="sm" className="print:hidden" onClick={() => window.print()}><Printer className="h-4 w-4" /> Print</Button>
+          <Button variant="outline" size="sm" className="hidden shrink-0 sm:inline-flex print:hidden" onClick={() => window.print()}><Printer className="h-4 w-4" /> Print</Button>
         </div>
         {loading && !report ? <Skeleton className="mt-5 h-16 w-full rounded-xl" /> : (
           <>
@@ -332,7 +332,7 @@ export default function WeeklyReportPage() {
             {openQ.map((q) => <li key={q.id} className="flex items-start gap-2.5 text-ink"><span className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-orange-500" />{q.text}</li>)}
             {providerFromInsights.filter((q) => !openQ.some((o) => o.text === q)).map((q) => <li key={q} className="flex items-start gap-2.5 text-muted"><span className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-line" />“{q}”</li>)}
           </ul>
-        ) : <p className="text-muted">None saved yet — ask me anything and I&apos;ll suggest a few worth raising.</p>}
+        ) : <p className="text-muted">None saved yet — bring up whatever&apos;s on your mind and I&apos;ll suggest a few worth raising.</p>}
       </Chapter>
 
       <Chapter q="What you've told me" icon={MessageCircle}>

@@ -11,15 +11,15 @@
 export const copy = {
   reportReady: {
     title: "Nice work completing another check-in.",
-    body: "Every assessment helps us understand your recovery a little better over time.",
+    body: "Every check-in helps me understand how you work a little better over time.",
   },
   assessmentDone: {
     title: "That's done — thank you for taking a few minutes for yourself today.",
     body: "I'll take a look at what changed and have a few thoughts for you shortly.",
   },
   coldStart: {
-    title: "We're just getting to know your recovery.",
-    body: "A couple more check-ins and patterns will start to come into focus. There's no rush.",
+    title: "We're just getting to know you.",
+    body: "A few check-ins and I'll start to see how you work — your rhythms, what helps, what doesn't. There's no rush.",
   },
   missedWeek: {
     title: "No worries if this week got away from you.",
@@ -27,7 +27,7 @@ export const copy = {
   },
   milestone: {
     title: "That's a milestone worth pausing on.",
-    body: "Steady, consistent effort is exactly what moves recovery forward.",
+    body: "Steady, consistent effort is exactly what moves you forward.",
   },
   greeting: (name: string, hour = new Date().getHours()) => {
     const part = hour < 12 ? "Good morning" : hour < 18 ? "Good afternoon" : "Good evening";
