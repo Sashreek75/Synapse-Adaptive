@@ -9,7 +9,7 @@
  */
 
 import { useState } from "react";
-import { ArrowRight, Menu, Sun, LineChart, Eraser, MessageCircle } from "lucide-react";
+import { ArrowRight, Menu, Sun, LineChart, Eraser, MessageCircle, Timer } from "lucide-react";
 import { useHealth } from "@/components/providers/health-store";
 import { SynapseOrb } from "@/components/synapse/orb";
 import { Button } from "@/components/ui/primitives";
@@ -30,6 +30,11 @@ const steps = [
     icon: Sun,
     title: "Check in to get smarter",
     body: "A 20-second daily check-in is how Synapse learns your patterns. The more you check in, the more personal — and more useful — it becomes each week.",
+  },
+  {
+    icon: Timer,
+    title: "A focus companion, on tap",
+    body: "Tell Synapse what you are working on and it tucks into the corner as a quiet orb — it keeps time, stays out of your way, and you can talk to it any moment without losing your flow. Pop it out and it stays beside you even in other tabs.",
   },
   {
     icon: LineChart,

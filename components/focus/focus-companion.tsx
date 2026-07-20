@@ -9,17 +9,16 @@
  * — NEVER page content, never what is typed. It speaks at most twice per session, only
  * when a check-in has truly earned it, always as support, never correction.
  *
- * Three things make it feel alive without an engine:
- *  1. It REMEMBERS how sessions unfold (a small local log) and makes the occasional
- *     honest longitudinal observation — only when the data supports it.
- *  2. Tapping it is just Synapse, minimized — talk naturally and it adapts in place.
- *  3. It LEARNS whether THIS person responds to check-ins, and intrudes less if not.
+ * It can POP OUT into an always-on-top window (Document Picture-in-Picture, where the
+ * browser supports it) so it stays beside you when you switch tabs or apps — present
+ * whenever you need it, without pulling you back into Synapse. It still watches nothing.
  *
  * Silence is the success state.
  */
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { X, Coffee, Brain, Check, ArrowRight, Plus } from "lucide-react";
+import { createPortal } from "react-dom";
+import { X, Coffee, Brain, Check, ArrowRight, Plus, ExternalLink } from "lucide-react";
 import { SynapseOrb } from "@/components/synapse/orb";
 import { useHealth } from "@/components/providers/health-store";
 import { useSubscription } from "@/components/providers/subscription-provider";
@@ -38,6 +37,8 @@ interface Line { id: string; from: "synapse" | "you"; text: string }
 /** How long after a check-in we watch for a response before judging it (in)effective. */
 const EFFECTIVE_WINDOW_MS = 90_000;
 
+const pipSupported = () => typeof window !== "undefined" && "documentPictureInPicture" in window;
+
 export function FocusCompanion() {
   const { mind } = useHealth();
   const { plan } = useSubscription();
@@ -48,6 +49,7 @@ export function FocusCompanion() {
   const [bubble, setBubble] = useState<Nudge | null>(null);
   const [note, setNote] = useState("");
   const [thinking, setThinking] = useState(false);
+  const [pipWin, setPipWin] = useState<Window | null>(null);
 
   const awaySince = useRef<number | null>(null);
   const lastActivity = useRef<number>(Date.now());
@@ -157,6 +159,31 @@ export function FocusCompanion() {
     };
   }, [session, evaluate, resolvePending]);
 
+  // POP OUT — an always-on-top window that stays beside you across tabs and apps.
+  const openPiP = useCallback(async () => {
+    try {
+      const dpip = (window as unknown as { documentPictureInPicture?: { requestWindow: (o: { width: number; height: number }) => Promise<Window> } }).documentPictureInPicture;
+      if (!dpip) return;
+      const w = await dpip.requestWindow({ width: 340, height: 470 });
+      // Bring the app's styles + theme + font into the pop-out so it looks like Synapse.
+      document.querySelectorAll('style, link[rel="stylesheet"]').forEach((node) => { try { w.document.head.appendChild(node.cloneNode(true)); } catch {} });
+      w.document.documentElement.className = document.documentElement.className;
+      w.document.body.className = document.body.className;
+      w.document.body.style.margin = "0";
+      w.document.title = "Synapse";
+      w.addEventListener("pagehide", () => setPipWin(null));
+      setOpen(false);
+      setPipWin(w);
+    } catch {}
+  }, []);
+  const closePiP = useCallback(() => { try { pipWin?.close(); } catch {} setPipWin(null); }, [pipWin]);
+
+  // Close the pop-out when the session ends or the companion unmounts.
+  useEffect(() => {
+    if (!session && pipWin) { try { pipWin.close(); } catch {} setPipWin(null); }
+  }, [session, pipWin]);
+  useEffect(() => () => { try { pipWin?.close(); } catch {} }, [pipWin]);
+
   const endSession = useCallback(() => {
     finishAndRecord(false);
     persist(null);
@@ -213,74 +240,100 @@ export function FocusCompanion() {
   if (!session) return null;
 
   const currentReplies = bubble?.replies ?? [];
+  const canPop = pipSupported() && !pipWin;
+
+  // The panel guts — rendered inline (corner card) OR inside the pop-out window.
+  const panelInner = (
+    <>
+      <div className="flex items-center justify-between gap-3 border-b px-4 py-3">
+        <div className="min-w-0">
+          <p className="text-[11px] font-semibold uppercase tracking-wider text-muted">{session.mode === "break" ? "Break" : "Focusing"}</p>
+          <p className="truncate text-sm font-medium text-ink">{session.goal || (session.mode === "break" ? "Resting" : "Focus session")}</p>
+        </div>
+        <div className="flex items-center gap-1">
+          <span className="tabular-nums text-lg font-semibold text-ink">{fmtClock(rem)}</span>
+          {canPop && (
+            <button onClick={openPiP} aria-label="Pop out" title="Pop out — stays beside you across tabs and apps" className="grid h-8 w-8 place-items-center rounded-full text-muted hover:bg-surface-2 hover:text-ink"><ExternalLink className="h-4 w-4" /></button>
+          )}
+          <button onClick={() => (pipWin ? closePiP() : setOpen(false))} aria-label={pipWin ? "Dock back into Synapse" : "Minimize"} title={pipWin ? "Dock back" : "Minimize"} className="grid h-8 w-8 place-items-center rounded-full text-muted hover:bg-surface-2 hover:text-ink"><X className="h-4 w-4" /></button>
+        </div>
+      </div>
+
+      <div className="max-h-56 space-y-2 overflow-y-auto px-4 py-3">
+        {thread.map((l) => (
+          <p key={l.id} className={cn("text-sm leading-relaxed", l.from === "you" ? "text-right text-ink" : "text-muted")}>
+            {l.from === "you" ? <span className="inline-block rounded-2xl bg-surface-2 px-3 py-1.5">{l.text}</span> : l.text}
+          </p>
+        ))}
+        {thinking && <p className="text-sm text-muted">Thinking…</p>}
+        {currentReplies.length > 0 && (
+          <div className="flex flex-wrap gap-2 pt-1">
+            {currentReplies.map((rp) => (
+              <button key={rp.label} onClick={() => onReply(rp.intent)} className="rounded-full border bg-surface px-3 py-1.5 text-xs font-medium text-ink transition hover:bg-surface-2">{rp.label}</button>
+            ))}
+          </div>
+        )}
+      </div>
+
+      <div className="flex items-center gap-2 border-t px-3 py-2.5">
+        <input value={note} onChange={(e) => setNote(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") void send(); }}
+          placeholder="Talk to Synapse…"
+          className="min-w-0 flex-1 rounded-full border bg-surface px-3 py-1.5 text-sm text-ink placeholder:text-muted focus:outline-none" />
+        <button onClick={() => void send()} disabled={thinking || !note.trim()} aria-label="Send" className="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-orange-500 text-white transition hover:bg-orange-600 disabled:opacity-50"><ArrowRight className="h-4 w-4" /></button>
+      </div>
+
+      <div className="flex items-center justify-between gap-2 border-t px-3 py-2.5">
+        <button onClick={() => { const s = loadSession(); if (s) persist({ ...s, endsAt: s.endsAt + 15 * 60_000, durationSec: s.durationSec + 15 * 60 }); }}
+          className="inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-medium text-muted hover:bg-surface-2 hover:text-ink"><Plus className="h-3.5 w-3.5" /> 15 min</button>
+        {session.mode === "focus"
+          ? <button onClick={() => startBlock(null, 5, "break")} className="inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-medium text-muted hover:bg-surface-2 hover:text-ink"><Coffee className="h-3.5 w-3.5" /> Break</button>
+          : <button onClick={() => startBlock(null, 25, "focus")} className="inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-medium text-muted hover:bg-surface-2 hover:text-ink"><Brain className="h-3.5 w-3.5" /> Focus</button>}
+        <button onClick={() => { say("Anytime. I'm here when you want to go again."); setTimeout(() => endSession(), 900); }}
+          className="inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-medium text-muted hover:bg-surface-2 hover:text-ink"><Check className="h-3.5 w-3.5" /> End</button>
+      </div>
+    </>
+  );
 
   return (
-    <div className="fixed bottom-4 right-4 z-[80] flex flex-col items-end gap-2 pb-[env(safe-area-inset-bottom)] pr-[env(safe-area-inset-right)] print:hidden">
-      {open && (
-        <div role="dialog" aria-label="Focus companion" className="w-[min(20rem,88vw)] overflow-hidden rounded-3xl border bg-surface/95 shadow-lift backdrop-blur animate-fade-up">
-          <div className="flex items-center justify-between gap-3 border-b px-4 py-3">
-            <div className="min-w-0">
-              <p className="text-[11px] font-semibold uppercase tracking-wider text-muted">{session.mode === "break" ? "Break" : "Focusing"}</p>
-              <p className="truncate text-sm font-medium text-ink">{session.goal || (session.mode === "break" ? "Resting" : "Focus session")}</p>
-            </div>
-            <div className="flex items-center gap-2">
-              <span className="tabular-nums text-lg font-semibold text-ink">{fmtClock(rem)}</span>
-              <button onClick={() => setOpen(false)} aria-label="Minimize" className="grid h-8 w-8 place-items-center rounded-full text-muted hover:bg-surface-2 hover:text-ink"><X className="h-4 w-4" /></button>
-            </div>
-          </div>
-
-          <div className="max-h-56 space-y-2 overflow-y-auto px-4 py-3">
-            {thread.map((l) => (
-              <p key={l.id} className={cn("text-sm leading-relaxed", l.from === "you" ? "text-right text-ink" : "text-muted")}>
-                {l.from === "you" ? <span className="inline-block rounded-2xl bg-surface-2 px-3 py-1.5">{l.text}</span> : l.text}
-              </p>
-            ))}
-            {thinking && <p className="text-sm text-muted">Thinking…</p>}
-            {currentReplies.length > 0 && (
-              <div className="flex flex-wrap gap-2 pt-1">
-                {currentReplies.map((rp) => (
-                  <button key={rp.label} onClick={() => onReply(rp.intent)} className="rounded-full border bg-surface px-3 py-1.5 text-xs font-medium text-ink transition hover:bg-surface-2">{rp.label}</button>
-                ))}
-              </div>
-            )}
-          </div>
-
-          <div className="flex items-center gap-2 border-t px-3 py-2.5">
-            <input value={note} onChange={(e) => setNote(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") void send(); }}
-              placeholder="Talk to Synapse…"
-              className="min-w-0 flex-1 rounded-full border bg-surface px-3 py-1.5 text-sm text-ink placeholder:text-muted focus:outline-none" />
-            <button onClick={() => void send()} disabled={thinking || !note.trim()} aria-label="Send" className="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-orange-500 text-white transition hover:bg-orange-600 disabled:opacity-50"><ArrowRight className="h-4 w-4" /></button>
-          </div>
-
-          <div className="flex items-center justify-between gap-2 border-t px-3 py-2.5">
-            <button onClick={() => { const s = loadSession(); if (s) persist({ ...s, endsAt: s.endsAt + 15 * 60_000, durationSec: s.durationSec + 15 * 60 }); }}
-              className="inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-medium text-muted hover:bg-surface-2 hover:text-ink"><Plus className="h-3.5 w-3.5" /> 15 min</button>
-            {session.mode === "focus"
-              ? <button onClick={() => startBlock(null, 5, "break")} className="inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-medium text-muted hover:bg-surface-2 hover:text-ink"><Coffee className="h-3.5 w-3.5" /> Break</button>
-              : <button onClick={() => startBlock(null, 25, "focus")} className="inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-medium text-muted hover:bg-surface-2 hover:text-ink"><Brain className="h-3.5 w-3.5" /> Focus</button>}
-            <button onClick={() => { say("Anytime. I'm here when you want to go again."); setTimeout(() => endSession(), 900); }}
-              className="inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-medium text-muted hover:bg-surface-2 hover:text-ink"><Check className="h-3.5 w-3.5" /> End</button>
-          </div>
-        </div>
+    <>
+      {pipWin && createPortal(
+        <div className="flex min-h-screen flex-col bg-surface text-ink">{panelInner}</div>,
+        pipWin.document.body,
       )}
 
-      {!open && bubble && (
-        <button onClick={() => setOpen(true)}
-          className="max-w-[min(18rem,80vw)] rounded-2xl border bg-surface/95 px-3.5 py-2.5 text-left text-sm leading-relaxed text-ink shadow-lift backdrop-blur animate-fade-up">
-          {bubble.text}
-          {currentReplies.length > 0 && <span className="mt-1 block text-xs font-medium text-orange-600 dark:text-orange-400">Tap to reply</span>}
+      <div className="fixed bottom-4 right-4 z-[80] flex flex-col items-end gap-2 pb-[env(safe-area-inset-bottom)] pr-[env(safe-area-inset-right)] print:hidden">
+        {!pipWin && open && (
+          <div role="dialog" aria-label="Focus companion" className="w-[min(20rem,88vw)] overflow-hidden rounded-3xl border bg-surface/95 shadow-lift backdrop-blur animate-fade-up">
+            {panelInner}
+          </div>
+        )}
+
+        {!pipWin && !open && bubble && (
+          <button onClick={() => setOpen(true)}
+            className="max-w-[min(18rem,80vw)] rounded-2xl border bg-surface/95 px-3.5 py-2.5 text-left text-sm leading-relaxed text-ink shadow-lift backdrop-blur animate-fade-up">
+            {bubble.text}
+            {currentReplies.length > 0 && <span className="mt-1 block text-xs font-medium text-orange-600 dark:text-orange-400">Tap to reply</span>}
+          </button>
+        )}
+
+        {pipWin && (
+          <button onClick={() => { try { pipWin.focus(); } catch {} }}
+            className="rounded-full border bg-surface/95 px-3 py-1.5 text-xs font-medium text-muted shadow-soft backdrop-blur">
+            Popped out — I'm beside you ↗
+          </button>
+        )}
+
+        <button onClick={() => { if (pipWin) { try { pipWin.focus(); } catch {} } else { setOpen((v) => !v); setBubble(null); } }}
+          aria-label={pipWin ? "Focus the pop-out window" : open ? "Minimize focus companion" : `Focus companion — ${fmtClock(rem)} left`}
+          className="relative grid h-16 w-16 place-items-center rounded-full transition-transform hover:scale-[1.03] active:scale-95">
+          <svg viewBox="0 0 64 64" className="absolute inset-0 h-full w-full -rotate-90" aria-hidden>
+            <circle cx="32" cy="32" r={r} fill="none" stroke="currentColor" strokeWidth="2.5" className="text-line/60" />
+            <circle cx="32" cy="32" r={r} fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"
+              className="text-orange-500 transition-[stroke-dashoffset] duration-1000 ease-linear" strokeDasharray={circ} strokeDashoffset={offset} />
+          </svg>
+          <SynapseOrb size={40} state={thinking ? "thinking" : "idle"} />
         </button>
-      )}
-
-      <button onClick={() => { setOpen((v) => !v); setBubble(null); }} aria-label={open ? "Minimize focus companion" : `Focus companion — ${fmtClock(rem)} left`}
-        className="relative grid h-16 w-16 place-items-center rounded-full transition-transform hover:scale-[1.03] active:scale-95">
-        <svg viewBox="0 0 64 64" className="absolute inset-0 h-full w-full -rotate-90" aria-hidden>
-          <circle cx="32" cy="32" r={r} fill="none" stroke="currentColor" strokeWidth="2.5" className="text-line/60" />
-          <circle cx="32" cy="32" r={r} fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"
-            className="text-orange-500 transition-[stroke-dashoffset] duration-1000 ease-linear" strokeDasharray={circ} strokeDashoffset={offset} />
-        </svg>
-        <SynapseOrb size={40} state={thinking ? "thinking" : "idle"} />
-      </button>
-    </div>
+      </div>
+    </>
   );
 }
