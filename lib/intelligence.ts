@@ -5,10 +5,10 @@
  */
 import { computeTrend, relativeLevel } from "@/lib/stats";
 import { computeAssociations } from "@/lib/correlations";
-import { METRIC_META, metricLabel } from "@/lib/metrics";
+import { signalLabel, signalDirection } from "@/lib/signals";
 import { getPath, goalMetricsForPath } from "@/lib/paths";
 import type { CheckIn, ContextNote, Profile, UnderstandingSnapshot } from "@/components/providers/health-store";
-import type { Confidence, MetricKey, MetricSeries, RecentChange } from "@/types";
+import type { Confidence, SignalId, MetricSeries, RecentChange } from "@/types";
 
 const dayKey = (iso: string) => iso.slice(0, 10);
 const daysSince = (iso: string) => Math.max(0, Math.round((Date.now() - new Date(iso).getTime()) / 864e5));
@@ -47,18 +47,18 @@ export function currentMilestone(s: Streak): string | null {
   return null;
 }
 
-interface MetricStatus { metric: MetricKey; label: string; worth: number; stable: boolean; declining: boolean; }
+interface MetricStatus { metric: SignalId; label: string; worth: number; stable: boolean; declining: boolean; }
 
-function statuses(series: MetricSeries[], goals: MetricKey[]): MetricStatus[] {
+function statuses(series: MetricSeries[], goals: SignalId[]): MetricStatus[] {
   return series.map((s) => {
     const t = computeTrend(s);
-    const higher = METRIC_META[s.metric].direction === "higher_is_better";
+    const higher = signalDirection(s.metric) === "higher_is_better";
     const declining = higher ? t.delta < -3 : t.delta > 3;
     const stable = t.n >= 4 && t.volatility < 8 && Math.abs(t.delta) < 4;
     const worth =
       (declining ? 1.2 : 0) + Math.min(1, t.volatility / 12) + Math.min(1, Math.abs(t.slope) / 4) +
       (goals.includes(s.metric) ? 0.6 : 0) - (stable ? 0.8 : 0);
-    return { metric: s.metric, label: metricLabel(s.metric), worth, stable, declining };
+    return { metric: s.metric, label: signalLabel(s.metric), worth, stable, declining };
   });
 }
 
@@ -154,11 +154,11 @@ export interface Recommendation {
   id: string;
   title: string;
   body: string;
-  metric?: MetricKey;
+  metric?: SignalId;
   why: ExplainWhy;
 }
 
-const REC_COPY: Partial<Record<MetricKey, { title: string; body: string; matters: string; alt: string }>> = {
+const REC_COPY: Partial<Record<SignalId, { title: string; body: string; matters: string; alt: string }>> = {
   sleep_quality: { title: "Protect a consistent sleep window", body: "Try keeping your bed and wake times within about a 30-minute range this week — consistency tends to matter more than total hours.", matters: "Across your own check-ins, steadier sleep has lined up with your better days, so it's a high-leverage lever to hold steady.", alt: "A stretch of late nights, travel, or a temporary schedule change could explain this just as well as a deeper pattern." },
   fatigue: { title: "Build in one real recovery block", body: "Pick one day this week for a genuinely lighter load — your energy readings suggest you've been running a little closer to empty.", matters: "Letting energy recover deliberately tends to protect the other trends Synapse watches, rather than letting a dip compound.", alt: "A heavy week, an illness coming on, or harder training could each explain lower energy on their own." },
   stress: { title: "Add a small daily decompress", body: "A five-minute wind-down at the same time each day — a walk, breathing, anything that's yours. Small and repeatable beats occasional and big.", matters: "Stress quietly colors sleep, focus, and mood, so easing it a little often lifts several trends at once.", alt: "A temporary crunch at work or school could account for this without it becoming a lasting pattern." },
@@ -180,7 +180,7 @@ export function todaysRecommendation(series: MetricSeries[], path: string, recen
   if (watch && (watch.declining || !win)) {
     const copy = REC_COPY[watch.metric] ?? REC_COPY.sleep_quality!;
     const t = computeTrend(series.find((s) => s.metric === watch.metric)!);
-    const label = metricLabel(watch.metric).toLowerCase();
+    const label = signalLabel(watch.metric).toLowerCase();
     return {
       id: `rec_${watch.metric}`,
       title: copy.title,
@@ -279,7 +279,7 @@ export function sessionOpener(
  * over time; profileEvolution() narrates how that understanding has shifted.
  * ========================================================================== */
 
-export interface Understanding { focus: string[]; leadMetric?: MetricKey; read: string; }
+export interface Understanding { focus: string[]; leadMetric?: SignalId; read: string; }
 
 /** Synapse's read of the user right now — focus areas, the clearest signal, one line. */
 export function currentUnderstanding(series: MetricSeries[], path: string, recent: RecentChange[]): Understanding {
@@ -321,7 +321,7 @@ export function profileEvolution(log: UnderstandingSnapshot[]): Evolution | null
   for (const f of dropped.slice(0, 2)) shifts.push(`${f} is no longer one of your main focuses — it's settled into a steadier place.`);
   for (const f of added.slice(0, 2)) shifts.push(`${f} has become something I'm watching more closely.`);
   if (to.leadMetric && (!from.leadMetric || from.leadMetric !== to.leadMetric)) {
-    shifts.push(`Your ${metricLabel(to.leadMetric).toLowerCase()} has become one of your most telling signals.`);
+    shifts.push(`Your ${signalLabel(to.leadMetric).toLowerCase()} has become one of your most telling signals.`);
   }
   if (!shifts.length) {
     shifts.push(`Your focus has held steady — ${list(to.focus.slice(0, 2).map((f) => f.toLowerCase()))} remain central. Consistency like that is exactly what makes my read of you reliable.`);
@@ -344,7 +344,7 @@ export function profileEvolution(log: UnderstandingSnapshot[]): Evolution | null
  * ========================================================================== */
 
 /** Direct, behavioral (never medical) actions, led by the verb. */
-const DIRECT_ACTION: Partial<Record<MetricKey, string>> = {
+const DIRECT_ACTION: Partial<Record<SignalId, string>> = {
   sleep_quality: "Tonight, guard a consistent lights-out time — even 30 minutes earlier and steadier is the highest-leverage move you have right now.",
   fatigue: "Build one genuine recovery block into tomorrow — a lighter load or a real break — before your energy compounds downward.",
   stress: "Take five minutes today to decompress on purpose — a walk or slow breathing — rather than pushing straight through.",
@@ -371,14 +371,14 @@ export interface DailyReflection {
 export function dailyReflection(series: MetricSeries[], path: string): DailyReflection {
   const goals = goalMetricsForPath(path);
   // Biggest concerning + biggest encouraging mover today vs the user's baseline.
-  type Mover = { metric: MetricKey; label: string; latest: number; delta: number; improving: boolean; n: number };
+  type Mover = { metric: SignalId; label: string; latest: number; delta: number; improving: boolean; n: number };
   const movers: Mover[] = [];
   for (const s of series) {
     const t = computeTrend(s);
     if (t.n < 2 || Math.abs(t.delta) < 4) continue;
-    const higher = METRIC_META[s.metric].direction === "higher_is_better";
+    const higher = signalDirection(s.metric) === "higher_is_better";
     movers.push({
-      metric: s.metric, label: metricLabel(s.metric), latest: Math.round(t.latest),
+      metric: s.metric, label: signalLabel(s.metric), latest: Math.round(t.latest),
       delta: Math.round(t.delta), improving: higher ? t.delta > 0 : t.delta < 0, n: t.n,
     });
   }
@@ -404,7 +404,7 @@ export function dailyReflection(series: MetricSeries[], path: string): DailyRefl
     const lag = assoc.find((a) => a.kind === "lag" && a.metrics[0] === headliner.metric);
     const linked = assoc.find((a) => a.metrics.includes(headliner.metric));
     if (lag) {
-      const follow = metricLabel(lag.metrics[1]).toLowerCase();
+      const follow = signalLabel(lag.metrics[1]).toLowerCase();
       points.push(`Here's why it matters: in your own data, your ${headliner.label.toLowerCase()} tends to run a day ahead of your ${follow}. So today's reading is a hint about how your ${follow} may feel tomorrow.`);
     } else if (linked && linked.kind !== "lag") {
       points.push(`Here's a pattern I've been seeing in you: ${linked.plain}`);

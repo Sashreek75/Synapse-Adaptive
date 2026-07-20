@@ -18,10 +18,25 @@
  * only lower it, never raise it.
  */
 
-import { METRIC_META, metricLabel } from "@/lib/metrics";
-import type { Confidence, MetricKey, MetricSeries } from "@/types";
+import { getSignal, signalLabel, signalDirection } from "@/lib/signals";
+import type { Confidence, MetricSeries, SignalId } from "@/types";
 
 const dayKey = (iso: string) => iso.slice(0, 10);
+/** ISO-week bucket (year + week number) for weekly-cadence signals. */
+function weekKeyOf(iso: string): string {
+  const d = new Date(iso); const day = (d.getUTCDay() + 6) % 7; // Mon=0
+  d.setUTCDate(d.getUTCDate() - day + 3); const firstThu = new Date(Date.UTC(d.getUTCFullYear(), 0, 4));
+  const week = 1 + Math.round(((d.getTime() - firstThu.getTime()) / 864e5 - 3 + ((firstThu.getUTCDay() + 6) % 7)) / 7);
+  return `${d.getUTCFullYear()}-W${String(week).padStart(2, "0")}`;
+}
+/** CADENCE-AWARE bucketing: a signal is aligned to its own rhythm (daily → day,
+ * weekly → ISO week). Two signals only ever co-occur when they share a bucket, so
+ * a weekly signal and a daily signal NEVER align — the engine refuses to correlate
+ * across mismatched cadences rather than manufacture significance. Honesty by design.
+ * (Health signals are all daily, so their behavior is byte-identical to before.) */
+function bucketKey(signalId: SignalId, iso: string): string {
+  return getSignal(signalId)?.cadence === "weekly" ? weekKeyOf(iso) : dayKey(iso);
+}
 const mean = (xs: number[]) => xs.reduce((a, b) => a + b, 0) / (xs.length || 1);
 
 function pearson(xs: number[], ys: number[]): number {
@@ -60,7 +75,7 @@ function pValue(r: number, n: number): number {
 
 export interface Association {
   kind: "lag" | "contrast" | "same_day" | "event";
-  metrics: MetricKey[];
+  metrics: SignalId[];
   r?: number;
   n: number;
   /** Two-sided p-value (after multiple-comparison control) — how likely this is noise. */
@@ -74,14 +89,14 @@ export interface Association {
 }
 
 /** day -> { metric -> averaged value that day } */
-type DayMatrix = Map<string, Partial<Record<MetricKey, number>>>;
+type DayMatrix = Map<string, Partial<Record<SignalId, number>>>;
 
 function buildMatrix(serieses: MetricSeries[]): DayMatrix {
   const m: DayMatrix = new Map();
-  const counts = new Map<string, Partial<Record<MetricKey, number>>>();
+  const counts = new Map<string, Partial<Record<SignalId, number>>>();
   for (const s of serieses) {
     for (const p of s.points) {
-      const d = dayKey(p.recordedAt);
+      const d = bucketKey(s.metric, p.recordedAt);
       if (!m.has(d)) { m.set(d, {}); counts.set(d, {}); }
       const row = m.get(d)!; const c = counts.get(d)!;
       row[s.metric] = (row[s.metric] ?? 0) + p.valueNorm;
@@ -91,7 +106,7 @@ function buildMatrix(serieses: MetricSeries[]): DayMatrix {
   // average same-day duplicates
   for (const [d, row] of m) {
     const c = counts.get(d)!;
-    for (const k of Object.keys(row) as MetricKey[]) row[k] = row[k]! / (c[k] || 1);
+    for (const k of Object.keys(row) as SignalId[]) row[k] = row[k]! / (c[k] || 1);
   }
   return m;
 }
@@ -103,15 +118,15 @@ function corrConfidence(n: number, absR: number, p: number): Confidence {
 }
 
 /** "higher"/"lower" word for a metric given whether we're at its good end. */
-const moreWord = (m: MetricKey) => (METRIC_META[m].direction === "higher_is_better" ? "more" : "higher");
+const moreWord = (m: SignalId) => (signalDirection(m) === "higher_is_better" ? "more" : "higher");
 
 /**
  * Translate a correlation sign into plain "when X is higher, Y tends to be …".
  * We speak in raw-value terms (higher/lower score) so it's unambiguous.
  */
-function relate(a: MetricKey, b: MetricKey, r: number, lead = "tend to move together"): string {
-  const la = metricLabel(a).toLowerCase();
-  const lb = metricLabel(b).toLowerCase();
+function relate(a: SignalId, b: SignalId, r: number, lead = "tend to move together"): string {
+  const la = signalLabel(a).toLowerCase();
+  const lb = signalLabel(b).toLowerCase();
   const dir = r > 0 ? "higher" : "lower";
   return `On the days your ${la} is higher, your ${lb} tends to be ${dir} too — they ${lead}.`;
 }
@@ -120,7 +135,7 @@ const clamp01 = (x: number) => Math.max(0, Math.min(1, x));
 
 interface CorrCandidate {
   kind: "same_day" | "lag";
-  lead: MetricKey; follow: MetricKey; // for same_day, order is cosmetic
+  lead: SignalId; follow: SignalId; // for same_day, order is cosmetic
   r: number; n: number; p: number;
 }
 
@@ -138,10 +153,10 @@ const BH_Q = 0.10;             // Benjamini-Hochberg false-discovery rate
  * relationships that survive multiple-comparison control are allowed to surface.
  * This is the core defense against "eye-opening" noise.
  */
-function correlationAssociations(matrix: DayMatrix, goals: Set<MetricKey>): Association[] {
+function correlationAssociations(matrix: DayMatrix, goals: Set<SignalId>): Association[] {
   const days = [...matrix.keys()].sort();
-  const metrics = new Set<MetricKey>();
-  for (const row of matrix.values()) for (const k of Object.keys(row) as MetricKey[]) metrics.add(k);
+  const metrics = new Set<SignalId>();
+  for (const row of matrix.values()) for (const k of Object.keys(row) as SignalId[]) metrics.add(k);
   const list = [...metrics];
   const cands: CorrCandidate[] = [];
 
@@ -159,7 +174,7 @@ function correlationAssociations(matrix: DayMatrix, goals: Set<MetricKey>): Asso
         cands.push({ kind: "same_day", lead: A, follow: B, r, n: xs.length, p: pValue(r, xs.length) });
       }
       // next-day lag, both directions
-      for (const [lead, follow] of [[A, B], [B, A]] as [MetricKey, MetricKey][]) {
+      for (const [lead, follow] of [[A, B], [B, A]] as [SignalId, SignalId][]) {
         const lx: number[] = [], ly: number[] = [];
         for (let k = 0; k < days.length - 1; k++) {
           const d0 = days[k], d1 = days[k + 1];
@@ -195,7 +210,7 @@ function correlationAssociations(matrix: DayMatrix, goals: Set<MetricKey>): Asso
         kind: "same_day", metrics: [A, B], r: c.r, n: c.n, p: c.p,
         strength: clamp01(Math.abs(c.r) * 0.8 + rel),
         confidence: conf,
-        evidence: `same-day correlation ${metricLabel(A)}~${metricLabel(B)}: r=${c.r.toFixed(2)}, n=${c.n}, p=${c.p.toFixed(3)} (FDR-controlled).`,
+        evidence: `same-day correlation ${signalLabel(A)}~${signalLabel(B)}: r=${c.r.toFixed(2)}, n=${c.n}, p=${c.p.toFixed(3)} (FDR-controlled).`,
         plain: relate(A, B, c.r),
       });
     } else {
@@ -206,8 +221,8 @@ function correlationAssociations(matrix: DayMatrix, goals: Set<MetricKey>): Asso
         kind: "lag", metrics: [lead, follow], r: c.r, n: c.n, p: c.p,
         strength: clamp01(Math.abs(c.r) * 0.9 + rel + 0.1),
         confidence: conf,
-        evidence: `next-day lag ${metricLabel(lead)}(d)->${metricLabel(follow)}(d+1): r=${c.r.toFixed(2)}, n=${c.n}, p=${c.p.toFixed(3)} (FDR-controlled).`,
-        plain: `When your ${metricLabel(lead).toLowerCase()} is higher one day, your ${metricLabel(follow).toLowerCase()} the next day tends to be ${dir} — it looks like ${metricLabel(lead).toLowerCase()} runs a day ahead of your ${metricLabel(follow).toLowerCase()}.`,
+        evidence: `next-day lag ${signalLabel(lead)}(d)->${signalLabel(follow)}(d+1): r=${c.r.toFixed(2)}, n=${c.n}, p=${c.p.toFixed(3)} (FDR-controlled).`,
+        plain: `When your ${signalLabel(lead).toLowerCase()} is higher one day, your ${signalLabel(follow).toLowerCase()} the next day tends to be ${dir} — it looks like ${signalLabel(lead).toLowerCase()} runs a day ahead of your ${signalLabel(follow).toLowerCase()}.`,
       });
     }
   }
@@ -218,15 +233,19 @@ function correlationAssociations(matrix: DayMatrix, goals: Set<MetricKey>): Asso
  * Best-vs-worst day contrast for an anchor metric: what most differentiates the
  * user's top days from their bottom days.
  */
-function contrastAssociations(matrix: DayMatrix, goals: Set<MetricKey>): Association[] {
+function contrastAssociations(matrix: DayMatrix, goals: Set<SignalId>): Association[] {
   const days = [...matrix.keys()].sort();
-  const metrics = new Set<MetricKey>();
-  for (const row of matrix.values()) for (const k of Object.keys(row) as MetricKey[]) metrics.add(k);
+  const metrics = new Set<SignalId>();
+  for (const row of matrix.values()) for (const k of Object.keys(row) as SignalId[]) metrics.add(k);
 
   // pick anchors: prefer mood / a goal metric that has enough coverage
-  const anchorPrefs: MetricKey[] = ["mood", "attention", "fatigue", ...goals];
+  // Anchors are chosen by relevance + coverage — never by health metric names. Goal
+  // signals first, then whichever signals we simply have the most days of data for.
+  const coverage = new Map<SignalId, number>();
+  for (const d of days) for (const k of Object.keys(matrix.get(d)!) as SignalId[]) coverage.set(k, (coverage.get(k) ?? 0) + 1);
+  const anchorPrefs: SignalId[] = [...goals, ...[...coverage.keys()].sort((a, b) => coverage.get(b)! - coverage.get(a)!)];
   const out: Association[] = [];
-  const seenAnchor = new Set<MetricKey>();
+  const seenAnchor = new Set<SignalId>();
 
   for (const anchor of anchorPrefs) {
     if (seenAnchor.has(anchor) || !metrics.has(anchor)) continue;
@@ -237,7 +256,7 @@ function contrastAssociations(matrix: DayMatrix, goals: Set<MetricKey>): Associa
     const k = Math.max(2, Math.floor(sorted.length / 3));
     const low = sorted.slice(0, k), high = sorted.slice(-k);
 
-    let best: { metric: MetricKey; diff: number } | null = null;
+    let best: { metric: SignalId; diff: number } | null = null;
     for (const m of metrics) {
       if (m === anchor) continue;
       const hv = high.map((d) => matrix.get(d)![m]).filter((v): v is number => v != null);
@@ -247,15 +266,15 @@ function contrastAssociations(matrix: DayMatrix, goals: Set<MetricKey>): Associa
       if (!best || Math.abs(diff) > Math.abs(best.diff)) best = { metric: m, diff };
     }
     if (best && Math.abs(best.diff) >= 10) {
-      const anchorHigherIsBetter = METRIC_META[anchor].direction === "higher_is_better";
+      const anchorHigherIsBetter = signalDirection(anchor) === "higher_is_better";
       const goodWord = anchorHigherIsBetter ? "best" : "toughest"; // high anchor value
       const dir = best.diff > 0 ? "higher" : "lower";
       out.push({
         kind: "contrast", metrics: [anchor, best.metric], n: withAnchor.length,
         strength: clamp01(0.55 + Math.min(0.3, Math.abs(best.diff) / 60) + (goals.has(best.metric) ? 0.15 : 0)),
         confidence: withAnchor.length >= 10 ? "moderate" : "low",
-        evidence: `contrast on ${metricLabel(anchor)}: top-third vs bottom-third days differ most in ${metricLabel(best.metric)} by ${best.diff.toFixed(0)} pts (n=${withAnchor.length}).`,
-        plain: `On your ${goodWord} ${metricLabel(anchor).toLowerCase()} days, your ${metricLabel(best.metric).toLowerCase()} tends to run about ${Math.abs(best.diff).toFixed(0)} points ${dir} than on the other days — it's the single biggest thing that separates them.`,
+        evidence: `contrast on ${signalLabel(anchor)}: top-third vs bottom-third days differ most in ${signalLabel(best.metric)} by ${best.diff.toFixed(0)} pts (n=${withAnchor.length}).`,
+        plain: `On your ${goodWord} ${signalLabel(anchor).toLowerCase()} days, your ${signalLabel(best.metric).toLowerCase()} tends to run about ${Math.abs(best.diff).toFixed(0)} points ${dir} than on the other days — it's the single biggest thing that separates them.`,
       });
     }
   }
@@ -266,7 +285,7 @@ function contrastAssociations(matrix: DayMatrix, goals: Set<MetricKey>): Associa
  * The public entry point. Returns the strongest associations, ranked, for the
  * report evidence, the chat context, and the deterministic renderer.
  */
-export function computeAssociations(serieses: MetricSeries[], goals: MetricKey[] = [], limit = 4): Association[] {
+export function computeAssociations(serieses: MetricSeries[], goals: SignalId[] = [], limit = 4): Association[] {
   const matrix = buildMatrix(serieses);
   if (matrix.size < 8) return []; // not enough days to say anything honest
   const goalSet = new Set(goals);

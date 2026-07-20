@@ -13,7 +13,7 @@
 import { useMemo } from "react";
 import { TrendingUp, TrendingDown } from "lucide-react";
 import { useHealth } from "@/components/providers/health-store";
-import { METRIC_META } from "@/lib/metrics";
+import { signalMeta } from "@/lib/signals";
 import { Sparkline } from "@/components/ui/sparkline";
 import { cn } from "@/lib/utils";
 
@@ -41,7 +41,7 @@ export function GeneratedDashboard() {
       <p className="text-[11px] font-semibold uppercase tracking-wider text-muted">What I&apos;m watching right now</p>
       <div className="mt-3 divide-y divide-line">
         {watching.map((c) => {
-          const meta = METRIC_META[c.metric];
+          const meta = signalMeta(c.metric);
           const Arrow = c.improving ? TrendingUp : TrendingDown;
           return (
             <div key={c.metric} className="flex items-center gap-4 py-3 first:pt-0 last:pb-0">

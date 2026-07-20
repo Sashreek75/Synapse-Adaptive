@@ -10,7 +10,7 @@
  */
 
 import { metricLabel } from "@/lib/metrics";
-import type { Insight, MetricKey } from "@/types";
+import type { Insight, SignalId } from "@/types";
 import type { ExperimentRecord } from "@/lib/focus";
 
 export type SpaceTag =
@@ -54,7 +54,7 @@ export interface SpaceItem {
   tags: SpaceTag[];
 }
 
-const METRIC_TAGS: Record<MetricKey, SpaceTag[]> = {
+const METRIC_TAGS: Partial<Record<SignalId, SpaceTag[]>> = {
   sleep_quality: ["sleep"],
   fatigue: ["energy"],
   stress: ["stress"],
@@ -96,20 +96,20 @@ function tagsForText(text: string): SpaceTag[] {
 function tagsForInsight(i: Insight): SpaceTag[] {
   const out = new Set<SpaceTag>();
   for (const ref of i.evidenceRefs ?? []) {
-    const m = ref.replace("metric:", "") as MetricKey;
+    const m = ref.replace("metric:", "") as SignalId;
     for (const t of METRIC_TAGS[m] ?? []) out.add(t);
   }
   if (i.category === "behavioral_focus" || (i.suggestedFocus?.length ?? 0) > 0) out.add("behavioral");
   return out.size ? [...out] : ["general"];
 }
 
-const metricTags = (m: MetricKey): SpaceTag[] => [...new Set([...(METRIC_TAGS[m] ?? []), "behavioral" as SpaceTag])];
+const metricTags = (m: SignalId): SpaceTag[] => [...new Set([...(METRIC_TAGS[m] ?? []), "behavioral" as SpaceTag])];
 
 export interface SpaceSourceData {
   insights?: Insight[];
   experiments?: ExperimentRecord[];
   notes?: { id: string; prompt: string; answer: string; date: string }[];
-  focus?: { id: string; title: string; metric: MetricKey; focusAction: string } | null;
+  focus?: { id: string; title: string; metric: SignalId; focusAction: string } | null;
 }
 
 /** Build every taggable item from the user's current data. */

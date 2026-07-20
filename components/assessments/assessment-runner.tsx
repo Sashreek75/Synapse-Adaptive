@@ -28,7 +28,7 @@ import type { MetricSeries } from "@/types";
 
 /** Append the just-finished assessment values to the series for an instant read. */
 function seriesWithToday(series: MetricSeries[], metrics: Partial<Record<MetricKey, number>>, date: string): MetricSeries[] {
-  const map = new Map<MetricKey, MetricSeries>(series.map((s) => [s.metric, { metric: s.metric, points: [...s.points] }]));
+  const map = new Map<SignalId, MetricSeries>(series.map((s) => [s.metric, { metric: s.metric, points: [...s.points] }]));
   for (const [m, v] of Object.entries(metrics) as [MetricKey, number][]) {
     if (v == null) continue;
     if (!map.has(m)) map.set(m, { metric: m, points: [] });
@@ -40,7 +40,7 @@ import { planAssessmentLocal, type AssessmentPlan, type MetricSnapshot, type Pla
 import { randomSeed, type TaskKind } from "@/lib/assessments/engine";
 import { TaskView, meanNorm, type TaskResult } from "@/components/assessments/task-renderers";
 import { cn } from "@/lib/utils";
-import type { MetricKey } from "@/types";
+import type { MetricKey, SignalId } from "@/types";
 
 const ALL_METRICS: MetricKey[] = ["reaction_time", "attention", "working_memory", "processing_speed", "fatigue", "sleep_quality", "stress", "mood", "symptoms"];
 const CALIB_KEY = "synapse.calib.v1";

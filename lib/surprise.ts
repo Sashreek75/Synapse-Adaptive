@@ -17,41 +17,13 @@
  */
 
 import { computeAssociations, type Association } from "@/lib/correlations";
-import type { AssociationSnapshot, MetricKey, MetricSeries } from "@/types";
+import { signalDomain, areExpectedPartners } from "@/lib/signals";
+import type { AssociationSnapshot, MetricSeries, SignalId } from "@/types";
 
 /** Stable key for a relationship: kind + the unordered metric pair. */
 export function associationKey(a: Pick<Association, "kind" | "metrics">): string {
   return `${a.kind}:${[...a.metrics].sort().join("+")}`;
 }
-
-const pairKey = (metrics: MetricKey[]) => [...metrics].sort().join("+");
-
-/**
- * The obviousness prior (0..1): how much a lay person already EXPECTS this
- * relationship. High = everyone knows it (boring). Low = genuinely non-obvious.
- * Deviation from expectation is what makes a finding feel like a revelation.
- * Any pair not listed defaults to 0.35 (mildly novel).
- */
-const EXPECTEDNESS: Record<string, number> = {
-  // Everybody already knows these — surfacing them is a failure.
-  "fatigue+sleep_quality": 0.9,
-  "mood+stress": 0.78,
-  "fatigue+mood": 0.7,
-  "mood+sleep_quality": 0.66,
-  "sleep_quality+stress": 0.62,
-  "stress+symptoms": 0.6,
-  // Plausible but not obvious.
-  "attention+fatigue": 0.5,
-  "fatigue+stress": 0.5,
-  "attention+sleep_quality": 0.45,
-  "mood+symptoms": 0.45,
-  // Genuinely non-obvious — the good stuff.
-  "stress+working_memory": 0.25,
-  "reaction_time+sleep_quality": 0.25,
-  "processing_speed+stress": 0.22,
-  "attention+stress": 0.3,
-  "reaction_time+stress": 0.22,
-};
 
 /** Kind multiplier: a time-delayed (lag) effect is inherently something a
  * dashboard cannot show, so it's less "expected" even for a familiar pair. */
@@ -62,8 +34,16 @@ const KIND_FACTOR: Record<Association["kind"], number> = {
   event: 0.6,
 };
 
+/**
+ * The obviousness prior (0..1), derived (not hardcoded): a lay person expects a pair
+ * MORE when the two signals are obviously related (registry metadata) or in the same
+ * domain, and LESS when they span different domains — cross-domain links are the most
+ * surprising. Kind then modulates it (a next-day lag is inherently non-obvious).
+ * Domain-general: new domains need no engine change, only registry entries.
+ */
 function expectednessOf(a: Association): number {
-  const base = EXPECTEDNESS[pairKey(a.metrics)] ?? 0.35;
+  const [x, y] = a.metrics;
+  const base = areExpectedPartners(x, y) ? 0.85 : signalDomain(x) === signalDomain(y) ? 0.45 : 0.22;
   return Math.max(0, Math.min(1, base * KIND_FACTOR[a.kind]));
 }
 
@@ -106,7 +86,7 @@ function recurrenceLabel(count: number): string {
  */
 export function computeSurprises(
   serieses: MetricSeries[],
-  goals: MetricKey[] = [],
+  goals: SignalId[] = [],
   history: AssociationSnapshot[] = [],
   limit = 5,
 ): SurprisingFinding[] {

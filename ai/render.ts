@@ -8,7 +8,8 @@
  * charter's rules in code. It keeps the product fully functional offline.
  */
 
-import { metricLabel, METRIC_META } from "@/lib/metrics";
+import { metricLabel } from "@/lib/metrics";
+import { signalDirection } from "@/lib/signals";
 import { computeTrend, detectPatterns, SALIENCE_THRESHOLD, type PatternCandidate, type TrendStat } from "@/lib/stats";
 import { type Association } from "@/lib/correlations";
 import { computeSurprises } from "@/lib/surprise";
@@ -16,7 +17,7 @@ import { goalMetricsForPath } from "@/lib/paths";
 import type {
   Confidence,
   Insight,
-  MetricKey,
+  SignalId,
   MetricSeries,
   ProactiveNotice,
   HealthProfile,
@@ -27,7 +28,7 @@ const id = (p: string) => `${p}_${Math.random().toString(36).slice(2, 9)}`;
 
 /** Is the observed delta an improvement, given the metric's direction? */
 function isImprovement(t: TrendStat): boolean {
-  const higher = METRIC_META[t.metric].direction === "higher_is_better";
+  const higher = signalDirection(t.metric) === "higher_is_better";
   return higher ? t.delta > 0 : t.delta < 0;
 }
 
@@ -274,7 +275,7 @@ function associationNotice(a: Association): ProactiveNotice {
   };
 }
 
-export function renderProactiveNotices(serieses: MetricSeries[], goals: MetricKey[]): ProactiveNotice[] {
+export function renderProactiveNotices(serieses: MetricSeries[], goals: SignalId[]): ProactiveNotice[] {
   const fromPatterns = detectPatterns(serieses, goals).filter((p) => p.salience >= SALIENCE_THRESHOLD).map(patternNotice);
   const fromAssoc = computeSurprises(serieses, goals, [], 3).map((f) => f.association).filter((a) => a.strength >= 0.55).map(associationNotice);
   const seen = new Set<string>();

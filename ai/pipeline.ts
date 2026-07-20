@@ -23,7 +23,7 @@ import type { PlanId } from "@/lib/billing/plans";
 import type {
   Confidence,
   Insight,
-  MetricKey,
+  SignalId,
   MetricSeries,
   ProactiveNotice,
   HealthProfile,
@@ -73,10 +73,10 @@ function buildEvidence(serieses: MetricSeries[], profile: HealthProfile & { path
 }
 
 /** Confidence may only be LOWERED relative to the data-driven ceiling. */
-function clampConfidence(insight: Insight, ceilings: Map<MetricKey, Confidence>): Insight {
+function clampConfidence(insight: Insight, ceilings: Map<SignalId, Confidence>): Insight {
   let ceiling: Confidence = "high";
   for (const ref of insight.evidenceRefs) {
-    const m = ref.replace("metric:", "") as MetricKey;
+    const m = ref.replace("metric:", "") as SignalId;
     const c = ceilings.get(m);
     if (c && RANK[c] < RANK[ceiling]) ceiling = c;
   }
@@ -86,7 +86,7 @@ function clampConfidence(insight: Insight, ceilings: Map<MetricKey, Confidence>)
   return insight;
 }
 
-function ceilingMap(serieses: MetricSeries[]): Map<MetricKey, Confidence> {
+function ceilingMap(serieses: MetricSeries[]): Map<SignalId, Confidence> {
   return new Map(serieses.map((s) => { const t = computeTrend(s); return [t.metric, t.confidenceCeiling]; }));
 }
 
@@ -135,7 +135,7 @@ export async function generateReport(serieses: MetricSeries[], profile: HealthPr
   return renderReport(serieses, profile); // deterministic, always safe
 }
 
-export async function generateProactiveNotices(serieses: MetricSeries[], goals: MetricKey[]): Promise<ProactiveNotice[]> {
+export async function generateProactiveNotices(serieses: MetricSeries[], goals: SignalId[]): Promise<ProactiveNotice[]> {
   // The deterministic renderer already runs detection + salience + thresholding.
   // When live, we re-voice each candidate via the model but keep the code-owned
   // salience, dedupe, and confidence ceiling.

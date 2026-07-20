@@ -13,7 +13,7 @@
 
 import { useMemo } from "react";
 import Link from "next/link";
-import { HeartPulse, Sun, ArrowRight, CheckCircle2 } from "lucide-react";
+import { Sun, ArrowRight, CheckCircle2 } from "lucide-react";
 import { useHealth } from "@/components/providers/health-store";
 import { Button, Skeleton } from "@/components/ui/primitives";
 import { SynapseOrb } from "@/components/synapse/orb";
@@ -64,7 +64,7 @@ export default function HomePage() {
             Tell me your name and what you&apos;re focused on — that&apos;s it. Everything else I&apos;ll learn as we talk, and I&apos;ll only ever ask what I genuinely need.
           </p>
         </div>
-        <Link href="/onboarding"><Button size="lg">Say hello <HeartPulse className="h-4 w-4" /></Button></Link>
+        <Link href="/onboarding"><Button size="lg">Say hello <ArrowRight className="h-4 w-4" /></Button></Link>
       </div>
     );
   }

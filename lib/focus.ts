@@ -17,9 +17,9 @@
 
 import { computeTrend, relativeLevel, relativeMove } from "@/lib/stats";
 import { computeAssociations } from "@/lib/correlations";
-import { METRIC_META, metricLabel } from "@/lib/metrics";
+import { signalLabel, signalDirection } from "@/lib/signals";
 import { goalMetricsForPath, getPath } from "@/lib/paths";
-import type { Confidence, MetricKey, MetricSeries, RecentChange, WeeklyFocusReasoning } from "@/types";
+import type { Confidence, MetricSeries, RecentChange, SignalId, WeeklyFocusReasoning } from "@/types";
 
 export interface Experiment {
   hypothesis: string;    // what we think is true
@@ -32,7 +32,7 @@ export interface Experiment {
 export interface WeeklyFocus {
   id: string;
   weekKey: string;
-  metric: MetricKey;
+  metric: SignalId;
   title: string;         // "Improve sleep consistency"
   /** 1. What changed */
   whatChanged: string;
@@ -62,12 +62,12 @@ export function currentWeekKey(d = new Date()): string {
  * The coaching template per metric — the ONE behavior, framed as an experiment.
  * Behavioral only, never medical. Kept short: a coach gives one clear instruction.
  */
-const PLAYBOOK: Record<MetricKey, {
+const PLAYBOOK: Partial<Record<SignalId, {
   title: string;
   behavior: string;
   matters: string;
   hypothesisLead: string; // "steadier sleep tends to lift your focus"
-}> = {
+}>> = {
   sleep_quality: {
     title: "Improve sleep consistency",
     behavior: "Keep your bed and wake times within a one-hour window every day this week — consistency matters more than total hours.",
@@ -131,13 +131,13 @@ function pickFocusMetric(
   series: MetricSeries[],
   path: string,
   recent: RecentChange[],
-): { metric: MetricKey; mode: WeeklyFocus["mode"]; delta: number; latest: number; baseline: number; n: number; confidence: Confidence } | null {
+): { metric: SignalId; mode: WeeklyFocus["mode"]; delta: number; latest: number; baseline: number; n: number; confidence: Confidence } | null {
   if (!series.length) return null;
-  const goals = new Set(goalMetricsForPath(path));
+  const goals = new Set<SignalId>(goalMetricsForPath(path));
   const trends = series.map((s) => ({ s, t: computeTrend(s) }));
 
   const scored = trends.map(({ s, t }) => {
-    const higher = METRIC_META[s.metric].direction === "higher_is_better";
+    const higher = signalDirection(s.metric) === "higher_is_better";
     const declining = higher ? t.delta < -3 : t.delta > 3;
     const improving = higher ? t.delta > 3 : t.delta < -3;
     // Priority: a declining GOAL metric is the most decision-worthy thing.
@@ -171,8 +171,13 @@ export function selectWeeklyFocus(
   const pick = pickFocusMetric(series, path, recent);
   if (!pick) return null;
   const { metric, mode, delta, latest, baseline, n, confidence } = pick;
-  const play = PLAYBOOK[metric];
-  const label = metricLabel(metric).toLowerCase();
+  const label = signalLabel(metric).toLowerCase();
+  const play = PLAYBOOK[metric] ?? {
+    title: `Focus on your ${label}`,
+    behavior: `Give your ${label} deliberate, repeatable attention this week and note what shifts.`,
+    matters: `It's one of the signals you're tracking, so a small, steady push here is the kind of thing that moves it.`,
+    hypothesisLead: `steady, deliberate attention to your ${label} tends to move it`,
+  };
 
   // Connect to a real relationship in the data when we have one (multi-source "why").
   const assoc = computeAssociations(series, goalMetricsForPath(path), 4);
@@ -239,7 +244,7 @@ export type ExperimentOutcome = "worked" | "partial" | "no_change" | "regressed"
 export interface ExperimentRecord {
   id: string;
   weekKey: string;
-  metric: MetricKey;
+  metric: SignalId;
   title: string;
   behavior: string;
   hypothesis: string;
@@ -274,7 +279,7 @@ const meanOf = (xs: number[]) => xs.reduce((a, b) => a + b, 0) / (xs.length || 1
 
 /** Review a past experiment against the readings that came after it started. */
 export function reviewExperiment(rec: ExperimentRecord, series: MetricSeries[]): ExperimentReview {
-  const label = metricLabel(rec.metric).toLowerCase();
+  const label = signalLabel(rec.metric).toLowerCase();
   const s = series.find((x) => x.metric === rec.metric);
   const post = s ? s.points.filter((p) => new Date(p.recordedAt).getTime() > new Date(rec.startedAt).getTime()).map((p) => p.valueNorm) : [];
 
@@ -288,7 +293,7 @@ export function reviewExperiment(rec: ExperimentRecord, series: MetricSeries[]):
   }
 
   const result = Math.round(meanOf(post));
-  const higher = METRIC_META[rec.metric].direction === "higher_is_better";
+  const higher = signalDirection(rec.metric) === "higher_is_better";
   const delta = Math.round(higher ? result - rec.baseline : rec.baseline - result);
   const outcome: ExperimentOutcome = delta >= 5 ? "worked" : delta >= 2 ? "partial" : delta <= -5 ? "regressed" : "no_change";
   const move = `your ${label} ${relativeMove(delta)}`;
@@ -324,21 +329,20 @@ export function reviewExperiment(rec: ExperimentRecord, series: MetricSeries[]):
  * high), Synapse stops coaching and urges a timely provider conversation. Safety
  * over cleverness: this is deterministic, never left to the model.
  * ========================================================================== */
-export interface Escalation { metric: MetricKey; label: string; reason: string; }
+export interface Escalation { metric: SignalId; label: string; reason: string; }
 
 export function detectEscalation(series: MetricSeries[], path: string): Escalation | null {
-  const goals = new Set(goalMetricsForPath(path));
+  const goals = new Set<SignalId>(goalMetricsForPath(path));
   for (const s of series) {
     if (s.points.length < 4) continue;
-    const meta = METRIC_META[s.metric];
-    const pts = s.points.slice(-4).map((p) => p.valueNorm);
-    const higher = meta.direction === "higher_is_better";
+        const pts = s.points.slice(-4).map((p) => p.valueNorm);
+    const higher = signalDirection(s.metric) === "higher_is_better";
     const net = pts[pts.length - 1] - pts[0];
     const worseningNet = higher ? net <= -15 : net >= 15;
     let badSteps = 0;
     for (let i = 1; i < pts.length; i++) { const d = pts[i] - pts[i - 1]; if (higher ? d < 0 : d > 0) badSteps++; }
     if (worseningNet && badSteps >= 2 && (goals.has(s.metric) || s.metric === "symptoms")) {
-      return { metric: s.metric, label: metricLabel(s.metric), reason: `your ${metricLabel(s.metric).toLowerCase()} has moved the wrong way across several check-ins in a row` };
+      return { metric: s.metric, label: signalLabel(s.metric), reason: `your ${signalLabel(s.metric).toLowerCase()} has moved the wrong way across several check-ins in a row` };
     }
     if (s.metric === "symptoms" && pts.slice(-3).every((v) => v >= 70)) {
       return { metric: "symptoms", label: "Symptoms", reason: "your symptoms have stayed high across several check-ins" };
@@ -347,18 +351,18 @@ export function detectEscalation(series: MetricSeries[], path: string): Escalati
   return null;
 }
 
-/** Build an escalation "focus" — stop experimenting, point to a provider. */
+/** Build an escalation "focus" — stop experimenting, point to qualified real-world help. */
 export function escalationReasoning(e: Escalation): WeeklyFocusReasoning {
   return {
-    weekKey: currentWeekKey(), metric: e.metric, title: "Let's bring this to your provider",
-    action: `I'd raise this with your healthcare provider soon — ${e.reason}, and that's beyond what a small experiment should carry.`,
-    why: `When a trend keeps moving the wrong way over several check-ins, the responsible next step isn't another self-experiment — it's a real clinical conversation.`,
-    whyItMatters: `I can help you track and prepare questions, but I can't examine you. Getting a professional eye on this now is the safer call.`,
-    measure: `Keep checking in if you can — I'll keep watching, and it'll help you describe the trend accurately to your provider.`,
+    weekKey: currentWeekKey(), metric: e.metric, title: "Time to bring in real help",
+    action: `I'd talk this over soon with a professional who can actually help — ${e.reason}, and that's beyond what a small experiment should carry.`,
+    why: `When a trend keeps moving the wrong way over several check-ins, the responsible next step isn't another self-experiment — it's a real conversation with someone qualified to help.`,
+    whyItMatters: `I can help you track and prepare, but I can't assess this myself. Getting a qualified person's eyes on it now is the safer call.`,
+    measure: `Keep checking in if you can — I'll keep watching, and it'll help you describe the trend accurately when you get help.`,
     confidence: "moderate",
-    reasoningSummary: `I'm stepping back from coaching this week: ${e.reason}. Rather than propose an experiment, I think this deserves a timely conversation with your provider.`,
-    hypotheses: [{ explanation: "This trend may be beyond what behavioral changes can address.", support: e.reason, confidence: "moderate" }],
-    experiment: { hypothesis: "A clinician can assess this properly.", behavior: "Book time with your provider and bring your recent trend.", expectedOutcome: "A professional read on what's driving this.", followUp: "I'll keep tracking so your next appointment is well-informed." },
+    reasoningSummary: `I'm stepping back from coaching this week: ${e.reason}. Rather than propose an experiment, I think this deserves a timely conversation with someone qualified to help.`,
+    hypotheses: [{ explanation: "This trend may be beyond what small changes can address.", support: e.reason, confidence: "moderate" }],
+    experiment: { hypothesis: "Someone qualified can assess this properly.", behavior: "Book time with a professional who can help, and bring your recent trend.", expectedOutcome: "A qualified read on what's driving this.", followUp: "I'll keep tracking so that conversation is well-informed." },
     providerNote: `${e.label}: ${e.reason}.`,
     escalate: true,
     source: "fallback",
@@ -369,7 +373,7 @@ export function escalationReasoning(e: Escalation): WeeklyFocusReasoning {
 export function earlyImpression(profile: { displayName?: string; path?: string; goals?: string[]; primaryChallenge?: string; conditionLabel?: string }): WeeklyFocusReasoning {
   const p = getPath(profile.path);
   const goal = (profile.goals?.[0] || profile.primaryChallenge || p.focusNoun).toLowerCase();
-  const watching = p.goalMetrics.slice(0, 2).map((m) => metricLabel(m).toLowerCase());
+  const watching = p.goalMetrics.slice(0, 2).map((m) => signalLabel(m).toLowerCase());
   const watchList = watching.length === 2 ? `${watching[0]} and ${watching[1]}` : watching[0] ?? "how you're doing";
   return {
     weekKey: currentWeekKey(), metric: p.goalMetrics[0], title: "Getting to know you",

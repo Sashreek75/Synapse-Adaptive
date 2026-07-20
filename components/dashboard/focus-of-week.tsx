@@ -13,7 +13,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
-import { Target, ChevronRight, Stethoscope } from "lucide-react";
+import { Target, ChevronRight, LifeBuoy } from "lucide-react";
 import { ConfidenceChip } from "@/components/ui/primitives";
 import { SynapseOrb } from "@/components/synapse/orb";
 import { useHealth } from "@/components/providers/health-store";
@@ -54,7 +54,7 @@ export function FocusOfWeek() {
           conditionLabel: profile.conditionLabel, recoveryStage: profile.recoveryStage,
           primaryChallenge: profile.primaryChallenge, occupation: profile.occupation,
           activityLevel: profile.activityLevel, lifestyle: profile.lifestyle,
-          definitionOfBetter: profile.definitionOfBetter, weeksTracked,
+          definitionOfBetter: profile.definitionOfBetter, trajectory: mind.trajectory?.statement ?? profile.definitionOfBetter, weeksTracked,
         },
         series, recentChanges, experiments,
         beliefs: mind.beliefs, conclusions: mind.conclusions, openQuestions: mind.openQuestions,
@@ -142,8 +142,8 @@ export function FocusOfWeek() {
               "inline-flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wider",
               escalate ? "text-amber-700 dark:text-amber-300" : "text-orange-600 dark:text-orange-400",
             )}>
-              {escalate ? <Stethoscope className="h-3.5 w-3.5" /> : <Target className="h-3.5 w-3.5" />}
-              {escalate ? "Worth a provider visit" : view.early ? "Early impression" : "This week's focus"}
+              {escalate ? <LifeBuoy className="h-3.5 w-3.5" /> : <Target className="h-3.5 w-3.5" />}
+              {escalate ? "Worth talking to someone" : view.early ? "Early impression" : "This week's focus"}
             </span>
             {!escalate && <ConfidenceChip level={view.confidence} />}
           </div>

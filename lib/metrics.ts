@@ -1,4 +1,4 @@
-import type { MetricKey, MetricMeta } from "@/types";
+import type { MetricKey, MetricMeta, SignalId } from "@/types";
 
 /** Single source of truth for metric metadata (shared by stats, render, UI). */
 export const METRIC_META: Record<MetricKey, MetricMeta> = {
@@ -13,6 +13,6 @@ export const METRIC_META: Record<MetricKey, MetricMeta> = {
   symptoms: { key: "symptoms", label: "Symptom load", direction: "lower_is_better", description: "How much symptoms have interfered with your day." },
 };
 
-export function metricLabel(key: MetricKey): string {
-  return METRIC_META[key]?.label ?? key;
+export function metricLabel(key: SignalId): string {
+  return METRIC_META[key as MetricKey]?.label ?? key;
 }

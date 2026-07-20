@@ -349,7 +349,7 @@ const SELF_COPY: Record<string, { prompt: string; low: string; high: string }> =
   stress: { prompt: "How stressed have you felt recently?", low: "Very low", high: "Very high" },
   sleep_quality: { prompt: "How restorative has your sleep felt?", low: "Poor", high: "Great" },
   mood: { prompt: "How has your mood been overall?", low: "Low", high: "Great" },
-  symptoms: { prompt: "How much have your symptoms interfered with your day?", low: "Not at all", high: "A lot" },
+  symptoms: { prompt: "How much did anything get in the way of your day?", low: "Not at all", high: "A lot" },
 };
 function SelfReportTask({ params, metric, onDone }: { params: TaskParams; metric: MetricKey; onDone: (r: TaskResult) => void }) {
   const copy = SELF_COPY[metric] ?? SELF_COPY.fatigue;

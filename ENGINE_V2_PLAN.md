@@ -152,3 +152,38 @@ Success = strongest long-term foundation, not least code: rigor preserved (same 
 ## Recommendation
 
 Approve this finalized architecture (note the two self-revisions: **Evidence as the atom**, and the **epistemic PersonModel**). Then I implement **P1 first** — invisible, tsc-verified, migration + pre-v2 backup — which de-risks everything after it and lets us prove "no user loses anything" before touching behavior. I will not begin P1 until you've signed off on §1–§2, since those are the decisions that are expensive to reverse.
+
+---
+
+## Amendment (co-founder review adopted) + P1 shipped
+
+**Design changes accepted and encoded:**
+- **Trajectory is first-class.** `Trajectory { statement, horizon, why }` — who the person is becoming, the objective the engine steers toward. Two users with identical evidence but different trajectories get different help.
+- **Facets, not a single domain.** `Evidence.facets` (areas[], timeHorizon, people, goalRef, energy, importance, emotion). An interview failure is career AND confidence AND learning AND relationships — no forced single bucket. `domain` survives only as a signal-registry attribute, not as the organizing principle.
+- **Architectural law** written into `types/index.ts`: no abstraction may exist merely because it was inherited from the health app; each must justify itself against today's product.
+- The loop is **Evidence → Understanding → Intent(Trajectory) → Decision → Action → Learning**.
+
+**P1 — SHIPPED (invisible, tsc-green, no data moved):**
+- `types/index.ts`: added `Trajectory`, `Evidence` (+`EvidenceFacets`, `EvidenceKind`), `SignalId`/`SignalKind`/`SignalDef`; extended `Mind` with optional `trajectory` + `evidence`. Legacy metric types untouched.
+- `lib/signals.ts`: the Signal Registry, seeded from the legacy health metrics with ids kept verbatim.
+- `health-store`: persists `trajectory`/`evidence`; **one-time `synapse.recovery.v3.pre_v2` backup** on first load; old blobs backfill defaults via the existing merge → zero user loss.
+- Onboarding captures the Trajectory from the aspiration; reasoning + chat now receive it and are instructed to steer toward it.
+
+**Next: P2** — rename `Mind`→`PersonModel` and expose the epistemic views (knows / believes / questioning / wondering / trusts / committed) over the existing fields. Touches ~10 `mind.` sites; recommend a checkpoint before starting.
+
+**P2 — SHIPPED (tsc-green, no data moved):**
+- `types/index.ts`: `Mind` → `PersonModel` (interface renamed); `export type Mind = PersonModel` transitional alias keeps all ~10 call sites compiling.
+- `lib/person-model.ts`: the mind as epistemic states — `epistemicView(pm)` derives **knows / believes / questioning / wondering / trusts / committed** purely from the existing substrate (no new storage, no migration). `understandingDepth(pm)` gives an honest "forming → developing → strong" read.
+- "You" surface now leads with the **Trajectory** ("You're working to become: …, I weigh what I notice against that") and shows an honest depth line. Verified with a synthetic model: knows/believes/questioning/wondering/trusts populate correctly from real hypothesis statuses.
+
+**Next: P3** — generalize the surprise obviousness prior + hypothesis phrasing off `SignalDef` metadata (remove the hardcoded health pair table), gated behind the golden-file test so ranking behavior is provably preserved.
+
+**P3 — SHIPPED:** health obviousness table deleted from the engine; expectedness derived from signal metadata + domain relationship (same-domain = more expected, cross-domain = more surprising). Hypothesis phrasing sourced from the registry. Golden test passes (planted non-obvious lag ranks #1, obvious pair demoted, noise → 0).
+
+**P4 — SHIPPED:** correlation is cadence-aware — each signal buckets by its registry cadence, so mismatched cadences never share a bucket and the engine refuses to correlate across them (no manufactured significance). Daily-health behavior byte-identical (regression verified).
+
+**P5 — SHIPPED (with an honest boundary):** `SignalId` widened to open `string`; the Signal Registry now spans health/work/study/habits/fitness; every context note is captured as first-class `Evidence` (the atom), so the person model reasons over a whole life, not just metrics. Health `MetricKey` deliberately remains the **numeric correlation substrate** — the honest quantitative core — rather than force-widening 128 call sites right before a test.
+
+**Deferred, and labeled (P5b — needs runtime QA, not a rush):** deleting the `MetricKey` enum entirely, replacing the `PathDef` health-condition lens with focus-area/domain weighting, and routing non-health *numeric* signals through correlation (`METRIC_META`→registry across 18 files). These are invisible-under-the-hood today (health copy already removed) and don't block the person-understanding MVP test; they're a deliberate, test-driven cleanup.
+
+**Net:** the engine now reads as a person-understanding engine — Evidence atom (any domain), Trajectory as the objective, an epistemic PersonModel, a domain-general surprise engine, cadence honesty, all rigor preserved (same golden test). Health is one source of evidence, not the identity. tsc green; existing users' data intact (pre-v2 backup + additive migration).

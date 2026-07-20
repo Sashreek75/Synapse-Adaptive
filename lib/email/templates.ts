@@ -22,8 +22,7 @@ const wrap = (heading: string, body: string, cta?: { label: string; url: string 
     <div style="font-size:15px;line-height:1.6;color:#33415c">${body}</div>
     ${button}
     <p style="font-size:12px;color:#8a97ad;margin-top:28px">
-      Synapse Adaptive offers general wellness insights and education — it doesn't diagnose, treat,
-      or replace your healthcare provider.
+      Synapse reflects patterns from your own data, and it can be wrong — you always make the call.
     </p>
   </div>`;
 };

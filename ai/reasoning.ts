@@ -24,7 +24,7 @@ import { chooseIntervention, shouldProposeExperiment } from "@/lib/intervention"
 import { goalMetricsForPath } from "@/lib/paths";
 import { metricLabel } from "@/lib/metrics";
 import type { PlanId } from "@/lib/billing/plans";
-import type { AssociationSnapshot, Belief, Confidence, Habit, InterventionType, MetricKey, MetricSeries, OpenQuestion, PlaybookEntry, RecentChange, TrackedHypothesis, WeeklyFocusReasoning } from "@/types";
+import type { AssociationSnapshot, Belief, Confidence, Habit, InterventionType, SignalId, MetricSeries, OpenQuestion, PlaybookEntry, RecentChange, TrackedHypothesis, WeeklyFocusReasoning } from "@/types";
 
 const RANK: Record<Confidence, number> = { low: 0, moderate: 1, high: 2 };
 
@@ -33,7 +33,7 @@ export interface ReasoningInput {
     displayName?: string; path?: string; goals?: string[]; conditionLabel?: string;
     recoveryStage?: string; primaryChallenge?: string; occupation?: string;
     activityLevel?: string; lifestyle?: Record<string, string>; definitionOfBetter?: string;
-    weeksTracked?: number;
+    trajectory?: string; weeksTracked?: number;
   };
   series: MetricSeries[];
   recentChanges: RecentChange[];
@@ -62,14 +62,14 @@ export interface ReasoningResult {
   habits?: Habit[];
 }
 
-function ceilingFor(series: MetricSeries[], metric: MetricKey): Confidence {
+function ceilingFor(series: MetricSeries[], metric: SignalId): Confidence {
   const s = series.find((x) => x.metric === metric);
   return s ? computeTrend(s).confidenceCeiling : "low";
 }
 
 /** Deterministic Playbook contribution: the user's experiment track record. */
 function playbookFromExperiments(experiments: ExperimentRecord[], series: MetricSeries[]): PlaybookEntry[] {
-  const wins = new Map<MetricKey, number>();
+  const wins = new Map<SignalId, number>();
   for (const e of experiments) {
     const r = reviewExperiment(e, series);
     if (r.outcome === "worked" || r.outcome === "partial") wins.set(e.metric, (wins.get(e.metric) ?? 0) + 1);

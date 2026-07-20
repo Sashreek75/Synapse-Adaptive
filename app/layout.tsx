@@ -8,7 +8,7 @@ const inter = Inter({ subsets: ["latin"], variable: "--font-sans", display: "swa
 const appUrl = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
 const title = "Synapse Adaptive — Your adaptive AI partner";
 const description =
-  "Synapse Adaptive helps you understand how your body and mind are functioning over time — what changed, why it might have changed, and what's worth discussing with your provider. Not another tracker.";
+  "An adaptive AI partner that learns how you work and helps you become who you want to be — remembering what matters to you and adapting as you change. Not another tracker.";
 
 export const metadata: Metadata = {
   metadataBase: new URL(appUrl),

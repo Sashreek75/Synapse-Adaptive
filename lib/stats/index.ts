@@ -10,13 +10,13 @@
 
 import type {
   Confidence,
-  MetricKey,
+  SignalId,
   MetricSeries,
   ProactivePatternType,
 } from "@/types";
 
 export interface TrendStat {
-  metric: MetricKey;
+  metric: SignalId;
   n: number;
   latest: number;
   baseline: number; // rolling mean excluding latest
@@ -108,7 +108,7 @@ export function computeTrend(series: MetricSeries): TrendStat {
 /** A pattern worth potentially surfacing proactively. */
 export interface PatternCandidate {
   type: ProactivePatternType;
-  metrics: MetricKey[];
+  metrics: SignalId[];
   /** 0..1 salience = strength × duration × goal-relevance × novelty. */
   salience: number;
   confidenceCeiling: Confidence;
@@ -126,7 +126,7 @@ const clamp01 = (x: number) => Math.max(0, Math.min(1, x));
  */
 export function detectPatterns(
   serieses: MetricSeries[],
-  goals: MetricKey[],
+  goals: SignalId[],
 ): PatternCandidate[] {
   const trends = serieses.map(computeTrend);
   const byKey = new Map(trends.map((t) => [t.metric, t]));

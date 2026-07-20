@@ -1,8 +1,8 @@
 /**
- * THE EMOTIONAL LAYER  (founding doc §20.2)
- * -----------------------------------------
- * Centralized microcopy so tone is consistent, warm, and intentional
- * everywhere. Recovery is emotional; tiny wording differences make a massive
+ * THE EMOTIONAL LAYER
+ * -------------------
+ * Centralized microcopy so tone is consistent, warm, and intentional everywhere.
+ * Becoming who you want to be is personal; tiny wording differences make a massive
  * product difference. Reviewed with the same care as the safety layer.
  *
  * Rule: never cold, never clinical, never anxiety-inducing. Celebrate effort.
@@ -34,5 +34,5 @@ export const copy = {
     return `${part}, ${name}.`;
   },
   disclaimer:
-    "Synapse Adaptive offers general wellness insights and education — it doesn't diagnose, treat, or replace your healthcare provider.",
+    "Synapse reflects patterns from your own data, and it can be wrong — you always make the call.",
 } as const;

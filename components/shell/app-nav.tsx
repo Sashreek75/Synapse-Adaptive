@@ -15,7 +15,7 @@ import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { Home, CreditCard, Settings, FileText, BookOpen, Menu, X, LogOut, LogIn, Target, Sparkles, MessageCircle, Timer } from "lucide-react";
+import { Home, CreditCard, Settings, FileText, BookOpen, Menu, X, LogOut, LogIn, Target, Sparkles, MessageCircle, Timer, BarChart3 } from "lucide-react";
 import { SynapseOrb } from "@/components/synapse/orb";
 import { ThemeToggle } from "@/components/shell/theme-toggle";
 import { useAuth } from "@/components/providers/auth-provider";
@@ -35,7 +35,7 @@ const asks: Ask[] = [
     prompt: "I have a decision to think through. Ask me what it is, then help me reason it out — the tradeoffs, what fits my patterns, and your honest recommendation. Leave the choice to me." },
   { label: "What have you learned about me?", icon: Sparkles, blurb: "How you understand me",
     prompt: "Show me how you understand me right now: what I'm working toward, the patterns you've noticed, what tends to help me and what sets me back, and what you're still figuring out." },
-  { label: "My weekly review", icon: FileText, blurb: "Our coaching sit-down",
+  { label: "Talk through my week", icon: FileText, blurb: "Reason through your week together",
     prompt: "Give me my weekly review: how you read my week, my biggest win, what concerns you most, the one thing to focus on next, and the small experiment we should run." },
 ];
 
@@ -44,6 +44,7 @@ const rooms: Room[] = [
   { href: "/dashboard", label: "Talk", icon: Home, blurb: "Think it through with Synapse" },
   { href: "/tools", label: "Focus", icon: Timer, blurb: "Timer, checklist \u2014 get moving" },
   { href: "/playbook", label: "You", icon: Sparkles, blurb: "What Synapse understands about you" },
+  { href: "/stats", label: "Your numbers", icon: BarChart3, blurb: "The trends behind what I notice" },
 ];
 
 const manage: Room[] = [

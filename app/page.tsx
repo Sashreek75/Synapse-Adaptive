@@ -87,7 +87,7 @@ function Hero() {
               <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-orange-400 opacity-60" />
               <span className="relative inline-flex h-2 w-2 rounded-full bg-orange-500" />
             </span>
-            An adaptive AI partner that learns how you work
+            Not a tracker — a partner that remembers you
           </div>
 
           <h1 className="animate-fade-up mt-6 text-balance text-5xl font-bold leading-[1.05] tracking-tight text-ink sm:text-6xl xl:text-7xl">
@@ -117,7 +117,7 @@ function Hero() {
           </div>
 
           <p className="animate-fade-up mt-6 text-xs text-muted">
-            General wellness &amp; education — never diagnosis or treatment.
+            Yours alone — private by design, and never sold.
           </p>
         </div>
 
@@ -169,15 +169,15 @@ function Hero() {
 
 function Problem() {
   const qs = [
-    "Am I actually improving?",
+    "Am I actually making progress?",
     "What changed this week?",
-    "Which habits seem to help me?",
-    "What should I ask my provider?",
+    "Which habits actually help me?",
+    "What's really worth my time?",
   ];
   return (
     <Section>
       <Eyebrow>The gap</Eyebrow>
-      <H2>Health happens between appointments — where you&apos;re mostly on your own.</H2>
+      <H2>You set out to become someone. Then ordinary life happens — and you&apos;re on your own.</H2>
       <p className="mt-4 max-w-2xl text-lg text-muted">
         Other apps collect data and draw charts, then stop. You&apos;re left to
         interpret raw numbers and answer the questions that actually matter:
@@ -210,7 +210,7 @@ function Solution() {
             {[
               { icon: Brain, t: "Remembers you", d: "Your goals, habits, and what's worked before — you never have to explain yourself twice." },
               { icon: Compass, t: "Helps you decide", d: "Every answer ends with one clear next step, personalized to you — and the reason for it." },
-              { icon: HeartPulse, t: "Honest & calm", d: "Shows its reasoning, states its confidence, and routes you to a provider when it should." },
+              { icon: ShieldCheck, t: "Honest & calm", d: "Shows its reasoning, states its confidence, and tells you when something is beyond it and worth real help." },
             ].map(({ icon: Icon, t, d }) => (
               <div key={t} className="rounded-2xl border border-white/10 bg-white/5 p-7 backdrop-blur transition-colors hover:bg-white/[0.08]">
                 <span className="grid h-11 w-11 place-items-center rounded-xl bg-orange-500/15">
@@ -231,7 +231,7 @@ function HowItWorks() {
   const steps = [
     { icon: MessageCircleQuestion, t: "Just talk to it", d: "Tell Synapse what's going on, or do a 20-second check-in. It reasons over your own history — no forms, no fixed surveys." },
     { icon: Brain, t: "It learns how you work", d: "Every conversation and check-in updates its understanding, building a private playbook of what genuinely helps you." },
-    { icon: CalendarCheck, t: "You get one clear next step", d: "Not ten. A specific, personalized action with the reason behind it — plus what's worth raising with your provider." },
+    { icon: CalendarCheck, t: "You get one clear next step", d: "Not ten. A specific, personalized action with the reason behind it — plus what to watch for next." },
   ];
   return (
     <Section id="how">
@@ -294,10 +294,10 @@ function AgentSpotlight() {
               </div>
             </div>
             <p className="mt-4 text-lg leading-relaxed text-ink">
-              “We&apos;ve noticed your fatigue has steadily increased over the past
-              four weeks, even though your reaction time has held steady. It may be
-              worth keeping an eye on, and mentioning to your provider if it
-              continues.”
+              “Your focus has been sharpest the day after you actually stopped
+              work on time — four weeks running. It&apos;s a small pattern, but a
+              consistent one. Want to make protecting your evenings this week&apos;s
+              focus?”
             </p>
             <div className="mt-6 flex items-center justify-between border-t pt-4 text-sm text-muted">
               <span className="inline-flex items-center gap-1.5">
@@ -394,8 +394,7 @@ function Roadmap() {
 function FAQ() {
   const faqs = [
     { q: "How is this different from ChatGPT or Apple Health's AI?", a: "A general AI answers your question and forgets you. Apple Health shows you numbers. Synapse continuously learns how you specifically live — your goals, habits, and what's worked before — then gives personalized, evidence-informed guidance that gets sharper every week. It remembers; they don't." },
-    { q: "Is this a medical device or a replacement for my care team?", a: "No. Synapse Adaptive is a general wellness and education tool. It never diagnoses, prescribes, or replaces your healthcare provider — it helps you understand your own patterns and decide what to do between appointments." },
-    { q: "How does it handle uncertainty?", a: "Honestly. Synapse states a confidence level, admits when it's unsure, and would rather say 'worth keeping an eye on' than overclaim. When something's beyond it, it points you to your provider." },
+    { q: "How does it handle uncertainty?", a: "Honestly. Synapse states a confidence level, admits when it's unsure, and would rather say 'worth keeping an eye on' than overclaim. When something's beyond it, it says so and points you toward real help." },
     { q: "What do I actually do in the app?", a: "Mostly just talk to it — like texting a coach. A quick daily check-in (about 20 seconds) sharpens what it knows. The more you use it, the better it understands you." },
     { q: "Who can see my data, and does it follow me across devices?", a: "Only you. Your data syncs privately to your account so it follows you between phone and computer, is never sold, and you can export or delete it anytime." },
   ];
@@ -466,10 +465,10 @@ function Footer() {
           </div>
         </div>
         <p className="mt-12 max-w-3xl text-xs leading-relaxed text-muted">
-          Synapse Adaptive provides general wellness insights and education. It does
-          not diagnose, treat, or provide medical advice, and is not a substitute for
-          professional care. If you may be experiencing a medical emergency, contact
-          your local emergency services.
+          Synapse Adaptive helps you understand your own patterns and make your own
+          decisions. It reflects your data, not professional advice, and isn&apos;t a
+          substitute for medical, legal, or financial guidance. In an emergency,
+          contact your local emergency services.
         </p>
         <p className="mt-4 text-xs text-muted">© {new Date().getFullYear()} Synapse Adaptive.</p>
       </div>
@@ -487,12 +486,12 @@ function AppleHealth() {
   return (
     <Section>
       <Eyebrow>The difference</Eyebrow>
-      <H2>Apple Health tells you what happened. Synapse helps you decide what to do next.</H2>
+      <H2>A tracker tells you what happened. Synapse helps you decide what to do next.</H2>
       <p className="mt-3 max-w-2xl text-lg text-muted">Trackers are repositories. Synapse Adaptive is a companion that learns you and reasons on your behalf.</p>
       <div className="mt-12 overflow-hidden rounded-2xl border bg-surface shadow-soft">
         <div className="grid grid-cols-3 border-b bg-surface-2 text-sm font-semibold text-ink">
           <div className="p-4" />
-          <div className="p-4 text-muted">Typical health app</div>
+          <div className="p-4 text-muted">A typical tracker</div>
           <div className="p-4 text-orange-600 dark:text-orange-400">Synapse Adaptive</div>
         </div>
         {rows.map(([k, a, b], i) => (
@@ -548,7 +547,7 @@ function Pricing() {
           );
         })}
       </div>
-      <p className="mt-5 text-center text-xs text-muted">Prices in USD. Cancel anytime. General wellness &amp; education — not medical care.</p>
+      <p className="mt-5 text-center text-xs text-muted">Prices in USD. Cancel anytime. Private by design — your data is yours.</p>
     </Section>
   );
 }

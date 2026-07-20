@@ -17,7 +17,7 @@ import { useHealth } from "@/components/providers/health-store";
 import { Card, CardBody, Button, Skeleton, ConfidenceChip } from "@/components/ui/primitives";
 import { SynapseOrb } from "@/components/synapse/orb";
 import { TrendChart } from "@/components/dashboard/trend-chart";
-import { METRIC_META } from "@/lib/metrics";
+import { signalMeta } from "@/lib/signals";
 import { computeTrend } from "@/lib/stats";
 import { computeStreak } from "@/lib/intelligence";
 import { computeAssociations } from "@/lib/correlations";
@@ -28,7 +28,7 @@ export default function StatsPage() {
   const { hydrated, hasData, series, recentChanges, weeksTracked, weeklyScore, consistency, checkIns, profile } = useHealth();
 
   const cards = useMemo(() => series.filter((s) => s.points.length >= 1).map((s) => {
-    const meta = METRIC_META[s.metric];
+    const meta = signalMeta(s.metric);
     const t = computeTrend(s);
     const improving = meta.direction === "higher_is_better" ? t.delta > 0 : t.delta < 0;
     const flat = Math.abs(t.delta) < 2 || s.points.length < 2;
@@ -158,7 +158,7 @@ export default function StatsPage() {
         </CardBody>
       </Card>
 
-      <p className="px-1 text-center text-[11px] text-muted">Scores are normalized 0–100 from your own check-ins — general wellness signals, not medical measurements.</p>
+      <p className="px-1 text-center text-[11px] text-muted">Scores are normalized 0–100 from your own check-ins — signals I reason from, not verdicts.</p>
     </div>
   );
 }

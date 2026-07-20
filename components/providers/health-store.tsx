@@ -1,8 +1,8 @@
 "use client";
 
 import { createContext, useContext, useEffect, useMemo, useRef, useState } from "react";
-import type { ChatMessage, MetricKey, MetricSeries, ProviderQuestion, RecentChange, Mind } from "@/types";
-import { METRIC_META } from "@/lib/metrics";
+import type { ChatMessage, MetricKey, MetricSeries, ProviderQuestion, RecentChange, Mind, Evidence, SignalId } from "@/types";
+import { signalMeta, mergeSeries, seriesFromEvidence } from "@/lib/signals";
 import { computeTrend } from "@/lib/stats";
 import { getSupabase } from "@/lib/supabase/client";
 import { loadCloud, saveCloud } from "@/lib/supabase/sync";
@@ -45,7 +45,7 @@ export type CheckInKind = "baseline" | "weekly" | "daily";
 export interface ContextNote { id: string; date: string; prompt: string; answer: string; }
 
 /** A dated snapshot of how Synapse understands the user — so the profile can EVOLVE. */
-export interface UnderstandingSnapshot { id: string; date: string; focus: string[]; leadMetric?: MetricKey; read: string; }
+export interface UnderstandingSnapshot { id: string; date: string; focus: string[]; leadMetric?: SignalId; read: string; }
 
 /** A recommendation Synapse made, so it can reference and follow up on it later. */
 export interface RecommendationRecord { id: string; title: string; date: string; }
@@ -69,7 +69,7 @@ const DEFAULT_PROFILE: Profile = {
 // Legacy storage key from the Recovery-era branding. Do NOT change the string —
 // existing users' on-device data lives under it.
 const KEY = "synapse.recovery.v3";
-const DEFAULT_MIND: Mind = { beliefs: [], conclusions: [], openQuestions: [], weekly: {}, playbook: [], hypotheses: [], associationHistory: [], habits: [] };
+const DEFAULT_MIND: Mind = { beliefs: [], conclusions: [], openQuestions: [], weekly: {}, playbook: [], hypotheses: [], associationHistory: [], habits: [], trajectory: null, evidence: [] };
 const dayKey = (iso: string) => iso.slice(0, 10);
 const todayKey = () => new Date().toISOString().slice(0, 10);
 
@@ -98,7 +98,7 @@ interface Store {
   addContextNote: (prompt: string, answer: string) => void;
   setLastFocus: (areas: string[]) => void;
   understandingLog: UnderstandingSnapshot[];
-  recordUnderstanding: (snap: { focus: string[]; leadMetric?: MetricKey; read: string }) => void;
+  recordUnderstanding: (snap: { focus: string[]; leadMetric?: SignalId; read: string }) => void;
   /** Past recommendations Synapse has made — so it can follow up on them. */
   recommendationLog: RecommendationRecord[];
   recordRecommendation: (rec: { id: string; title: string }) => void;
@@ -154,7 +154,7 @@ function deriveRecentChanges(series: MetricSeries[]): RecentChange[] {
   for (const s of series) {
     if (s.points.length < 2) continue;
     const t = computeTrend(s);
-    const meta = METRIC_META[s.metric];
+    const meta = signalMeta(s.metric);
     const improving = meta.direction === "higher_is_better" ? t.delta > 0 : t.delta < 0;
     if (Math.abs(t.delta) < 2) continue;
     out.push({
@@ -203,7 +203,12 @@ export function HealthProvider({ children }: { children: React.ReactNode }) {
     let localSnap: Snapshot | null = null;
     try {
       const raw = localStorage.getItem(KEY);
-      if (raw) { localSnap = JSON.parse(raw) as Snapshot; applySnapshot(localSnap); }
+      if (raw) {
+        // Engine V2 safety net: keep a one-time, byte-for-byte pre-migration backup
+        // so any user can be rolled back if a future phase mishandles their data.
+        try { if (!localStorage.getItem(`${KEY}.pre_v2`)) localStorage.setItem(`${KEY}.pre_v2`, raw); } catch {}
+        localSnap = JSON.parse(raw) as Snapshot; applySnapshot(localSnap);
+      }
     } catch {}
     setHydrated(true);
 
@@ -262,7 +267,10 @@ export function HealthProvider({ children }: { children: React.ReactNode }) {
     }
   }
 
-  const series = useMemo(() => deriveSeries(checkIns), [checkIns]);
+  const series = useMemo(
+    () => mergeSeries(deriveSeries(checkIns), seriesFromEvidence(mind.evidence ?? [])),
+    [checkIns, mind.evidence],
+  );
   const recentChanges = useMemo(() => deriveRecentChanges(series), [series]);
 
   const { consistency, weeklyScore } = useMemo(() => {
@@ -308,7 +316,18 @@ export function HealthProvider({ children }: { children: React.ReactNode }) {
     setChat: (msgs) => { setChatState(msgs); persist({ chat: msgs }); },
     contextNotes,
     lastFocusAreas,
-    addContextNote: (prompt, answer) => { const n = [...contextNotes, { id: `n_${Date.now()}`, date: new Date().toISOString(), prompt, answer }]; setContextNotes(n); persist({ contextNotes: n }); },
+    addContextNote: (prompt, answer) => {
+      const now = new Date().toISOString();
+      const n = [...contextNotes, { id: `n_${Date.now()}`, date: now, prompt, answer }];
+      setContextNotes(n);
+      // The atom: a statement is first-class Evidence about the person (any domain),
+      // not just a note. The quantitative engine still runs on health signals; this
+      // captures the rest so the model reasons over a whole life, not just metrics.
+      const ev: Evidence = { id: `ev_${Date.now()}`, kind: "statement", recordedAt: now, source: "conversation", text: answer, facets: { importance: "medium" } };
+      const nm: Mind = { ...mind, evidence: [...(mind.evidence ?? []), ev].slice(-500) };
+      setMind(nm);
+      persist({ contextNotes: n, mind: nm });
+    },
     setLastFocus: (areas) => { setLastFocusAreas(areas); persist({ lastFocusAreas: areas }); },
     understandingLog,
     recordUnderstanding: (snap) => {

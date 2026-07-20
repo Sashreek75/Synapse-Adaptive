@@ -29,7 +29,7 @@ const AREAS: { label: string; path: string; icon: typeof Target }[] = [
   { label: "Fitness & training", path: "athlete", icon: Dumbbell },
   { label: "Building better habits", path: "general", icon: Repeat },
   { label: "Stress & wellbeing", path: "wellness", icon: Flame },
-  { label: "Health & recovery", path: "wellness", icon: HeartPulse },
+  { label: "Health & wellbeing", path: "wellness", icon: HeartPulse },
   { label: "Personal growth", path: "general", icon: Compass },
 ];
 
@@ -41,7 +41,7 @@ const TOTAL = 3;
 
 export function OnboardingFlow() {
   const router = useRouter();
-  const { saveProfile } = useHealth();
+  const { saveProfile, saveMind, mind } = useHealth();
 
   const [step, setStep] = useState(0);
   const [name, setName] = useState("");
@@ -86,6 +86,10 @@ export function OnboardingFlow() {
       if (d.summary) aiSummary = d.summary;
     } catch {}
     saveProfile({ ...assembled(), aiSummary, onboardedAt: new Date().toISOString() });
+    // Trajectory is first-class: who they're working to become is the objective the
+    // engine steers toward. Seed it from the aspiration (or their primary focus).
+    const statement = aspiration.trim() || `make progress on ${pathLabel.toLowerCase()}`;
+    saveMind({ ...mind, trajectory: { statement, horizon: "months", updatedAt: new Date().toISOString() } });
     router.push("/dashboard");
   }
 

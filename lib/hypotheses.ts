@@ -13,7 +13,8 @@
  * deterministic, so the loop keeps turning even with no AI key.
  */
 
-import { metricLabel, METRIC_META } from "@/lib/metrics";
+import { metricLabel } from "@/lib/metrics";
+import { signalLabel, getSignal } from "@/lib/signals";
 import type { ExperimentReview } from "@/lib/focus";
 import { associationKey, type SurprisingFinding } from "@/lib/surprise";
 import type { Confidence, Habit, HypothesisStatus, MetricKey, TrackedHypothesis } from "@/types";
@@ -37,12 +38,12 @@ const slug = (s: string) => s.toLowerCase().replace(/[^a-z0-9]+/g, "-").slice(0,
 function phrasing(f: SurprisingFinding): { statement: string; prediction: string; experiment: string } {
   const a = f.association;
   const [m0, m1] = a.metrics;
-  const l0 = metricLabel(m0).toLowerCase();
-  const l1 = metricLabel(m1).toLowerCase();
+  const l0 = signalLabel(m0).toLowerCase();
+  const l1 = signalLabel(m1).toLowerCase();
 
   if (a.kind === "lag") {
     // m0 today tends to predict m1 tomorrow
-    const better0 = METRIC_META[m0].direction === "higher_is_better";
+    const better0 = getSignal(m0)?.direction !== "lower_is_better";
     const lever = better0 ? `protecting your ${l0}` : `easing your ${l0}`;
     return {
       statement: `I'm starting to think your ${l0} on one day steers your ${l1} the next — like it runs a day ahead.`,

@@ -12,9 +12,10 @@
 import { useMemo } from "react";
 import Link from "next/link";
 import { Sparkles, GitBranch, Lightbulb, RefreshCw, Trophy, HelpCircle, Check, CheckCircle2, FlaskConical, Compass, Repeat } from "lucide-react";
-import { Card, CardBody, Button, SectionLabel, ConfidenceChip } from "@/components/ui/primitives";
+import { Card, CardBody, Button, SectionLabel, ConfidenceChip, Skeleton } from "@/components/ui/primitives";
 import { SynapseOrb } from "@/components/synapse/orb";
 import { useHealth } from "@/components/providers/health-store";
+import { understandingDepth } from "@/lib/person-model";
 import { UnderstandingEvolution } from "@/components/profile/understanding-evolution";
 import type { TrackedHypothesis, Habit, HypothesisStatus, WeeklyFocusReasoning } from "@/types";
 
@@ -71,9 +72,13 @@ export default function PlaybookPage() {
     return g;
   }, [mind.hypotheses]);
 
-  if (!hydrated) return null;
+  if (!hydrated) return <Skeleton className="h-96 w-full rounded-2xl" />;
 
   const voice = livingVoice(weekly, mind.hypotheses, mind.habits);
+  const depth = understandingDepth(mind);
+  const depthLine = depth === "strong" ? "I know how you work pretty well now, and I keep refining it."
+    : depth === "developing" ? "I'm getting to know how you work — this sharpens every week."
+    : "We're still early — I'm forming my first real picture of you.";
   const activeHabits = mind.habits.filter((h) => h.status !== "lapsed");
   const lapsedHabits = mind.habits.filter((h) => h.status === "lapsed");
   const openQ = mind.openQuestions.filter((q) => q.status === "open");
@@ -89,12 +94,14 @@ export default function PlaybookPage() {
         <div>
           <h1 className="text-2xl font-semibold tracking-tight text-ink">You</h1>
           <p className="text-sm text-muted">{"Everything I learn about you here has one purpose: helping you make better calls, day to day."}</p>
+          <p className="mt-0.5 text-xs text-muted">{depthLine}</p>
         </div>
       </header>
 
-      {profile.goals && profile.goals.length > 0 && (
+      {(mind.trajectory?.statement || (profile.goals && profile.goals.length > 0)) && (
         <Card className="overflow-hidden"><div className="mesh"><CardBody className="sm:p-6">
           <SectionLabel className="mb-2 flex items-center gap-1.5"><Compass className="h-3.5 w-3.5 text-orange-500" /> Who you&apos;re becoming</SectionLabel>
+          {mind.trajectory?.statement && <p className="mb-3 text-ink">{`You're working to become: ${mind.trajectory.statement}. I weigh what I notice against that.`}</p>}
           <ul className="space-y-1.5">
             {profile.goals.map((g, i) => (
               <li key={i} className="flex items-start gap-2 text-ink">

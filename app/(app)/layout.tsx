@@ -8,6 +8,7 @@ import { AuthGuard } from "@/components/providers/auth-gate";
 import { AnimatedBackground } from "@/components/ui/animated-background";
 import { OnboardingGate } from "@/components/providers/onboarding-gate";
 import { FeatureTour } from "@/components/tour/feature-tour";
+import { FocusCompanion } from "@/components/focus/focus-companion";
 
 /**
  * THE FRAME — deliberately almost nothing.
@@ -46,6 +47,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
               </div>
             </main>
           </div>
+          <FocusCompanion />
         </AuthGuard>
       </SubscriptionProvider>
     </HealthProvider>

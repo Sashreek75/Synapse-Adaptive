@@ -69,7 +69,7 @@ export async function POST(req: Request) {
   const openQs = (body.openQuestions ?? []).slice(0, 5);
 
   const user = [
-    `Path focus: ${body.focusNoun || body.pathLabel || body.path || "general wellness"}`,
+    `Path focus: ${body.focusNoun || body.pathLabel || body.path || "personal growth"}`,
     `Day of week: ${body.dayOfWeek || new Date().toLocaleDateString("en-US", { weekday: "long" })}`,
     `Check-ins so far: ${body.checkInCount ?? 0}`,
     `Goals: ${(body.goals ?? []).slice(0, 5).join("; ") || "none stated yet"}`,

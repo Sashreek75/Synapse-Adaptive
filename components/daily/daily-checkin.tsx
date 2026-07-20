@@ -17,20 +17,20 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Moon, Battery, Activity, Check, Smile, Stethoscope, CalendarDays, Sparkles, Zap, HelpCircle, Flag } from "lucide-react";
+import { Moon, Battery, Activity, Check, Smile, CalendarDays, Sparkles, Zap, HelpCircle, Flag } from "lucide-react";
 import { Card, CardBody, Button, Skeleton } from "@/components/ui/primitives";
 import { SynapseOrb } from "@/components/synapse/orb";
 import { useHealth } from "@/components/providers/health-store";
 import { getPath } from "@/lib/paths";
 import { dailyReflection, type DailyReflection } from "@/lib/intelligence";
 import { cn } from "@/lib/utils";
-import type { MetricKey, MetricSeries } from "@/types";
+import type { MetricKey, MetricSeries, SignalId } from "@/types";
 import type { DailyCheckinOutput, DailyItemOutput } from "@/ai/schemas";
 
 const wordFor = (labels: string[], v: number) => labels[Math.min(labels.length - 1, Math.floor((v / 100) * labels.length))];
 
 function seriesWithToday(series: MetricSeries[], metrics: Partial<Record<MetricKey, number>>, date: string): MetricSeries[] {
-  const map = new Map<MetricKey, MetricSeries>(series.map((s) => [s.metric, { metric: s.metric, points: [...s.points] }]));
+  const map = new Map<SignalId, MetricSeries>(series.map((s) => [s.metric, { metric: s.metric, points: [...s.points] }]));
   for (const [m, v] of Object.entries(metrics) as [MetricKey, number][]) {
     if (v == null) continue;
     if (!map.has(m)) map.set(m, { metric: m, points: [] });
@@ -63,7 +63,7 @@ function daySeed(): number {
 const variant = <T,>(xs: T[], seed: number, salt: number): T => xs[(seed + salt) % xs.length];
 
 const SCALE_ICON: Record<string, typeof Moon> = {
-  sleep_quality: Moon, fatigue: Battery, stress: Activity, mood: Smile, symptoms: Stethoscope, reaction_time: Zap,
+  sleep_quality: Moon, fatigue: Battery, stress: Activity, mood: Smile, symptoms: Activity, reaction_time: Zap,
 };
 
 /** Client-side sanity check for a cached/returned generated plan. */
@@ -215,7 +215,7 @@ export function DailyCheckIn() {
           )}
         </CardBody></div></Card>
         <div className="flex gap-2">
-          <Button className="flex-1" onClick={() => router.push("/dashboard")}>Go to dashboard <Check className="h-4 w-4" /></Button>
+          <Button className="flex-1" onClick={() => router.push("/dashboard")}>Done for today <Check className="h-4 w-4" /></Button>
           <Button variant="outline" className="flex-1" onClick={() => router.push("/dashboard#conversation")}>Talk this through</Button>
         </div>
       </div>
@@ -285,10 +285,10 @@ export function DailyCheckIn() {
             <div>
               <button type="button" onClick={() => setHasSymptoms((v) => !v)} aria-pressed={hasSymptoms}
                 className="flex w-full items-center justify-between rounded-xl bg-surface-2 px-3 py-2.5 text-left text-sm font-medium text-ink transition-colors hover:bg-surface">
-                <span className="flex items-center gap-2"><Stethoscope className="h-4 w-4 text-navy-500" /> Any symptoms today?</span>
+                <span className="flex items-center gap-2"><Activity className="h-4 w-4 text-navy-500" /> Anything dragging on you today?</span>
                 <span className="text-xs text-muted">{hasSymptoms ? "Yes" : "No — tap if so"}</span>
               </button>
-              {hasSymptoms && <div className="mt-4"><Q icon={Stethoscope} label="How much did they interfere?" value={symptoms} setValue={setSymptoms} labels={SYMPTOMS} /></div>}
+              {hasSymptoms && <div className="mt-4"><Q icon={Activity} label="How much did it get in your way?" value={symptoms} setValue={setSymptoms} labels={SYMPTOMS} /></div>}
             </div>
             <div>
               <label htmlFor="life-event" className="mb-1.5 flex items-center gap-2 text-sm font-medium text-ink">

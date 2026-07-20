@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Download, Trash2, Bell, User, ShieldCheck, LogIn, LogOut, Sparkles } from "lucide-react";
 import { Card, CardBody, SectionLabel, Button } from "@/components/ui/primitives";
@@ -16,6 +16,8 @@ export default function SettingsPage() {
   const [notifs, setNotifs] = useState({ weekly: true, milestones: true, nudges: false });
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [signingOut, setSigningOut] = useState(false);
+  useEffect(() => { try { const r = localStorage.getItem("synapse.notifs.v1"); if (r) setNotifs(JSON.parse(r)); } catch {} }, []);
+  useEffect(() => { try { localStorage.setItem("synapse.notifs.v1", JSON.stringify(notifs)); } catch {} }, [notifs]);
 
   async function handleSignOut() {
     setSigningOut(true);
@@ -54,15 +56,14 @@ export default function SettingsPage() {
         {profile.onboardedAt ? (
           <dl className="space-y-2 text-sm">
             <Row label="Name" value={profile.displayName || "—"} />
-            <Row label="Recovery" value={profile.conditionLabel || "—"} />
-            <Row label="Stage" value={profile.recoveryStage} />
+            <Row label="Working toward" value={profile.definitionOfBetter || "—"} />
             <Row label="Goals" value={profile.goals.join(", ") || "—"} />
           </dl>
         ) : (
           <p className="text-muted">You haven&apos;t set up your profile yet.</p>
         )}
         <div className="mt-4">
-          <Link href="/onboarding"><Button variant="outline" size="sm">{profile.onboardedAt ? "Edit my profile" : "Set up my profile"}</Button></Link>
+          <Link href="/onboarding"><Button variant="outline" size="sm">{profile.onboardedAt ? "Update my intro" : "Set up my profile"}</Button></Link>
         </div>
       </CardBody></Card>
 

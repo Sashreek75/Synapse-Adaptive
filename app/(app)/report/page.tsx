@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { Printer, TrendingUp, TrendingDown, Eye, Lightbulb, Stethoscope, Brain, MessageCircle, Activity, Sparkles, ListChecks, PencilLine, CalendarCheck, BookOpen, HelpCircle } from "lucide-react";
+import { Printer, TrendingUp, TrendingDown, Eye, Lightbulb, LifeBuoy, Brain, MessageCircle, Activity, Sparkles, ListChecks, PencilLine, CalendarCheck, BookOpen, HelpCircle } from "lucide-react";
 import { Card, CardBody, Button, ConfidenceChip, Skeleton } from "@/components/ui/primitives";
 import { SynapseOrb } from "@/components/synapse/orb";
 import { InsightExplain } from "@/components/synapse/insight-explain";
@@ -130,9 +130,9 @@ export default function WeeklyReportPage() {
   if (!hasData) {
     return (
       <div className="mx-auto max-w-2xl space-y-6">
-        <h1 className="text-2xl font-semibold tracking-tight text-ink">Your coaching session</h1>
+        <h1 className="text-2xl font-semibold tracking-tight text-ink">Your weekly review</h1>
         <Card><CardBody className="py-10 text-center"><p className="text-muted">Our first session happens once you have a check-in or two.</p>
-          <Link href="/assessments" className="mt-5 inline-block"><Button>Start a check-in <Activity className="h-4 w-4" /></Button></Link></CardBody></Card>
+          <Link href="/daily" className="mt-5 inline-block"><Button>Start a check-in <Activity className="h-4 w-4" /></Button></Link></CardBody></Card>
       </div>
     );
   }
@@ -145,7 +145,7 @@ export default function WeeklyReportPage() {
         <Card className="sa-rise overflow-hidden"><div className="mesh"><CardBody className="flex flex-col items-center gap-6 py-14 text-center sm:px-10">
           <SynapseOrb size={84} state="thinking" />
           <div>
-            <div className="inline-flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-muted"><Sparkles className="h-3.5 w-3.5 text-orange-500" /> Weekly coaching session</div>
+            <div className="inline-flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-muted"><Sparkles className="h-3.5 w-3.5 text-orange-500" /> Weekly review</div>
             <h1 className="mt-2 text-2xl font-semibold tracking-tight text-ink">Our session isn&apos;t ready yet</h1>
             <p className="mx-auto mt-2 max-w-md leading-relaxed text-muted">
               I&apos;m still gathering this week — we sit down together on Sunday. Every check-in between now and then makes it sharper.
@@ -181,7 +181,7 @@ export default function WeeklyReportPage() {
           <div className="flex items-center gap-4">
             <SynapseOrb size={60} />
             <div>
-              <div className="inline-flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-muted"><Sparkles className="h-3.5 w-3.5 text-orange-500" /> Weekly coaching session</div>
+              <div className="inline-flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-muted"><Sparkles className="h-3.5 w-3.5 text-orange-500" /> Weekly review</div>
               <h1 className="mt-1 text-2xl font-semibold tracking-tight text-ink">{getPath(profile.path).focusNoun.replace(/^\w/, (c) => c.toUpperCase())} · Week of {new Date().toLocaleDateString(undefined, { month: "long", day: "numeric" })}</h1>
               <p className="mt-0.5 text-sm text-muted">{streak.totalDays} check-ins so far</p>
               {publishedAt && (
@@ -238,7 +238,7 @@ export default function WeeklyReportPage() {
               </p>
             )}
             {coach.watchFor && <p className="mt-3 text-sm text-muted"><span className="font-semibold text-ink">Watch for this before next week — </span>{coach.watchFor}</p>}
-            {coach.providerNote && <p className="mt-2 flex items-start gap-2 text-sm text-muted"><Stethoscope className="mt-0.5 h-4 w-4 shrink-0 text-emerald-600" /><span><span className="font-semibold text-ink">Worth raising with your provider if it continues — </span>{coach.providerNote}</span></p>}
+            {coach.providerNote && <p className="mt-2 flex items-start gap-2 text-sm text-muted"><LifeBuoy className="mt-0.5 h-4 w-4 shrink-0 text-emerald-600" /><span><span className="font-semibold text-ink">Worth keeping an eye on — and getting real help if it continues — </span>{coach.providerNote}</span></p>}
           </div>
         )}
       </CardBody></Card>
@@ -326,13 +326,13 @@ export default function WeeklyReportPage() {
         </Chapter>
       )}
 
-      <Chapter q="Questions worth asking your provider" icon={Stethoscope}>
+      <Chapter q="Open questions worth chasing down" icon={HelpCircle}>
         {openQ.length || providerFromInsights.length ? (
           <ul className="space-y-2">
             {openQ.map((q) => <li key={q.id} className="flex items-start gap-2.5 text-ink"><span className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-orange-500" />{q.text}</li>)}
             {providerFromInsights.filter((q) => !openQ.some((o) => o.text === q)).map((q) => <li key={q} className="flex items-start gap-2.5 text-muted"><span className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-line" />“{q}”</li>)}
           </ul>
-        ) : <p className="text-muted">None saved yet — bring up whatever&apos;s on your mind and I&apos;ll suggest a few worth raising.</p>}
+        ) : <p className="text-muted">Nothing open yet — bring up whatever&apos;s on your mind and I&apos;ll help you get to the bottom of it.</p>}
       </Chapter>
 
       <Chapter q="What you've told me" icon={MessageCircle}>
@@ -355,7 +355,7 @@ export default function WeeklyReportPage() {
       </Chapter>
 
       <Chapter q="Your reflection" icon={MessageCircle}>
-        <p className="mb-2 text-sm text-muted">A line for yourself — how did this week actually feel? I&apos;ll remember it.</p>
+        <p className="mb-2 text-sm text-muted">A line for yourself — a moment to mark how this week actually felt.</p>
         <textarea value={reflection} onChange={(e) => setReflection(e.target.value)} rows={2} placeholder="This week I felt…" className="w-full resize-none rounded-xl border bg-surface px-4 py-2 text-ink placeholder:text-muted focus:outline-none focus-visible:ring-2 focus-visible:ring-navy-400" />
       </Chapter>
 
@@ -371,7 +371,7 @@ export default function WeeklyReportPage() {
         </ProGate>
       </CardBody></Card>
 
-      <p className="px-1 text-center text-xs text-muted">General wellness observations from your own data — educational, not medical advice.</p>
+      <p className="px-1 text-center text-xs text-muted">Patterns from your own data — you always make the call.</p>
     </div>
   );
 }

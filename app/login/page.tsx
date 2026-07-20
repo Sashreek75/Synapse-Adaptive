@@ -92,7 +92,7 @@ export default function LoginPage() {
         <div className="text-center">
           <div className="mx-auto w-fit"><SynapseOrb size={48} /></div>
           <h1 className="mt-5 text-2xl font-semibold tracking-tight text-ink">
-            {mode === "signup" ? "Create your account" : mode === "reset" ? "Reset your password" : "Welcome back"}
+            {mode === "signup" ? "Create your account" : mode === "reset" ? "Reset your password" : "Sign in to Synapse"}
           </h1>
           <p className="mt-2 text-sm text-muted">Your adaptive AI partner — with you anywhere you sign in.</p>
         </div>
@@ -159,7 +159,7 @@ export default function LoginPage() {
             )}
           </div>
         )}
-        <p className="mt-6 text-center text-[11px] text-muted">General wellness &amp; education — never diagnosis or treatment.</p>
+        <p className="mt-6 text-center text-[11px] text-muted">Private by design — your data is yours, and never sold.</p>
       </div>
     </div>
   );

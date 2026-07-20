@@ -1,12 +1,12 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { useRouter } from "next/navigation";
 import { detectFocusIntent } from "@/lib/focus-intent";
-import { Send, Eye, BookOpen, Stethoscope, Sparkles, Target, CalendarCheck, Activity, Eraser, Timer, Play } from "lucide-react";
+import { newSession, saveSession, loadSession, DURATION_PRESETS } from "@/lib/focus-session";
+import { Send, Eye, BookOpen, Compass, Sparkles, Target, CalendarCheck, Activity, Eraser, Timer } from "lucide-react";
 import { preGate, CRISIS_RESPONSE } from "@/ai/safety";
 import { useHealth } from "@/components/providers/health-store";
-import { METRIC_META } from "@/lib/metrics";
+import { signalMeta } from "@/lib/signals";
 import { computeTrend } from "@/lib/stats";
 import { getPath, goalMetricsForPath } from "@/lib/paths";
 import { computeStreak, focusAreas, sessionOpener } from "@/lib/intelligence";
@@ -31,7 +31,7 @@ function rankStrength(s: string): number { return s === "strong" ? 2 : s === "mo
 const sectionMeta = {
   observation: { label: "What I see", icon: Eye, tint: "text-navy-500", bar: "bg-navy-500" },
   education: { label: "Good to know", icon: BookOpen, tint: "text-orange-600", bar: "bg-orange-500" },
-  ask_provider: { label: "Worth asking your provider", icon: Stethoscope, tint: "text-emerald-600", bar: "bg-emerald-500" },
+  ask_provider: { label: "Worth a closer look", icon: Compass, tint: "text-emerald-600", bar: "bg-emerald-500" },
 } as const;
 
 export function AgentConsole({ embedded = false, immersive = false }: { embedded?: boolean; immersive?: boolean } = {}) {
@@ -46,25 +46,37 @@ export function AgentConsole({ embedded = false, immersive = false }: { embedded
   useEffect(() => { try { setUsedToday(Number(localStorage.getItem(usageKey) || 0)); } catch {} }, [usageKey]);
   const [input, setInput] = useState("");
   const [busy, setBusy] = useState(false);
+  const [focusActive, setFocusActive] = useState(false);
+  const [customOpen, setCustomOpen] = useState(false);
+  const [customMin, setCustomMin] = useState("");
   const endRef = useRef<HTMLDivElement>(null);
-  const router = useRouter();
+  useEffect(() => {
+    const sync = () => setFocusActive(!!loadSession());
+    sync();
+    window.addEventListener("synapse:focus-start", sync);
+    window.addEventListener("synapse:focus-end", sync);
+    return () => { window.removeEventListener("synapse:focus-start", sync); window.removeEventListener("synapse:focus-end", sync); };
+  }, []);
 
-  // Entering focus mode from natural language: if the person says they're starting
-  // a work session, offer to start a real one on the spot (roles are entered, not clicked).
+  // Entering focus mode from natural language: begin a real companion session on the
+  // spot (roles are entered, not clicked), then MINIMIZE into the floating orb — no extra
+  // screens, no dashboard. The user is back to work within seconds.
   function startFocus(goal: string | undefined, minutes: number) {
-    const dur = Math.max(60, minutes * 60);
-    try {
-      localStorage.setItem("synapse.tools.timer.v1", JSON.stringify({ mode: "focus", durationSec: dur, endsAt: Date.now() + dur * 1000, remainingSec: dur, running: true }));
-      if (goal) localStorage.setItem("synapse.tools.focusGoal", goal); else localStorage.removeItem("synapse.tools.focusGoal");
-    } catch {}
-    router.push("/tools");
+    const s = newSession(goal ?? null, minutes, "focus");
+    saveSession(s);
+    setFocusActive(true); setCustomOpen(false); setCustomMin("");
+    try { window.dispatchEvent(new CustomEvent("synapse:focus-start")); } catch {}
+    const line = `Sounds good${goal ? ` \u2014 ${goal} it is` : ""}. I'll be right here if you need me: keeping time, quiet while you're in flow, and I'll only look in if it seems like you've drifted.`;
+    setChat([...chat.filter((m) => m.id !== "intro"), { id: `a_${Date.now()}`, role: "assistant" as const, content: line }]);
   }
+  const startCustom = () => { const m = Math.min(180, Math.max(5, parseInt(customMin, 10) || 25)); startFocus(focusHint.goal, m); };
 
   const focus = getPath(profile.path).focusNoun;
 
   const context = useMemo(() => {
     const who = [
       `Name: ${profile.displayName || "User"}`,
+      (mind.trajectory?.statement || profile.definitionOfBetter) && `Working to become: ${mind.trajectory?.statement || profile.definitionOfBetter} (the objective — weigh advice against whether it moves them toward this)`,
       profile.aiSummary && `Profile: ${profile.aiSummary}`,
       `What they care about most: ${focus}`,
       profile.goals.length && `Goals: ${profile.goals.join(", ")}`,
@@ -76,7 +88,7 @@ export function AgentConsole({ embedded = false, immersive = false }: { embedded
     ].filter(Boolean).join("\n");
     if (!hasData) return who;
     const lines = series.map((s) => {
-      const t = computeTrend(s); const m = METRIC_META[s.metric];
+      const t = computeTrend(s); const m = signalMeta(s.metric);
       return `${m.label}: latest ${Math.round(t.latest)}, baseline ${Math.round(t.baseline)}, change ${Math.round(t.delta)} (${m.direction}).`;
     });
     const dailyN = checkIns.filter((c) => c.kind === "daily").length;
@@ -95,12 +107,12 @@ export function AgentConsole({ embedded = false, immersive = false }: { embedded
     const activity = [
       `Activity: ${weeklyN} weekly + ${dailyN} daily check-ins; ${Math.round(consistency * 7)}/7 days active this week.`,
       last ? `Most recent check-in: ${new Date(last.date).toLocaleDateString()}${daysSinceLast != null ? ` (${daysSinceLast === 0 ? "today" : `${daysSinceLast} day${daysSinceLast === 1 ? "" : "s"} ago`})` : ""}.` : "",
-      `Weekly score: ${weeklyScore}/100 (consistency + trend direction; not medical).`,
+      `Weekly score: ${weeklyScore}/100 (consistency + trend direction).`,
       `Recent changes: ${changes}.`,
       `Currently watching most closely: ${watching}.`,
       `Consistency: ${streak.totalDays} total check-in days, current streak ${streak.currentStreak} days.`,
       notes ? `Things they told me recently:\n${notes}` : "",
-      openQ.length ? `Open questions they saved for their provider: ${openQ.join(" | ")}.` : "",
+      openQ.length ? `Open questions they still want answered: ${openQ.join(" | ")}.` : "",
       recommendationLog.length
         ? `Suggestions I made previously (most recent last): ${recommendationLog.slice(-3).map((r) => `"${r.title}" (${new Date(r.date).toLocaleDateString()})`).join("; ")}. Follow up on these naturally when relevant.`
         : "",
@@ -314,13 +326,24 @@ export function AgentConsole({ embedded = false, immersive = false }: { embedded
             </div>
           )}
           <WaitlistDialog plan="pro" open={waitlistOpen} onClose={() => setWaitlistOpen(false)} defaultEmail={email} />
-          {focusHint.focus && !busy && (
-            <button onClick={() => startFocus(focusHint.goal, focusHint.minutes ?? 25)}
-              className="mb-2.5 flex w-full items-center gap-2.5 rounded-xl border border-orange-300/60 bg-orange-500/10 px-3 py-2.5 text-left text-sm text-ink transition hover:bg-orange-500/15">
-              <Timer className="h-4 w-4 shrink-0 text-orange-500" />
-              <span className="min-w-0 flex-1">Start a {focusHint.minutes ?? 25}-minute focus session{focusHint.goal ? ` on ${focusHint.goal}` : ""} — I&apos;ll keep time with you.</span>
-              <Play className="h-4 w-4 shrink-0 text-orange-500" />
-            </button>
+          {focusHint.focus && !busy && !focusActive && (
+            <div className="mb-2.5 rounded-xl border border-orange-300/60 bg-orange-500/10 px-3 py-2.5 text-sm text-ink">
+              <p className="flex items-center gap-2"><Timer className="h-4 w-4 shrink-0 text-orange-500" /> Sounds good{focusHint.goal ? ` — ${focusHint.goal}` : ""}. About how long would you like to focus?</p>
+              <div className="mt-2 flex flex-wrap items-center gap-2">
+                {(focusHint.minutes && !(DURATION_PRESETS as readonly number[]).includes(focusHint.minutes) ? [focusHint.minutes, ...DURATION_PRESETS] : DURATION_PRESETS).map((m) => (
+                  <button key={m} onClick={() => startFocus(focusHint.goal, m)} className="rounded-full border bg-surface px-3 py-1.5 text-sm font-medium text-ink transition hover:bg-surface-2">{m} min</button>
+                ))}
+                {!customOpen ? (
+                  <button onClick={() => setCustomOpen(true)} className="rounded-full border bg-surface px-3 py-1.5 text-sm font-medium text-muted transition hover:text-ink">Custom</button>
+                ) : (
+                  <span className="inline-flex items-center gap-1.5">
+                    <input type="number" min={5} max={180} value={customMin} autoFocus onChange={(e) => setCustomMin(e.target.value)} onKeyDown={(e) => e.key === "Enter" && startCustom()}
+                      placeholder="min" className="w-16 rounded-full border bg-surface px-2.5 py-1.5 text-sm text-ink focus:outline-none" />
+                    <button onClick={startCustom} className="rounded-full bg-orange-500 px-3 py-1.5 text-sm font-medium text-white transition hover:bg-orange-600">Start</button>
+                  </span>
+                )}
+              </div>
+            </div>
           )}
           <div className="mb-2.5 flex items-center justify-between gap-2">
             <div className="flex flex-1 flex-wrap gap-2">
@@ -345,7 +368,7 @@ export function AgentConsole({ embedded = false, immersive = false }: { embedded
               <Send className="h-5 w-5" />
             </button>
           </div>
-          <p className="mt-2 px-1 text-center text-[11px] text-muted">Synapse offers general wellness insights — not diagnosis or medical advice.</p>
+          <p className="mt-2 px-1 text-center text-[11px] text-muted">Synapse reflects your own patterns and can be wrong — you make the call.</p>
         </div>
       </div>
     );
@@ -445,7 +468,7 @@ export function AgentConsole({ embedded = false, immersive = false }: { embedded
             <Send className="h-5 w-5" />
           </button>
         </div>
-        <p className="mt-2 px-1 text-[11px] text-muted">Synapse offers general wellness insights — not diagnosis or medical advice.</p>
+        <p className="mt-2 px-1 text-[11px] text-muted">Synapse reflects your own patterns and can be wrong — you make the call.</p>
       </div>
     </div>
   );
