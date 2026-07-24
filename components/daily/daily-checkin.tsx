@@ -21,6 +21,7 @@ import { Moon, Battery, Activity, Check, Smile, CalendarDays, Sparkles, Zap, Hel
 import { Card, CardBody, Button, Skeleton } from "@/components/ui/primitives";
 import { SynapseOrb } from "@/components/synapse/orb";
 import { useHealth } from "@/components/providers/health-store";
+import { useSubscription } from "@/components/providers/subscription-provider";
 import { getPath } from "@/lib/paths";
 import { dailyReflection, type DailyReflection } from "@/lib/intelligence";
 import { cn } from "@/lib/utils";
@@ -81,9 +82,35 @@ function isValidCheckin(p: unknown): p is DailyCheckinOutput {
   return coreScales >= 2;
 }
 
+/** A brief, non-leading feeling summary (a secondary lens for the model). */
+function feelingSummary(m: Partial<Record<MetricKey, number>>): string {
+  const w = (labels: string[], v: number) => labels[Math.min(labels.length - 1, Math.floor((v / 100) * labels.length))];
+  const bits: string[] = [];
+  if (m.sleep_quality != null) bits.push("sleep " + w(SLEEP, m.sleep_quality).toLowerCase());
+  if (m.fatigue != null) bits.push("energy " + w(ENERGY, 100 - m.fatigue).toLowerCase());
+  if (m.stress != null) bits.push("stress " + w(STRESS, m.stress).toLowerCase());
+  if (m.mood != null) bits.push("mood " + w(MOOD, m.mood).toLowerCase());
+  return bits.join(", ");
+}
+
+/** Parse the model labelled instant read into the reflection shape (graceful if it strays). */
+function parseReflection(text: string): DailyReflection | null {
+  const t = (text || "").trim();
+  if (!t) return null;
+  const nl = String.fromCharCode(10);
+  const pick = (label: string) => {
+    const line = t.split(nl).find((l) => l.trim().toUpperCase().startsWith(label + ":"));
+    return line ? line.slice(line.indexOf(":") + 1).trim() : "";
+  };
+  const lead = pick("LEAD"), insight = pick("INSIGHT"), action = pick("TRY"), watch = pick("WATCH");
+  if (!lead && !action) return { lead: t, points: [], action: null, watch: null, confidence: "moderate" };
+  return { lead: lead || t, points: insight ? [insight] : [], action: action || null, watch: watch || null, confidence: "moderate" };
+}
+
 export function DailyCheckIn() {
   const router = useRouter();
   const { dailyDoneToday, addCheckIn, addContextNote, recentChanges, contextNotes, profile, series, checkIns, mind } = useHealth();
+  const { plan: tier } = useSubscription();
 
   const [plan, setPlan] = useState<DailyCheckinOutput | null | undefined>(undefined);
   // Generated-item answers, keyed by item index.
@@ -102,6 +129,7 @@ export function DailyCheckIn() {
 
   const [saved, setSaved] = useState(false);
   const [reflection, setReflection] = useState<DailyReflection | null>(null);
+  const [reflecting, setReflecting] = useState(false);
 
   const seed = useMemo(daySeed, []);
   const fq = useMemo(() => ({
@@ -148,6 +176,37 @@ export function DailyCheckIn() {
     setAns((cur) => ({ ...cur, [i]: { ...cur[i], ...patch } }));
   }
 
+  // The instant read after a check-in: MODEL-driven, tailored to their goals and to
+  // exactly what they wrote today. The deterministic reflection is only an offline safety net.
+  async function runInstantRead(metrics: Partial<Record<MetricKey, number>>, date: string, written: string[]) {
+    setSaved(true); setReflecting(true); setReflection(null);
+    let fallback: DailyReflection | null = null;
+    try { fallback = dailyReflection(seriesWithToday(series, metrics, date), profile.path); } catch {}
+    const nl = String.fromCharCode(10);
+    try {
+      const said = written.map((w) => (w || "").trim()).filter(Boolean).join(" | ");
+      const feeling = feelingSummary(metrics);
+      const ctx = [
+        "The user just finished the check-in below. Give an INSTANT, genuinely useful read, specific to THEM and their goals, never generic wellbeing.",
+        mind.trajectory && mind.trajectory.statement ? "They are working to become: " + mind.trajectory.statement + "." : "",
+        profile.goals && profile.goals.length ? "Their focus areas: " + profile.goals.join(", ") + "." : "",
+        profile.definitionOfBetter ? "What better looks like to them: " + profile.definitionOfBetter + "." : "",
+        said ? ("In their OWN words today: " + JSON.stringify(said) + ". Reference this directly so they know you truly read it.") : "",
+        feeling ? ("How they are feeling today (a secondary lens, do NOT lead with this): " + feeling + ".") : "",
+        "Reply in EXACTLY this labelled format. Each line 1-2 sentences, warm, concrete, second person:",
+        "LEAD: the single most useful thing you notice today, tied to what they did or their goal.",
+        "INSIGHT: one non-obvious connection or a genuine encouragement (omit this line entirely if you have nothing real).",
+        "TRY: one concrete step toward their goal for tomorrow. Match it to their energy today, keep the destination, never busywork.",
+        "WATCH: one thing you will keep an eye on next.",
+        "No preamble and no markdown. Just those labelled lines.",
+      ].filter(Boolean).join(nl);
+      const res = await fetch("/api/chat", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ message: said || "Here is my check-in for today.", tier, context: ctx }) });
+      const data = await res.json();
+      const parsed = parseReflection(String((data && data.content) || ""));
+      setReflection(parsed || fallback);
+    } catch { setReflection(fallback); }
+    finally { setReflecting(false); }
+  }
   function saveGenerated(items: DailyItemOutput[]) {
     const date = new Date().toISOString();
     const metrics: Partial<Record<MetricKey, number>> = {};
@@ -172,8 +231,7 @@ export function DailyCheckIn() {
     if (progress.trim()) addContextNote("What I moved forward today", progress.trim());
     addCheckIn({ date, kind: "daily", metrics, note: "Daily check-in" });
     for (const n of notes) addContextNote(n.prompt, n.answer);
-    try { setReflection(dailyReflection(seriesWithToday(series, metrics, date), profile.path)); } catch { setReflection(null); }
-    setSaved(true);
+    void runInstantRead(metrics, date, [progress.trim(), ...notes.map((n) => n.answer)]);
   }
 
   function saveFallback() {
@@ -184,8 +242,7 @@ export function DailyCheckIn() {
     addCheckIn({ date, kind: "daily", metrics, note: "Daily check-in" });
     if (fallbackAnswer.trim()) addContextNote(fq.event, fallbackAnswer.trim());
     if (lifeEvent.trim()) addContextNote(fq.event, lifeEvent.trim());
-    try { setReflection(dailyReflection(seriesWithToday(series, metrics, date), profile.path)); } catch { setReflection(null); }
-    setSaved(true);
+    void runInstantRead(metrics, date, [progress.trim(), fallbackAnswer.trim(), lifeEvent.trim()]);
   }
 
   if (saved) {
@@ -193,13 +250,15 @@ export function DailyCheckIn() {
       <div className="mx-auto max-w-md space-y-4">
         <Card className="sa-rise overflow-hidden"><div className="mesh"><CardBody className="py-8">
           <div className="flex items-center gap-3">
-            <SynapseOrb size={40} className="shrink-0" />
+            <SynapseOrb size={40} state={reflecting ? "thinking" : "idle"} className="shrink-0" />
             <div>
               <h2 className="text-lg font-semibold text-ink">Here&apos;s what I noticed just now</h2>
               <p className="text-xs text-muted">A quick read on today — from your own data.</p>
             </div>
           </div>
-          {reflection ? (
+          {reflecting ? (
+            <p className="mt-4 text-sm text-muted">Reading your day — one sec…</p>
+          ) : reflection ? (
             <div className="mt-4 space-y-3 text-sm leading-relaxed text-ink">
               <p>{reflection.lead}</p>
               {reflection.points.map((p, i) => <p key={i} className="rounded-xl bg-surface-2 p-3">{p}</p>)}
