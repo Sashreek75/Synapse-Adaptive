@@ -323,6 +323,12 @@ export function FocusCompanion() {
           </button>
         )}
 
+        {!open && !bubble && canPop && (
+          <button onClick={openPiP} title="Pop out — stays beside you across tabs and apps"
+            className="inline-flex items-center gap-1.5 rounded-full border bg-surface/95 px-3 py-1.5 text-xs font-medium text-muted shadow-soft backdrop-blur transition hover:text-ink">
+            <ExternalLink className="h-3.5 w-3.5" /> Pop me out
+          </button>
+        )}
         <button onClick={() => { if (pipWin) { try { pipWin.focus(); } catch {} } else { setOpen((v) => !v); setBubble(null); } }}
           aria-label={pipWin ? "Focus the pop-out window" : open ? "Minimize focus companion" : `Focus companion — ${fmtClock(rem)} left`}
           className="relative grid h-16 w-16 place-items-center rounded-full transition-transform hover:scale-[1.03] active:scale-95">
