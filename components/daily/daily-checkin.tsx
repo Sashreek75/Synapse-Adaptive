@@ -24,6 +24,8 @@ import { useHealth } from "@/components/providers/health-store";
 import { useSubscription } from "@/components/providers/subscription-provider";
 import { getPath } from "@/lib/paths";
 import { dailyReflection, type DailyReflection } from "@/lib/intelligence";
+import { addCommitment, loadCommitments } from "@/lib/commitments";
+import { readMomentum, commitmentHint } from "@/lib/momentum";
 import { cn } from "@/lib/utils";
 import type { MetricKey, MetricSeries, SignalId } from "@/types";
 import type { DailyCheckinOutput, DailyItemOutput } from "@/ai/schemas";
@@ -186,6 +188,7 @@ export function DailyCheckIn() {
     try {
       const said = written.map((w) => (w || "").trim()).filter(Boolean).join(" | ");
       const feeling = feelingSummary(metrics);
+      const mom = readMomentum(loadCommitments());
       const ctx = [
         "The user just finished the check-in below. Give an INSTANT, genuinely useful read, specific to THEM and their goals, never generic wellbeing.",
         mind.trajectory && mind.trajectory.statement ? "They are working to become: " + mind.trajectory.statement + "." : "",
@@ -193,6 +196,7 @@ export function DailyCheckIn() {
         profile.definitionOfBetter ? "What better looks like to them: " + profile.definitionOfBetter + "." : "",
         said ? ("In their OWN words today: " + JSON.stringify(said) + ". Reference this directly so they know you truly read it.") : "",
         feeling ? ("How they are feeling today (a secondary lens, do NOT lead with this): " + feeling + ".") : "",
+        mom.observation ? ("Where their momentum is trending (factor this into the ONE step: push if building, protect and shrink if fragile): " + mom.observation) : "",
         "Reply in EXACTLY this labelled format. Each line 1-2 sentences, warm, concrete, second person:",
         "LEAD: the single most useful thing you notice today, tied to what they did or their goal.",
         "INSIGHT: one non-obvious connection or a genuine encouragement (omit this line entirely if you have nothing real).",
@@ -273,6 +277,7 @@ export function DailyCheckIn() {
             <p className="mt-4 text-sm text-muted">Logged — thank you. A couple more check-ins and I&apos;ll start connecting the dots.</p>
           )}
         </CardBody></div></Card>
+        {!reflecting && <CommitmentCapture suggestion={reflection?.action ?? ""} towards={mind.trajectory?.statement ?? undefined} />}
         <div className="flex gap-2">
           <Button className="flex-1" onClick={() => router.push("/dashboard")}>Done for today <Check className="h-4 w-4" /></Button>
           <Button variant="outline" className="flex-1" onClick={() => router.push("/dashboard#conversation")}>Talk this through</Button>
@@ -470,3 +475,38 @@ function Q({ icon: Icon, label, value, setValue, labels }: { icon: typeof Moon; 
     </div>
   );
 }
+
+/* ---- One promise before you go: turns the read into a commitment Synapse will hold ---- */
+function CommitmentCapture({ suggestion, towards }: { suggestion: string; towards?: string }) {
+  const [text, setText] = useState(suggestion);
+  const [committed, setCommitted] = useState<string | null>(null);
+  useEffect(() => { setText(suggestion); }, [suggestion]);
+  useEffect(() => {
+    const t = new Date().toISOString().slice(0, 10);
+    const todays = loadCommitments().find((c) => c.status === "open" && c.createdAt.slice(0, 10) === t);
+    if (todays) setCommitted(todays.text);
+  }, []);
+  if (committed) {
+    return (
+      <Card><CardBody className="flex items-start gap-3">
+        <Flag className="mt-0.5 h-4 w-4 shrink-0 text-orange-500" />
+        <p className="text-sm text-ink">Locked in: <span className="font-medium">{committed}</span>. It is a promise now, not a plan — I will pick it back up next time we talk.</p>
+      </CardBody></Card>
+    );
+  }
+  return (
+    <Card><CardBody className="space-y-3">
+      <div>
+        <p className="flex items-center gap-2 text-sm font-medium text-ink"><Flag className="h-4 w-4 text-orange-500" /> One thing before we go</p>
+        <p className="mt-0.5 text-xs text-muted">What is the single step you'll commit to before we next talk? Small enough to actually happen.</p>
+        {commitmentHint(readMomentum(loadCommitments())) && <p className="mt-1 text-xs font-medium text-orange-600 dark:text-orange-400">{commitmentHint(readMomentum(loadCommitments()))}</p>}
+      </div>
+      <input value={text} onChange={(e) => setText(e.target.value)} placeholder="e.g. email three professors"
+        className="w-full rounded-xl border bg-surface px-3 py-2.5 text-base text-ink placeholder:text-muted focus:outline-none" />
+      <Button className="w-full" disabled={!text.trim()} onClick={() => { const c = addCommitment(text.trim(), towards); setCommitted(c.text); }}>
+        This is my commitment <Check className="h-4 w-4" />
+      </Button>
+    </CardBody></Card>
+  );
+}
+

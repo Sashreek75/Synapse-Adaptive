@@ -20,6 +20,7 @@ import { SynapseOrb } from "@/components/synapse/orb";
 import { FocusOfWeek } from "@/components/dashboard/focus-of-week";
 import { GeneratedDashboard } from "@/components/dashboard/generated-dashboard";
 import { FirstWeek } from "@/components/dashboard/first-week";
+import { CommitmentPrompt } from "@/components/dashboard/commitment-prompt";
 import { AgentConsole } from "@/components/agent/agent-console";
 import { sessionOpener } from "@/lib/intelligence";
 import { copy } from "@/lib/copy";
@@ -87,6 +88,7 @@ export default function HomePage() {
 
       {/* Proactive: it's a new day — lead with the core loop, the check-in */}
       <div className="sa-rise-2 space-y-4">
+        <CommitmentPrompt />
         {!dailyDoneToday ? (
           <section className="overflow-hidden rounded-3xl border bg-surface shadow-soft">
             <div className="mesh flex flex-col gap-3 p-5 sm:flex-row sm:items-center sm:justify-between sm:p-6">
