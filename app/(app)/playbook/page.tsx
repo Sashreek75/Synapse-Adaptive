@@ -78,7 +78,7 @@ export default function PlaybookPage() {
   const depth = understandingDepth(mind);
   const depthLine = depth === "strong" ? "I know how you work pretty well now, and I keep refining it."
     : depth === "developing" ? "I'm getting to know how you work — this sharpens every week."
-    : "We're still early — I'm forming my first real picture of you.";
+    : "Still early in reading you — but I don't need weeks to be useful; the picture just gets sharper as we go.";
   const activeHabits = mind.habits.filter((h) => h.status !== "lapsed");
   const lapsedHabits = mind.habits.filter((h) => h.status === "lapsed");
   const openQ = mind.openQuestions.filter((q) => q.status === "open");
@@ -115,7 +115,7 @@ export default function PlaybookPage() {
 
       {nothingYet ? (
         <Card><CardBody className="py-10 text-center">
-          <p className="mx-auto max-w-md text-muted">{"I'm still getting to know you. Check in for a couple of weeks and this page fills up with what I'm noticing, the theories I'm forming, and what turns out to actually help you."}</p>
+          <p className="mx-auto max-w-md text-muted">{"This page fills in as we work together — but don't wait for it. Tell me what you're working toward and let's move on something today; I'll capture what I learn here as we go."}</p>
           <Link href="/daily" className="mt-5 inline-block"><Button>Do today&apos;s check-in <Sparkles className="h-4 w-4" /></Button></Link>
         </CardBody></Card>
       ) : (

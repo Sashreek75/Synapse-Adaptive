@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { Printer, TrendingUp, TrendingDown, Eye, Lightbulb, LifeBuoy, Brain, MessageCircle, Activity, Sparkles, ListChecks, PencilLine, CalendarCheck, BookOpen, HelpCircle } from "lucide-react";
+import { ConvictionCard } from "@/components/dashboard/conviction-card";
 import { Card, CardBody, Button, ConfidenceChip, Skeleton } from "@/components/ui/primitives";
 import { SynapseOrb } from "@/components/synapse/orb";
 import { InsightExplain } from "@/components/synapse/insight-explain";
@@ -203,6 +204,7 @@ export default function WeeklyReportPage() {
 
       {/* THE FLAGSHIP COACHING SESSION — written for one person, not a summary. */}
       <Card className="overflow-hidden sa-rise-2"><CardBody className="sm:p-7">
+        <ConvictionCard source="mindshift" mindShift={coach.mindShift} />
         {coach.summary && (
           <div className="mb-4 rounded-2xl border border-navy-200/50 bg-surface-2 p-4 dark:border-navy-700/50">
             <p className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wider text-muted"><Brain className="h-3.5 w-3.5 text-navy-400" /> How I read your week</p>
@@ -258,7 +260,7 @@ export default function WeeklyReportPage() {
               </div>
             ))}
           </div>
-        ) : <p className="text-muted">Not enough movement to explain yet — a couple more check-ins and the connections get clearer.</p>}
+        ) : <p className="text-muted">Not enough data to draw a firm connection yet — that part sharpens with time. It doesn't stop us from picking one thing to move on this week.</p>}
         {notices.length ? (
           <div className="mt-4 space-y-2 border-t pt-4">
             <p className="text-xs font-semibold uppercase tracking-wider text-muted">Patterns across your weeks</p>

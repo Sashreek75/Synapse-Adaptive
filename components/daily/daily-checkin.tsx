@@ -274,7 +274,7 @@ export function DailyCheckIn() {
               {reflection.watch && <p className="text-muted">{reflection.watch}</p>}
             </div>
           ) : (
-            <p className="mt-4 text-sm text-muted">Logged — thank you. A couple more check-ins and I&apos;ll start connecting the dots.</p>
+            <p className="mt-4 text-sm text-muted">Logged. Now the part that matters — let&apos;s turn today into one small step you&apos;ll actually take, just below.</p>
           )}
         </CardBody></div></Card>
         {!reflecting && <CommitmentCapture suggestion={reflection?.action ?? ""} towards={mind.trajectory?.statement ?? undefined} />}

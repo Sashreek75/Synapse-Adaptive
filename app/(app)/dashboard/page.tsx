@@ -21,6 +21,7 @@ import { FocusOfWeek } from "@/components/dashboard/focus-of-week";
 import { GeneratedDashboard } from "@/components/dashboard/generated-dashboard";
 import { FirstWeek } from "@/components/dashboard/first-week";
 import { CommitmentPrompt } from "@/components/dashboard/commitment-prompt";
+import { ConvictionCard } from "@/components/dashboard/conviction-card";
 import { AgentConsole } from "@/components/agent/agent-console";
 import { sessionOpener } from "@/lib/intelligence";
 import { copy } from "@/lib/copy";
@@ -60,7 +61,7 @@ export default function HomePage() {
         <SynapseOrb size={112} />
         <div>
           <p className="text-sm text-muted">{copy.greeting(name)}</p>
-          <h1 className="mt-1 text-3xl font-semibold tracking-tight text-ink">I&apos;m Synapse. Let&apos;s start understanding you.</h1>
+          <h1 className="mt-1 text-3xl font-semibold tracking-tight text-ink">I&apos;m Synapse. Let&apos;s make real progress — starting today.</h1>
           <p className="mx-auto mt-3 max-w-md leading-relaxed text-muted">
             Tell me your name and what you&apos;re focused on — that&apos;s it. Everything else I&apos;ll learn as we talk, and I&apos;ll only ever ask what I genuinely need.
           </p>
@@ -88,6 +89,7 @@ export default function HomePage() {
 
       {/* Proactive: it's a new day — lead with the core loop, the check-in */}
       <div className="sa-rise-2 space-y-4">
+        <ConvictionCard />
         <CommitmentPrompt />
         {!dailyDoneToday ? (
           <section className="overflow-hidden rounded-3xl border bg-surface shadow-soft">

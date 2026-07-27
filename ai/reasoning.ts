@@ -220,7 +220,7 @@ function fallbackReasoning(input: ReasoningInput, findings: SurprisingFinding[])
         hypotheses: [{ explanation: "Not enough data to hypothesize yet.", support: "Fewer than a couple of check-ins.", confidence: "low" }],
         interventionType: "observe",
         biggestWin: "You started — that's the hardest part.",
-        biggestConcern: "I simply don't know you well enough yet; a week of check-ins fixes that.",
+        biggestConcern: "Nothing yet — and we don't need weeks to start. Pick one thing that matters and we'll move on it today.",
         watchFor: "Just aim for a check-in most days this week.",
         ...(surprise ? { surprise } : {}),
         source: "fallback",

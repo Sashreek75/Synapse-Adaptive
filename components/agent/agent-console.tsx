@@ -5,6 +5,7 @@ import { detectFocusIntent } from "@/lib/focus-intent";
 import { newSession, saveSession, loadSession, DURATION_PRESETS } from "@/lib/focus-session";
 import { openCommitment, commitmentAwaitingReport, loadCommitments } from "@/lib/commitments";
 import { readMomentum } from "@/lib/momentum";
+import { convictionContextLines } from "@/lib/convictions";
 import { Send, Eye, BookOpen, Compass, Sparkles, Target, CalendarCheck, Activity, Eraser, Timer } from "lucide-react";
 import { preGate, CRISIS_RESPONSE } from "@/ai/safety";
 import { useHealth } from "@/components/providers/health-store";
@@ -88,6 +89,7 @@ export function AgentConsole({ embedded = false, immersive = false }: { embedded
         const m = readMomentum(loadCommitments(), []);
         return m.observation ? `Where the relationship is trending right now (a judgment about the arc of your work together — voice it only if it genuinely fits, in your own words, and rarely): ${m.observation}` : (m.state !== "early" ? `Relationship momentum: ${m.state}.` : "");
       })(),
+      ...convictionContextLines(),
       (() => {
         const aw = commitmentAwaitingReport();
         if (aw) return `A PROMISE THEY MADE TO THEMSELVES (still open, from a previous session): "${aw.text}". This is the single most important thread right now. OPEN the conversation by gently asking whether it happened — do not wait for them to raise it. If they did it, name it as who they are becoming. If they did not, do not glide past it: ask what got in the way, then help them restart it, make it smaller, or consciously swap it for something higher-leverage. It never just disappears.`;
