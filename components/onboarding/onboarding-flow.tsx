@@ -18,6 +18,7 @@ import {
 import { Card, CardBody, Button } from "@/components/ui/primitives";
 import { SynapseOrb } from "@/components/synapse/orb";
 import { useHealth } from "@/components/providers/health-store";
+import { witness } from "@/lib/activity";
 import { cn } from "@/lib/utils";
 
 /** Life domains → the engine "path" (lens) each maps to. The label is person-first;
@@ -90,6 +91,7 @@ export function OnboardingFlow() {
     // engine steers toward. Seed it from the aspiration (or their primary focus).
     const statement = aspiration.trim() || `make progress on ${pathLabel.toLowerCase()}`;
     saveMind({ ...mind, trajectory: { statement, horizon: "months", updatedAt: new Date().toISOString() } });
+    try { witness("trajectory_changed", statement); witness("onboarding_updated"); } catch {}
     router.push("/dashboard");
   }
 

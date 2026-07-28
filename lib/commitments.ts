@@ -11,6 +11,8 @@
  * No gamification: no points, no streaks, no badges. Just a promise, remembered.
  */
 
+import { witness } from "@/lib/activity";
+
 export const COMMITMENTS_KEY = "synapse.commitments.v1";
 
 export type CommitmentStatus = "open" | "done" | "partial" | "dropped" | "replaced";
@@ -58,10 +60,10 @@ export function addCommitment(text: string, towards?: string, now = new Date()):
   const iso = now.toISOString();
   const t = iso.slice(0, 10);
   const todays = list.find((c) => c.status === "open" && dayOf(c.createdAt) === t);
-  if (todays) { todays.text = text.trim(); if (towards) todays.towards = towards; save(list); emit(); return todays; }
+  if (todays) { todays.text = text.trim(); if (towards) todays.towards = towards; save(list); emit(); witness("commitment_made", todays.text); return todays; }
   const created: Commitment = { id: `c_${now.getTime()}`, text: text.trim(), createdAt: iso, status: "open", towards, history: [{ at: iso, status: "open" }] };
   for (const c of list) if (c.status === "open") { c.status = "replaced"; c.resolvedAt = iso; c.reason = "replaced by a newer commitment"; c.replacedBy = created.id; c.history.push({ at: iso, status: "replaced" }); }
-  list.push(created); save(list); emit(); return created;
+  list.push(created); save(list); emit(); witness("commitment_made", created.text); return created;
 }
 
 /** Report how a commitment went. Every path is explicit — nothing evaporates. */
@@ -75,6 +77,7 @@ export function resolveCommitment(id: string, status: CommitmentStatus, extra: {
   if (extra.reason) c.reason = extra.reason;
   c.history.push({ at: iso, status, note: extra.note });
   save(list); emit();
+  if (status === "done") witness("commitment_kept", c.text); else if (status === "dropped") witness("commitment_missed", c.text);
 }
 
 /** Carry an unfinished commitment into today (keeps the promise alive without shame). */
@@ -85,7 +88,7 @@ export function recommitToday(id: string, note?: string, now = new Date()): void
   const iso = now.toISOString();
   c.createdAt = iso; c.status = "open";
   c.history.push({ at: iso, status: "open", note: note || "carried into today" });
-  save(list); emit();
+  save(list); emit(); witness("commitment_carried", c.text);
 }
 
 /** Swap the current commitment for a higher-leverage one — conscious, with a reason. */

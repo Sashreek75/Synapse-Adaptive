@@ -14,11 +14,15 @@ const CUES: RegExp[] = [
   /\bfocus (session|block|time|sprint)\b/,
   /\bwork session\b/,
   /\bdeep work\b/,
-  /\bstart(ing)? (a |my )?(work|study|writing|focus)\b/,
-  /\b(help me|let'?s) (focus|concentrate|lock in|get to work)\b/,
-  /\bkeep me (accountable|on track)\b/,
+  /\btimer\b/,
+  /\btime me\b/,
+  /\bset (a|the) timer\b/,
+  /\block in\b/,
   /\bpomodoro\b/,
   /\bstudy session\b/,
+  /\bstart(ing)? (to |a |my )?(stud(y|ying)|work(ing)?|writ(e|ing)|read(ing)?|focus(ing)?)\b/,
+  /\b(help me|let'?s|i want to|i'?d like to|i need to|i wanna|gonna|going to|gotta) (study|work|write|read|focus|concentrate|grind|lock in|get to work)\b/,
+  /\bkeep me (accountable|on track)\b/,
   /\bi'?m about to (work|start|study|write|focus)\b/,
   /\btime to (work|focus|study|write)\b/,
 ];
@@ -47,7 +51,7 @@ export function detectFocusIntent(text: string): FocusIntent {
       .replace(/\s+/g, " ")
       .trim();
     // Guard against grabbing filler ("on it", "for now").
-    if (/^(it|now|today|a bit|while|the next)\b/i.test(goal) || goal.length < 3) goal = undefined;
+    if (/^(it|now|today|a bit|while|the next)\b/i.test(goal) || /^\d+\s*(m|mins?|minutes?|h|hours?)\b/i.test(goal) || goal.length < 3) goal = undefined;
   }
   return { focus: true, goal, minutes };
 }

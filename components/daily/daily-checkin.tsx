@@ -26,6 +26,7 @@ import { getPath } from "@/lib/paths";
 import { dailyReflection, type DailyReflection } from "@/lib/intelligence";
 import { addCommitment, loadCommitments } from "@/lib/commitments";
 import { readMomentum, commitmentHint } from "@/lib/momentum";
+import { witness } from "@/lib/activity";
 import { cn } from "@/lib/utils";
 import type { MetricKey, MetricSeries, SignalId } from "@/types";
 import type { DailyCheckinOutput, DailyItemOutput } from "@/ai/schemas";
@@ -182,6 +183,7 @@ export function DailyCheckIn() {
   // exactly what they wrote today. The deterministic reflection is only an offline safety net.
   async function runInstantRead(metrics: Partial<Record<MetricKey, number>>, date: string, written: string[]) {
     setSaved(true); setReflecting(true); setReflection(null);
+    try { witness("snapshot", written.map((w) => (w || "").trim()).filter(Boolean)[0]); } catch {}
     let fallback: DailyReflection | null = null;
     try { fallback = dailyReflection(seriesWithToday(series, metrics, date), profile.path); } catch {}
     const nl = String.fromCharCode(10);
@@ -478,7 +480,7 @@ function Q({ icon: Icon, label, value, setValue, labels }: { icon: typeof Moon; 
 }
 
 /* ---- One promise before you go: turns the read into a commitment Synapse will hold ---- */
-function CommitmentCapture({ suggestion, towards }: { suggestion: string; towards?: string }) {
+export function CommitmentCapture({ suggestion, towards }: { suggestion: string; towards?: string }) {
   const [text, setText] = useState(suggestion);
   const [committed, setCommitted] = useState<string | null>(null);
   useEffect(() => { setText(suggestion); }, [suggestion]);

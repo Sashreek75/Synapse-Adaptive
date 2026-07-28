@@ -1,2 +1,5 @@
-import { DailyCheckIn } from "@/components/daily/daily-checkin";
-export default function DailyPage() { return <DailyCheckIn />; }
+import { DailySnapshot } from "@/components/daily/daily-snapshot";
+
+export default function DailyPage() {
+  return <DailySnapshot />;
+}

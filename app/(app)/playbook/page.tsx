@@ -9,7 +9,8 @@
  * persisted `mind`; it never recomputes intelligence.
  */
 
-import { useMemo } from "react";
+import { useEffect, useMemo } from "react";
+import { witness } from "@/lib/activity";
 import Link from "next/link";
 import { Sparkles, GitBranch, Lightbulb, RefreshCw, Trophy, HelpCircle, Check, CheckCircle2, FlaskConical, Compass, Repeat } from "lucide-react";
 import { Card, CardBody, Button, SectionLabel, ConfidenceChip, Skeleton } from "@/components/ui/primitives";
@@ -58,6 +59,7 @@ const HABIT_STYLE: Record<Habit["status"], { chip: string; label: string }> = {
 export default function PlaybookPage() {
   const { hydrated, mind, weeksTracked, profile } = useHealth();
 
+  useEffect(() => { witness("you_opened"); }, []);
   const weekly = useMemo(() => {
     const wk = Object.keys(mind.weekly).sort().pop();
     return wk ? mind.weekly[wk] : undefined;

@@ -23,12 +23,13 @@ import { SynapseOrb } from "@/components/synapse/orb";
 import { useHealth } from "@/components/providers/health-store";
 import { useSubscription } from "@/components/providers/subscription-provider";
 import { preGate, CRISIS_RESPONSE } from "@/ai/safety";
+import { witness } from "@/lib/activity";
 import { cn } from "@/lib/utils";
 import {
   type FocusSession, type Nudge, type Telemetry, type NudgeKind,
   loadSession, saveSession, clearSession, newSession, registerNudge,
   remainingSec, progress, fmtClock, lifecycleNudge, driftNudge,
-  recordSession, sessionReflection, loadPrefs, recordOutcome, adaptiveMaxDrift,
+  recordSession, sessionReflection, loadHistory, loadPrefs, recordOutcome, adaptiveMaxDrift,
   TAB_SWITCH_WINDOW_MS, TAB_SWITCH_COUNT,
 } from "@/lib/focus-session";
 
@@ -38,6 +39,17 @@ interface Line { id: string; from: "synapse" | "you"; text: string }
 const EFFECTIVE_WINDOW_MS = 90_000;
 
 const pipSupported = () => typeof window !== "undefined" && "documentPictureInPicture" in window;
+
+/** A tiny, unprompted acknowledgment after a session — presence, not a lecture. Speaks only
+ * when it is honestly notable (a deep block, or longer than last time); otherwise stays quiet. */
+function deepWorkAck(s: FocusSession | null, hist: { elapsedSec: number }[]): string | null {
+  if (!s || s.mode !== "focus") return null;
+  const mins = Math.round(s.durationSec / 60);
+  const prev = hist.length >= 2 ? Math.round(hist[hist.length - 2].elapsedSec / 60) : null;
+  if (prev != null && mins >= prev + 10) return "And you stayed with it longer than last time — that's the part that compounds.";
+  if (mins >= 45) return "That looked like real, deep work.";
+  return null;
+}
 
 export function FocusCompanion() {
   const { mind } = useHealth();
@@ -72,6 +84,8 @@ export function FocusCompanion() {
     recordedFor.current = s.startedAt;
     const elapsed = Math.min(s.durationSec, Math.max(0, Math.round((Date.now() - s.startedAt) / 1000)));
     const rec = { goal: s.goal, plannedSec: s.durationSec, elapsedSec: completed ? s.durationSec : elapsed, completed, at: s.startedAt };
+    const mins = Math.round(rec.elapsedSec / 60);
+    try { witness("focus_end", mins + (mins === 1 ? " minute" : " minutes") + (s.goal ? " on " + s.goal : "")); } catch {}
     return sessionReflection(recordSession(rec), rec);
   }, []);
 
@@ -96,7 +110,7 @@ export function FocusCompanion() {
     say(n.text);
     setBubble(n);
     if (n.kind === "idle" || n.kind === "tabswitch") pending.current = { kind: n.kind, shownAt: Date.now() };
-    if (n.kind === "complete") { const refl = finishAndRecord(true); if (refl) setTimeout(() => say(refl), 1100); }
+    if (n.kind === "complete") { const s0 = loadSession(); const refl = finishAndRecord(true); const ack = deepWorkAck(s0, loadHistory()); if (ack) setTimeout(() => say(ack), 400); if (refl) setTimeout(() => say(refl), 1100); }
     if (bubbleTimer.current) clearTimeout(bubbleTimer.current);
     bubbleTimer.current = setTimeout(() => setBubble(null), 24_000);
   }, [persist, say, finishAndRecord]);

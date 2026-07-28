@@ -14,6 +14,7 @@
 
 import type { MomentumRead } from "@/lib/momentum";
 import type { FocusLike } from "@/lib/commitments";
+import { witness } from "@/lib/activity";
 
 export const CONVICTIONS_KEY = "synapse.convictions.v1";
 
@@ -79,7 +80,7 @@ export function reviseConviction(id: string, note?: string, now = new Date()): v
 }
 export function releaseConviction(id: string, note?: string, now = new Date()): void {
   const list = loadConvictions(); const c = list.find((x) => x.id === id); if (!c) return;
-  const iso = now.toISOString(); c.status = "released"; c.updatedAt = iso; c.history.push({ at: iso, status: "released", note }); save(list); emit();
+  const iso = now.toISOString(); c.status = "released"; c.updatedAt = iso; c.history.push({ at: iso, status: "released", note }); save(list); emit(); witness("conviction_released", c.statement);
 }
 
 /** The one conviction it is appropriate to VOICE right now — or null. Scarcity + timing:
@@ -97,7 +98,7 @@ export function convictionToSurface(list: Conviction[] = loadConvictions(), now 
 
 export function recordSurfaced(id: string, now = new Date()): void {
   const list = loadConvictions(); const c = list.find((x) => x.id === id); if (!c) return;
-  c.lastSurfacedAt = now.toISOString(); save(list);
+  c.lastSurfacedAt = now.toISOString(); save(list); witness("conviction_seen", c.statement);
 }
 
 /** Lines describing currently-held convictions, for the conversation context — so a belief

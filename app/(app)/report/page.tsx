@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { witness } from "@/lib/activity";
 import Link from "next/link";
 import { Printer, TrendingUp, TrendingDown, Eye, Lightbulb, LifeBuoy, Brain, MessageCircle, Activity, Sparkles, ListChecks, PencilLine, CalendarCheck, BookOpen, HelpCircle } from "lucide-react";
 import { ConvictionCard } from "@/components/dashboard/conviction-card";
@@ -123,6 +124,7 @@ export default function WeeklyReportPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [report, focus, coach.action]);
 
+  useEffect(() => { witness("weekly_review_opened"); }, []);
   const openQ = providerQuestions.filter((q) => q.status !== "dismissed");
   const providerFromInsights = Array.from(new Set((report?.insights ?? []).flatMap((i) => i.questionsForProvider)));
   const lifestyleNotes = contextNotes.slice(-3).reverse();

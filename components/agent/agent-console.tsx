@@ -6,6 +6,7 @@ import { newSession, saveSession, loadSession, DURATION_PRESETS } from "@/lib/fo
 import { openCommitment, commitmentAwaitingReport, loadCommitments } from "@/lib/commitments";
 import { readMomentum } from "@/lib/momentum";
 import { convictionContextLines } from "@/lib/convictions";
+import { witness, activityContextBlock } from "@/lib/activity";
 import { Send, Eye, BookOpen, Compass, Sparkles, Target, CalendarCheck, Activity, Eraser, Timer } from "lucide-react";
 import { preGate, CRISIS_RESPONSE } from "@/ai/safety";
 import { useHealth } from "@/components/providers/health-store";
@@ -68,6 +69,7 @@ export function AgentConsole({ embedded = false, immersive = false }: { embedded
     const s = newSession(goal ?? null, minutes, "focus");
     saveSession(s);
     setFocusActive(true); setCustomOpen(false); setCustomMin("");
+    try { witness("focus_start", goal ?? undefined); } catch {}
     try { window.dispatchEvent(new CustomEvent("synapse:focus-start")); } catch {}
     const line = `Sounds good${goal ? ` \u2014 ${goal} it is` : ""}. I'll be right here if you need me: keeping time, quiet while you're in flow, and I'll only look in if it seems like you've drifted.`;
     setChat([...chat.filter((m) => m.id !== "intro"), { id: `a_${Date.now()}`, role: "assistant" as const, content: line }]);
@@ -89,6 +91,7 @@ export function AgentConsole({ embedded = false, immersive = false }: { embedded
         const m = readMomentum(loadCommitments(), []);
         return m.observation ? `Where the relationship is trending right now (a judgment about the arc of your work together — voice it only if it genuinely fits, in your own words, and rarely): ${m.observation}` : (m.state !== "early" ? `Relationship momentum: ${m.state}.` : "");
       })(),
+      activityContextBlock(),
       ...convictionContextLines(),
       (() => {
         const aw = commitmentAwaitingReport();
@@ -98,6 +101,7 @@ export function AgentConsole({ embedded = false, immersive = false }: { embedded
       })(),
       "App capability: the underlying numbers still exist (a stats view at /stats with trend charts), but lead with what they MEAN for the person and where they're headed — not the charts. If they ask to 'see' their stats, point them there, then summarize the key movements in plain words.",
       "The daily check-in lives at /daily; if they want to log today or you need fresher data, invite them to do a quick check-in.",
+      "You CAN start a focus timer / study session right here: when they ask for a timer or to focus, study, or work, a small \"how long?\" chooser appears in the chat — have them pick a length and you'll keep time beside them as a floating companion. Never say you can't set a timer.",
       "Assessments (short cognitive tasks) live at /assessments — if you recommend one, tell them they can start it there.",
     ].filter(Boolean).join("\n");
     if (!hasData) return who;
