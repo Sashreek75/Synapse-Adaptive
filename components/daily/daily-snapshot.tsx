@@ -10,7 +10,7 @@
  * through and enrich it. Pure UX layer; reuses the existing check-in + chat.
  */
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { ListChecks, MessageCircle, ArrowRight, Clock, ArrowLeft } from "lucide-react";
 import { Card, CardBody } from "@/components/ui/primitives";
 import { SynapseOrb } from "@/components/synapse/orb";
@@ -24,6 +24,7 @@ type Mode = "choose" | "quick" | "talk";
 export function DailySnapshot() {
   const { hydrated, dailyDoneToday } = useHealth();
   const [mode, setMode] = useState<Mode>("choose");
+  useEffect(() => { try { if (sessionStorage.getItem("synapse.snapshot.mode") === "talk") { sessionStorage.removeItem("synapse.snapshot.mode"); setMode("talk"); } } catch {} }, []);
 
   if (!hydrated) return null;
 

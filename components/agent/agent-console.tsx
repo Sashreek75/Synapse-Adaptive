@@ -2,6 +2,8 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { detectFocusIntent } from "@/lib/focus-intent";
+import { useRouter } from "next/navigation";
+import { detectNavIntent } from "@/lib/nav-intent";
 import { newSession, saveSession, loadSession, DURATION_PRESETS } from "@/lib/focus-session";
 import { openCommitment, commitmentAwaitingReport, loadCommitments } from "@/lib/commitments";
 import { readMomentum } from "@/lib/momentum";
@@ -54,6 +56,7 @@ export function AgentConsole({ embedded = false, immersive = false }: { embedded
   const [customOpen, setCustomOpen] = useState(false);
   const [customMin, setCustomMin] = useState("");
   const endRef = useRef<HTMLDivElement>(null);
+  const router = useRouter();
   useEffect(() => {
     const sync = () => setFocusActive(!!loadSession());
     sync();
@@ -99,10 +102,10 @@ export function AgentConsole({ embedded = false, immersive = false }: { embedded
         const oc = openCommitment();
         return oc ? `The commitment they set today (a promise to themselves): "${oc.text}". Hold them to it warmly and weave it in when relevant.` : "";
       })(),
-      "App capability: the underlying numbers still exist (a stats view at /stats with trend charts), but lead with what they MEAN for the person and where they're headed — not the charts. If they ask to 'see' their stats, point them there, then summarize the key movements in plain words.",
-      "The daily check-in lives at /daily; if they want to log today or you need fresher data, invite them to do a quick check-in.",
+      "App capability: their numbers exist behind the scenes, but lead with what they MEAN and where they're headed, not charts. If they want to SEE their numbers, the app takes them there when they ask, then summarize the key movements in plain words.",
+      "If they want to check in, reflect, see their numbers, or open their weekly review, the app takes them there automatically the moment they ask, so NEVER hand out links or file paths (never write things like slash-daily). Refer to places by name: today's snapshot, your numbers, your weekly review, the You page.",
       "You CAN start a focus timer / study session right here: when they ask for a timer or to focus, study, or work, a small \"how long?\" chooser appears in the chat — have them pick a length and you'll keep time beside them as a floating companion. Never say you can't set a timer.",
-      "Assessments (short cognitive tasks) live at /assessments — if you recommend one, tell them they can start it there.",
+      "Short cognitive 'sharpness' tasks exist if they want them; if you suggest one, just say so in plain words, no links or paths.",
     ].filter(Boolean).join("\n");
     if (!hasData) return who;
     const lines = series.map((s) => {
@@ -242,6 +245,15 @@ export function AgentConsole({ embedded = false, immersive = false }: { embedded
     setChat(next); setInput(""); setBusy(true); scrollDown();
     if (free) { const n = usedToday + 1; setUsedToday(n); try { localStorage.setItem(usageKey, String(n)); } catch {} }
     if (preGate(q).triggered) { setChat([...next, { id: `a_${Date.now()}`, role: "assistant", content: CRISIS_RESPONSE }]); setBusy(false); scrollDown(); return; }
+    const nav = detectNavIntent(q);
+    if (nav) {
+      if (nav.talk) { try { sessionStorage.setItem("synapse.snapshot.mode", "talk"); sessionStorage.setItem("synapse.snapshot.seed", q); } catch {} }
+      const line = nav.talk ? "Talking it through \u2014 taking you there now." : "On it \u2014 taking you to " + nav.label + " now.";
+      setChat([...next, { id: `a_${Date.now()}`, role: "assistant" as const, content: line }]);
+      setBusy(false); scrollDown();
+      setTimeout(() => { try { router.push(nav.to); } catch {} }, 650);
+      return;
+    }
     try {
       const transcript = next.slice(-7, -1).map((m) => `${m.role === "user" ? "User" : "Synapse"}: ${m.content || (m.sections?.map((s) => s.text).join(" ") ?? "")}`).join("\n");
       // Synapse remembers everything — even conversations the user cleared from view.

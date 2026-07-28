@@ -9,6 +9,7 @@ import { AnimatedBackground } from "@/components/ui/animated-background";
 import { OnboardingGate } from "@/components/providers/onboarding-gate";
 import { FeatureTour } from "@/components/tour/feature-tour";
 import { FocusCompanion } from "@/components/focus/focus-companion";
+import { CompanionPresence } from "@/components/companion-presence";
 
 /**
  * THE FRAME — deliberately almost nothing.
@@ -48,6 +49,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
             </main>
           </div>
           <FocusCompanion />
+          <CompanionPresence />
         </AuthGuard>
       </SubscriptionProvider>
     </HealthProvider>

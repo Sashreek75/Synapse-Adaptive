@@ -40,6 +40,14 @@ export function TalkSnapshot({ enrich = false }: { enrich?: boolean }) {
   const marked = useRef(false);
   const noted = useRef(0);
   const endRef = useRef<HTMLDivElement>(null);
+  const seeded = useRef(false);
+
+  useEffect(() => {
+    if (seeded.current) return; seeded.current = true;
+    let seed = ""; try { seed = sessionStorage.getItem("synapse.snapshot.seed") || ""; if (seed) sessionStorage.removeItem("synapse.snapshot.seed"); } catch {}
+    if (seed) setTimeout(() => { void send(seed); }, 400);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   useEffect(() => {
     setMsgs([{ id: "intro", from: "synapse", text: enrich
