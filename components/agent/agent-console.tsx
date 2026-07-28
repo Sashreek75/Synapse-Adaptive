@@ -247,7 +247,8 @@ export function AgentConsole({ embedded = false, immersive = false }: { embedded
         const priorUser = arch.filter((m) => m.role === "user").slice(-12).map((m) => `- "${m.content}"`).join("\n");
         if (priorUser) memoryPreamble = `Things the user has discussed with you in the past (they cleared the visible chat for a fresh start, but you DO remember everything — act like it, reference it naturally when relevant):\n${priorUser}\n\n`;
       } catch {}
-      const fullContext = `${memoryPreamble}${context}${transcript ? `\n\nRecent conversation:\n${transcript}` : ""}`;
+      const nowLine = `Right now it is ${new Date().toLocaleString(undefined, { weekday: "long", month: "long", day: "numeric", year: "numeric", hour: "numeric", minute: "2-digit" })} — the user is messaging you at this exact moment. Anchor every time word to this: "today" is this date, "tonight" is this evening, "tomorrow" is the day after. If a commitment or plan is set for a future day, it is NOT happening yet — never tell them to start it now.`;
+      const fullContext = `${nowLine}\n\n${memoryPreamble}${context}${transcript ? `\n\nRecent conversation:\n${transcript}` : ""}`;
       const res = await fetch("/api/chat", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ message: q, tier: plan, context: fullContext }) });
       const data = await res.json();
       setChat([...next, { id: `a_${Date.now()}`, role: "assistant", content: data.content ?? "", sections: data.sections, evidenceUsed: data.evidenceUsed }]);

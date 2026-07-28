@@ -190,6 +190,7 @@ export function DailyCheckIn() {
       const feeling = feelingSummary(metrics);
       const mom = readMomentum(loadCommitments());
       const ctx = [
+        "Right now it is " + new Date().toLocaleString(undefined, { weekday: "long", month: "long", day: "numeric", year: "numeric", hour: "numeric", minute: "2-digit" }) + ". Anchor any time words to this; a step they set for a later day is not due now.",
         "The user just finished the check-in below. Give an INSTANT, genuinely useful read, specific to THEM and their goals, never generic wellbeing.",
         mind.trajectory && mind.trajectory.statement ? "They are working to become: " + mind.trajectory.statement + "." : "",
         profile.goals && profile.goals.length ? "Their focus areas: " + profile.goals.join(", ") + "." : "",

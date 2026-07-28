@@ -225,7 +225,7 @@ export function FocusCompanion() {
     setThinking(true);
     try {
       const s = loadSession();
-      const ctx = `The user is in a focus session${s?.goal ? ` working on ${s.goal}` : ""} and tapped your orb to talk without leaving their work. Be brief and genuinely useful — do exactly what they asked, then get out of the way so they can get back to it. This is a quick aside mid-focus, not a full sit-down.`;
+      const ctx = `Right now it is ${new Date().toLocaleString(undefined, { weekday: "long", month: "long", day: "numeric", year: "numeric", hour: "numeric", minute: "2-digit" })}. The user is in a focus session${s?.goal ? ` working on ${s.goal}` : ""} and tapped your orb to talk without leaving their work. Be brief and genuinely useful — do exactly what they asked, then get out of the way so they can get back to it. This is a quick aside mid-focus, not a full sit-down.`;
       const res = await fetch("/api/chat", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ message: q, tier: plan, context: ctx }) });
       const data = await res.json();
       say((data && data.content) || "I'm here — tell me a little more?");
