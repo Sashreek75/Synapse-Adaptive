@@ -18,16 +18,27 @@ const CATEGORIES: { rx: RegExp; to: string; label: string; talk?: boolean }[] = 
   { rx: /\b(what have you learned|how do you see me|the you page|about[\s-]?me page|my playbook|what you (know|understand) about me)\b/, to: "/playbook", label: "what I understand about you" },
 ];
 
-const DIRECTIVE = /\b(take me|bring me|go to|open|show me|pull up|head (to|over)|jump to|let'?s (do|go|see|talk|reflect)|i (want|need|'?d like|wanna) to|can (we|you|i)|start (my|today'?s|a))\b/;
+const DIRECTIVE = /\b(take me|bring me|go to|open|show me|pull up|head (to|over)|jump to|let'?s (do|go|see|talk|reflect)|i (want|need|'?d like|wanna) to|start (my|today'?s|a))\b/;
 
-/** Returns a destination only when the message genuinely reads as a request to GO there —
- * not a passing mention (so "the numbers don't add up in my essay" won't navigate). */
+/** Words that mean "answer me right here", not "move me somewhere else". A companion that
+ * can actually talk should never march you to another page when you're just asking it a
+ * question — it should reply in place. */
+const ANSWER_SEEKING = /(\btell me\b|\bexplain\b|\bwhat (do|does|is|are|'?s)\b|\bhow (am|do|does|is|are|'?s) i\b|\bmean(s|ing)?\b|\bhelp me understand\b|\bwhy\b|\bshould i\b|\bis (it|this|that)\b)/;
+
+/** Returns a destination ONLY when the message genuinely reads as a request to GO there.
+ * Questions and "just tell me…" requests return null, so they get answered in place instead
+ * of routed. ("what do these numbers mean?" and "the numbers don't add up in my essay" both stay put.) */
 export function detectNavIntent(text: string): NavIntent | null {
   const t = (text || "").toLowerCase().trim();
   if (!t) return null;
+  const hasGo = DIRECTIVE.test(t);
+  // Asking to be told/shown/explained something → answer it, don't relocate them.
+  if (ANSWER_SEEKING.test(t)) return null;
+  if (/\?/.test(t) && !hasGo) return null;
   const wordCount = t.split(/\s+/).filter(Boolean).length;
-  const directive = DIRECTIVE.test(t) || /^(what|how|show|see|pull up|open|let'?s)\b/.test(t) || wordCount <= 4;
-  if (!directive) return null;
+  // A bare noun-phrase ("my numbers", "weekly report") reads as go; a question word never does.
+  const terse = wordCount <= 3 && !/^(what|why|how|who|when|which|is|are|do|does|can|should)\b/.test(t);
+  if (!hasGo && !terse) return null;
   for (const c of CATEGORIES) if (c.rx.test(t)) return { to: c.to, label: c.label, talk: c.talk };
   return null;
 }

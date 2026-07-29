@@ -1,21 +1,20 @@
 "use client";
 
 /**
- * THE MENU — a way into the conversation, not a site map.
+ * THE MENU — a compact way around the app.
  *
- * Because the AI IS the product, most menu items don't navigate to a page — they
- * hand Synapse a prompt and start the conversation for you (your health profile,
- * your playbook, an assessment, your weekly session). A short "Go to" section
- * still opens the genuinely separate surfaces (check-in, the numbers dashboard,
- * billing, settings). Clicking a prompt drops you into chat with Synapse already
- * answering.
+ * Synapse itself lives in the orb, present on every page — that's where you talk,
+ * ask what something means, or think things through. So this menu stays lean: mostly
+ * the real places you might want to open (your check-in, weekly review, numbers, the
+ * You page, settings), plus a couple of high-value prompts that drop you into the full
+ * conversation already underway.
  */
 
 import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { Home, CreditCard, Settings, FileText, BookOpen, Menu, X, LogOut, LogIn, Target, Sparkles, MessageCircle, Timer, BarChart3 } from "lucide-react";
+import { Home, CreditCard, Settings, FileText, CalendarCheck, Menu, X, LogOut, LogIn, Target, Sparkles, MessageCircle, Timer, BarChart3 } from "lucide-react";
 import { SynapseOrb } from "@/components/synapse/orb";
 import { ThemeToggle } from "@/components/shell/theme-toggle";
 import { useAuth } from "@/components/providers/auth-provider";
@@ -29,26 +28,21 @@ type Room = { href: string; label: string; icon: typeof Home; blurb: string };
 const asks: Ask[] = [
   { label: "What matters today?", icon: Target, blurb: "The one thing worth your energy",
     prompt: "Based on everything you know about me, what's the single most important thing I should focus on today, and why? Give me one clear next step." },
-  { label: "Help me plan today", icon: BookOpen, blurb: "Turn it into a realistic plan",
-    prompt: "Help me plan today. Look at what I'm working toward and my recent days, then propose a short, realistic plan — the few things that would actually make today count." },
-  { label: "Help me think this through", icon: MessageCircle, blurb: "Reason through a decision",
-    prompt: "I have a decision to think through. Ask me what it is, then help me reason it out — the tradeoffs, what fits my patterns, and your honest recommendation. Leave the choice to me." },
   { label: "What have you learned about me?", icon: Sparkles, blurb: "How you understand me",
     prompt: "Show me how you understand me right now: what I'm working toward, the patterns you've noticed, what tends to help me and what sets me back, and what you're still figuring out." },
-  { label: "Talk through my week", icon: FileText, blurb: "Reason through your week together",
-    prompt: "Give me my weekly review: how you read my week, my biggest win, what concerns you most, the one thing to focus on next, and the small experiment we should run." },
 ];
 
 // Items that OPEN a real, interactive surface.
 const rooms: Room[] = [
-  { href: "/dashboard", label: "Talk", icon: Home, blurb: "Think it through with Synapse" },
-  { href: "/tools", label: "Focus", icon: Timer, blurb: "Timer, checklist \u2014 get moving" },
-  { href: "/playbook", label: "You", icon: Sparkles, blurb: "What Synapse understands about you" },
+  { href: "/dashboard", label: "Talk", icon: Home, blurb: "The full conversation with Synapse" },
+  { href: "/daily", label: "Daily check-in", icon: CalendarCheck, blurb: "Today's snapshot" },
+  { href: "/report", label: "Weekly review", icon: FileText, blurb: "Our coaching sit-down" },
   { href: "/stats", label: "Your numbers", icon: BarChart3, blurb: "The trends behind what I notice" },
+  { href: "/playbook", label: "You", icon: Sparkles, blurb: "What Synapse understands about you" },
+  { href: "/tools", label: "Focus", icon: Timer, blurb: "Timer, checklist \u2014 get moving" },
 ];
 
 const manage: Room[] = [
-  { href: "/report", label: "Weekly review", icon: FileText, blurb: "Our coaching sit-down" },
   { href: "/settings", label: "Settings", icon: Settings, blurb: "Preferences, data & privacy" },
   { href: "/billing", label: "Plan & billing", icon: CreditCard, blurb: "How deeply I reason" },
 ];

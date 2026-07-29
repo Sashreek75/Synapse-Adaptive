@@ -87,18 +87,18 @@ function Hero() {
               <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-orange-400 opacity-60" />
               <span className="relative inline-flex h-2 w-2 rounded-full bg-orange-500" />
             </span>
-            Not a tracker — a partner that remembers you
+            Not a chatbot — a companion who helps you follow through
           </div>
 
           <h1 className="animate-fade-up mt-6 text-balance text-5xl font-bold leading-[1.05] tracking-tight text-ink sm:text-6xl xl:text-7xl">
-            The AI partner that learns how you work
-            <span className="block sa-gradient-text">and helps you become who you want to be.</span>
+            The companion who helps you follow through
+            <span className="block sa-gradient-text">and become who you want to be.</span>
           </h1>
 
           <p className="animate-fade-up mx-auto mt-6 max-w-xl text-lg leading-relaxed text-muted lg:mx-0">
-            Talk to Synapse like a coach who remembers everything. It learns how you
-            work over time, notices what changed, and helps you decide what to do next —
-            one clear step at a time, with its reasoning shown.
+            Synapse is an adaptive companion for the long run. It remembers what
+            you&apos;re working toward, notices when you drift, and keeps you moving —
+            turning good intentions into real progress, day after day.
           </p>
 
           <div className="animate-fade-up mt-9 flex flex-col items-center justify-center gap-3 sm:flex-row lg:justify-start">
@@ -111,8 +111,8 @@ function Hero() {
           </div>
 
           <div className="animate-fade-up mt-8 flex flex-wrap items-center justify-center gap-x-6 gap-y-2 text-sm text-muted lg:justify-start">
-            <span className="inline-flex items-center gap-1.5"><Timer className="h-4 w-4 text-navy-400" /> Smarter every week</span>
-            <span className="inline-flex items-center gap-1.5"><ShieldCheck className="h-4 w-4 text-navy-400" /> Remembers you</span>
+            <span className="inline-flex items-center gap-1.5"><Timer className="h-4 w-4 text-navy-400" /> Keeps you moving</span>
+            <span className="inline-flex items-center gap-1.5"><ShieldCheck className="h-4 w-4 text-navy-400" /> Remembers what matters</span>
             <span className="inline-flex items-center gap-1.5"><Lock className="h-4 w-4 text-navy-400" /> Private by design</span>
           </div>
 
@@ -133,10 +133,10 @@ function Hero() {
                 <Sparkles className="h-3 w-3" /> Synapse noticed
               </div>
               <p className="text-sm leading-relaxed text-ink">
-                &ldquo;Your attention has been stronger in the weeks your sleep was more
-                consistent. Worth keeping a gentle eye on.&rdquo;
+                &ldquo;You said finishing the draft mattered this month. You&apos;ve shown up
+                four evenings running — that&apos;s real momentum. Let&apos;s protect it.&rdquo;
               </p>
-              <p className="mt-2 text-[11px] text-muted">From 6 weeks of your check-ins · moderate confidence</p>
+              <p className="mt-2 text-[11px] text-muted">From 6 weeks together · moderate confidence</p>
             </div>
           </div>
 
@@ -146,7 +146,7 @@ function Hero() {
                 <span className="text-[11px] font-semibold uppercase tracking-wider text-muted">Today&apos;s focus</span>
                 <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-semibold text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-300">1 step</span>
               </div>
-              <p className="mt-2 text-sm text-ink">Protect tonight&apos;s sleep — on your data, it&apos;s what lifts your focus tomorrow.</p>
+              <p className="mt-2 text-sm text-ink">One small step toward your goal today — the kind that keeps momentum alive.</p>
               <div className="mt-3 flex items-center gap-1.5">
                 {[62, 78, 70, 84, 88, 92].map((v, i) => (
                   <span key={i} className="w-6 rounded-full bg-navy-200 dark:bg-navy-700" style={{ height: `${Math.max(8, v / 6)}px` }} />
@@ -158,7 +158,7 @@ function Hero() {
           <div className="absolute bottom-2 left-1/2 -translate-x-1/2">
             <div className="inline-flex items-center gap-2 rounded-full border bg-surface/85 px-3.5 py-1.5 text-xs text-muted shadow-soft glass">
               <span className="sa-typing"><span /><span /><span /></span>
-              Synapse is connecting this week&apos;s dots…
+              Synapse is thinking about where you&apos;re headed…
             </div>
           </div>
         </div>
@@ -169,18 +169,19 @@ function Hero() {
 
 function Problem() {
   const qs = [
-    "Am I actually making progress?",
-    "What changed this week?",
-    "Which habits actually help me?",
-    "What's really worth my time?",
+    "I know what I should do. Why don't I do it?",
+    "I started strong. Where did it go?",
+    "Who's actually keeping me accountable?",
+    "Am I any closer than I was six months ago?",
   ];
   return (
     <Section>
       <Eyebrow>The gap</Eyebrow>
       <H2>You set out to become someone. Then ordinary life happens — and you&apos;re on your own.</H2>
       <p className="mt-4 max-w-2xl text-lg text-muted">
-        Other apps collect data and draw charts, then stop. You&apos;re left to
-        interpret raw numbers and answer the questions that actually matter:
+        The problem was never a lack of information — you already know roughly what to do.
+        What&apos;s missing is someone who remembers what you&apos;re working toward, notices
+        when you slip, and keeps you honest. The questions that actually keep you up:
       </p>
       <div className="mt-10 grid gap-4 sm:grid-cols-2">
         {qs.map((q) => (
@@ -203,14 +204,15 @@ function Solution() {
           <H2 className="text-white">From a chatbot that forgets to a companion that remembers.</H2>
           <p className="mt-4 max-w-2xl text-lg text-navy-100/80">
             A generic AI answers your question and forgets you the moment you close it.
-            Synapse builds an evolving understanding of one person — you — so every answer
-            fits your life, and every week it knows you a little better.
+            Synapse stays. It comes to know you not to impress you with insight, but to help
+            you keep moving toward what you actually want — and to notice, honestly, when
+            you&apos;re drifting away from it.
           </p>
           <div className="mt-12 grid gap-5 md:grid-cols-3">
             {[
-              { icon: Brain, t: "Remembers you", d: "Your goals, habits, and what's worked before — you never have to explain yourself twice." },
-              { icon: Compass, t: "Helps you decide", d: "Every answer ends with one clear next step, personalized to you — and the reason for it." },
-              { icon: ShieldCheck, t: "Honest & calm", d: "Shows its reasoning, states its confidence, and tells you when something is beyond it and worth real help." },
+              { icon: Brain, t: "Remembers what you're working toward", d: "Your goals, your commitments, what's worked and what hasn't — so nothing important quietly slips." },
+              { icon: Compass, t: "Keeps you moving", d: "Notices when momentum builds and when it fades, then offers one honest, doable next thing — accountability, not nagging." },
+              { icon: ShieldCheck, t: "Honest enough to challenge you", d: "Shows its reasoning, admits what it doesn't know, and pushes back when you're drifting from what you said you wanted." },
             ].map(({ icon: Icon, t, d }) => (
               <div key={t} className="rounded-2xl border border-white/10 bg-white/5 p-7 backdrop-blur transition-colors hover:bg-white/[0.08]">
                 <span className="grid h-11 w-11 place-items-center rounded-xl bg-orange-500/15">
@@ -229,14 +231,14 @@ function Solution() {
 
 function HowItWorks() {
   const steps = [
-    { icon: MessageCircleQuestion, t: "Just talk to it", d: "Tell Synapse what's going on, or do a 20-second check-in. It reasons over your own history — no forms, no fixed surveys." },
-    { icon: Brain, t: "It learns how you work", d: "Every conversation and check-in updates its understanding, building a private playbook of what genuinely helps you." },
-    { icon: CalendarCheck, t: "You get one clear next step", d: "Not ten. A specific, personalized action with the reason behind it — plus what to watch for next." },
+    { icon: MessageCircleQuestion, t: "Just talk to it", d: "Tell Synapse what you're working toward and what's in the way. No forms, no fixed surveys — an honest conversation with someone who remembers." },
+    { icon: Brain, t: "It stays with you", d: "Every conversation deepens what it understands about you — a private picture of what actually moves you, and what pulls you off course." },
+    { icon: CalendarCheck, t: "You keep moving", d: "One clear next step, the reason behind it, and a companion who'll notice next time whether you followed through." },
   ];
   return (
     <Section id="how">
       <Eyebrow>How it works</Eyebrow>
-      <H2>Talk. Learn. Decide.</H2>
+      <H2>Talk. Commit. Keep moving.</H2>
       <div className="relative mt-12 grid gap-6 md:grid-cols-3">
         <div className="absolute left-[16%] right-[16%] top-11 hidden border-t border-dashed border-line md:block" />
         {steps.map(({ icon: Icon, t, d }, i) => (
@@ -265,14 +267,15 @@ function AgentSpotlight() {
           <H2>Synapse notices things — before you ask.</H2>
           <p className="mt-4 text-lg leading-relaxed text-muted">
             Synapse reasons like a coach who knows you, not a chatbot. It remembers what
-            you&apos;ve told it, watches for meaningful patterns across weeks, and opens the
-            conversation when something matters — calmly, in plain language.
+            you&apos;ve told it, watches your momentum across weeks, and opens the
+            conversation when it matters — to keep you moving, or to gently call it when
+            you&apos;re drifting.
           </p>
           <ul className="mt-7 space-y-3.5 text-ink">
             {[
-              "Remembers your goals, habits, and what's worked before",
-              "Tailors every recommendation to your life — not a generic health-site tip",
-              "Ends with one clear next step, and states its confidence honestly",
+              "Remembers your goals, your commitments, and what's worked before",
+              "Protects your momentum — and notices, honestly, when it's slipping",
+              "Ends with one clear next step, and holds you to it with care",
             ].map((x) => (
               <li key={x} className="flex gap-3">
                 <span className="mt-1 grid h-5 w-5 shrink-0 place-items-center rounded-full bg-orange-100 dark:bg-orange-500/15">
@@ -294,10 +297,10 @@ function AgentSpotlight() {
               </div>
             </div>
             <p className="mt-4 text-lg leading-relaxed text-ink">
-              “Your focus has been sharpest the day after you actually stopped
-              work on time — four weeks running. It&apos;s a small pattern, but a
-              consistent one. Want to make protecting your evenings this week&apos;s
-              focus?”
+              “You told me finishing the book proposal mattered this month. You&apos;ve
+              shown up four evenings running — that&apos;s real momentum, not luck.
+              Want to make protecting those evenings this week&apos;s
+              commitment?”
             </p>
             <div className="mt-6 flex items-center justify-between border-t pt-4 text-sm text-muted">
               <span className="inline-flex items-center gap-1.5">
@@ -316,11 +319,11 @@ function AgentSpotlight() {
 
 function Features() {
   const f = [
-    { icon: Sparkles, t: "Conversation-first", d: "The whole app is a conversation with Synapse. Ask anything — it answers from your own history." },
-    { icon: Brain, t: "A memory that compounds", d: "Your Personal Playbook grows every week: what helps you, what sets you back, what you've tried." },
-    { icon: HeartPulse, t: "Advice that fits your life", d: "Two people with the same numbers get different guidance — yours accounts for your goals, work, and schedule." },
-    { icon: MessageCircleQuestion, t: "Proactive, never spammy", d: "It opens the conversation when it notices something that matters — and stays quiet when nothing does." },
-    { icon: LineChart, t: "See what Synapse has learned about you", d: "Your evolving understanding, whenever you want it — the understanding is the point, not the charts." },
+    { icon: Sparkles, t: "Conversation-first", d: "The whole app is one ongoing conversation with a companion who remembers — ask anything, anytime." },
+    { icon: Brain, t: "A relationship that compounds", d: "It remembers your goals, your commitments, and what's actually moved you — so it deepens instead of resetting." },
+    { icon: HeartPulse, t: "Guidance that fits your life", d: "Thoughtful, honest advice shaped by who you are and what you're working toward — never a generic tip." },
+    { icon: MessageCircleQuestion, t: "Accountability, not nagging", d: "It speaks up when your momentum's at stake and stays quiet when it isn't — the way a good friend would." },
+    { icon: LineChart, t: "Protects your momentum", d: "It watches whether you're truly moving toward what you said you wanted, and helps you course-correct early." },
     { icon: ShieldCheck, t: "Private, synced, yours", d: "Follows you across devices in your account, never sold, and yours to export or delete." },
   ];
   return (
@@ -370,7 +373,7 @@ function Testimonials() {
 
 function Roadmap() {
   const r = [
-    { phase: "Now", t: "The partner", d: "Conversation-first coaching, a memory that compounds, proactive insights, and a picture of how you work that deepens every week." },
+    { phase: "Now", t: "The companion", d: "Conversation-first coaching, a memory that compounds, proactive accountability, and a relationship that keeps you moving toward what you want." },
     { phase: "Next", t: "Deeper context", d: "Optional imports — calendar, wearables — to enrich the picture." },
     { phase: "Later", t: "Alongside your world", d: "Working with the people and tools you already rely on." },
   ];
@@ -393,9 +396,9 @@ function Roadmap() {
 
 function FAQ() {
   const faqs = [
-    { q: "How is this different from ChatGPT or Apple Health's AI?", a: "A general AI answers your question and forgets you. Apple Health shows you numbers. Synapse continuously learns how you specifically live — your goals, habits, and what's worked before — then gives personalized, evidence-informed guidance that gets sharper every week. It remembers; they don't." },
+    { q: "How is this different from ChatGPT or Apple Health's AI?", a: "A general AI answers your question and forgets you. A tracker shows you numbers. Synapse is a companion for the long run: it remembers what you're working toward, notices when you drift, and keeps you moving toward it — week after week. The point isn't insight; it's real progress." },
     { q: "How does it handle uncertainty?", a: "Honestly. Synapse states a confidence level, admits when it's unsure, and would rather say 'worth keeping an eye on' than overclaim. When something's beyond it, it says so and points you toward real help." },
-    { q: "What do I actually do in the app?", a: "Mostly just talk to it — like texting a coach. A quick daily check-in (about 20 seconds) sharpens what it knows. The more you use it, the better it understands you." },
+    { q: "What do I actually do in the app?", a: "Mostly just talk to it — like texting a coach who remembers everything. Set what you're working toward, check in when you can, and let it keep you honest and moving. The relationship deepens the more you use it." },
     { q: "Who can see my data, and does it follow me across devices?", a: "Only you. Your data syncs privately to your account so it follows you between phone and computer, is never sold, and you can export or delete it anytime." },
   ];
   return (
@@ -426,11 +429,12 @@ function CTA() {
         <div className="relative">
           <div className="mx-auto mb-7 w-fit"><SynapseOrb size={72} /></div>
           <h2 className="mx-auto max-w-2xl text-balance text-3xl font-semibold tracking-tight sm:text-4xl">
-            Meet the AI partner that learns how you work.
+            Meet the companion who helps you actually follow through.
           </h2>
           <p className="mx-auto mt-4 max-w-xl text-navy-100/80">
-            Not another tracker — a companion that remembers, personalizes, and helps you
-            decide what to do next. The longer you use it, the better it knows you.
+            Not another tracker — a companion that remembers what you&apos;re working toward,
+            protects your momentum, and helps you become who you want to be. The longer you
+            use it, the more it&apos;s worth.
           </p>
           <Link href="/login" className="mt-9 inline-block">
             <Button size="lg" className="sa-shine">Meet Synapse <ArrowRight className="h-4 w-4" /></Button>
@@ -452,7 +456,7 @@ function Footer() {
               Synapse Adaptive
             </div>
             <p className="mt-3 max-w-sm text-sm leading-relaxed text-muted">
-              An adaptive AI partner that learns how you work and helps you become who you want to be.
+              An adaptive companion that remembers what you&apos;re working toward and helps you actually get there.
             </p>
           </div>
           <div className="text-sm text-muted">
@@ -465,9 +469,9 @@ function Footer() {
           </div>
         </div>
         <p className="mt-12 max-w-3xl text-xs leading-relaxed text-muted">
-          Synapse Adaptive helps you understand your own patterns and make your own
-          decisions. It reflects your data, not professional advice, and isn&apos;t a
-          substitute for medical, legal, or financial guidance. In an emergency,
+          Synapse Adaptive is a companion for personal progress and reflection. It supports
+          your own decisions, reflects your data rather than professional advice, and
+          isn&apos;t a substitute for medical, legal, or financial guidance. In an emergency,
           contact your local emergency services.
         </p>
         <p className="mt-4 text-xs text-muted">© {new Date().getFullYear()} Synapse Adaptive.</p>
@@ -478,16 +482,16 @@ function Footer() {
 
 function AppleHealth() {
   const rows = [
-    ["When you open it", "A wall of numbers and charts", "A companion that greets you and knows where things stand"],
-    ["A change in your data", "“Here's the graph.”", "“Here's what moved, the likely reason, and what I'd do.”"],
-    ["Does it know you?", "No — every user sees the same app", "Yes — it learns how you specifically work over time"],
-    ["What you leave with", "More data", "One clear next step, personalized to your life"],
+    ["When you open it", "A wall of numbers and charts", "A companion who remembers what you're working toward"],
+    ["When something slips", "You notice — eventually, maybe", "It notices, and gently calls it before you drift"],
+    ["Does it know you?", "No — every user sees the same app", "Yes — an evolving relationship, built around your goals"],
+    ["What you leave with", "More data", "Real momentum — one honest next step at a time"],
   ];
   return (
     <Section>
       <Eyebrow>The difference</Eyebrow>
-      <H2>A tracker tells you what happened. Synapse helps you decide what to do next.</H2>
-      <p className="mt-3 max-w-2xl text-lg text-muted">Trackers are repositories. Synapse Adaptive is a companion that learns you and reasons on your behalf.</p>
+      <H2>A tracker tells you what happened. Synapse helps you do something about it.</H2>
+      <p className="mt-3 max-w-2xl text-lg text-muted">Trackers are repositories. Synapse Adaptive is a companion that remembers what you want and keeps you moving toward it.</p>
       <div className="mt-12 overflow-hidden rounded-2xl border bg-surface shadow-soft">
         <div className="grid grid-cols-3 border-b bg-surface-2 text-sm font-semibold text-ink">
           <div className="p-4" />
@@ -510,7 +514,7 @@ function Pricing() {
   return (
     <Section id="pricing" className="bg-surface">
       <Eyebrow>Pricing</Eyebrow>
-      <H2>Everyone gets the insights. Pro &amp; Max get them every day.</H2>
+      <H2>Everyone gets the guidance. Pro &amp; Max get it every day.</H2>
       <p className="mt-3 max-w-2xl text-lg text-muted">Free is genuinely useful — no card needed.</p>
 
       {/* The real value axis, stated plainly: weekly insight is free; daily is the upgrade. */}
@@ -519,8 +523,8 @@ function Pricing() {
           <Sparkles className="h-3.5 w-3.5" /> What you actually get
         </div>
         <p className="mt-3 text-lg leading-relaxed text-ink">
-          <b>Every plan — free included — gets a full weekly report:</b> Synapse&apos;s proactive
-          insights and its suggestions for what to focus on next week. That value is never paywalled.
+          <b>Every plan — free included — gets a full weekly read:</b> what Synapse noticed about
+          your momentum and where to put your energy next week. That value is never paywalled.
         </p>
         <p className="mt-2 text-lg leading-relaxed text-muted">
           The real difference with <b className="text-ink">Pro</b> and <b className="text-ink">Max</b>?

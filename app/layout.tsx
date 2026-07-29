@@ -8,14 +8,14 @@ const inter = Inter({ subsets: ["latin"], variable: "--font-sans", display: "swa
 const appUrl = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
 const title = "Synapse Adaptive — Your adaptive AI partner";
 const description =
-  "An adaptive AI partner that learns how you work and helps you become who you want to be — remembering what matters to you and adapting as you change. Not another tracker.";
+  "An adaptive companion that remembers what you're working toward, notices when you drift, and keeps you moving toward it — turning good intentions into real progress. Not another tracker.";
 
 export const metadata: Metadata = {
   metadataBase: new URL(appUrl),
   title: { default: title, template: "%s · Synapse Adaptive" },
   description,
   applicationName: "Synapse Adaptive",
-  keywords: ["adaptive AI", "AI coach", "self-understanding", "habits", "focus", "personal growth"],
+  keywords: ["adaptive companion", "AI coach", "accountability", "momentum", "follow through", "personal growth"],
   openGraph: {
     type: "website",
     siteName: "Synapse Adaptive",
