@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { detectFocusIntent } from "@/lib/focus-intent";
 import { useRouter } from "next/navigation";
 import { detectNavIntent } from "@/lib/nav-intent";
+import { NAV_HINT_EXAMPLES, shouldShowNavHints, recordNavUse } from "@/lib/nav-hint";
 import { newSession, saveSession, loadSession, DURATION_PRESETS } from "@/lib/focus-session";
 import { openCommitment, commitmentAwaitingReport, loadCommitments } from "@/lib/commitments";
 import { readMomentum } from "@/lib/momentum";
@@ -65,6 +66,16 @@ export function AgentConsole({ embedded = false, immersive = false }: { embedded
     return () => { window.removeEventListener("synapse:focus-start", sync); window.removeEventListener("synapse:focus-end", sync); };
   }, []);
 
+  // Teach-once cue: show "try saying…" until they've driven themselves around a few times.
+  const [showHints, setShowHints] = useState(false);
+  useEffect(() => {
+    const sync = () => setShowHints(shouldShowNavHints());
+    sync();
+    window.addEventListener("synapse:navhint", sync);
+    window.addEventListener("storage", sync);
+    return () => { window.removeEventListener("synapse:navhint", sync); window.removeEventListener("storage", sync); };
+  }, []);
+
   // Entering focus mode from natural language: begin a real companion session on the
   // spot (roles are entered, not clicked), then MINIMIZE into the floating orb — no extra
   // screens, no dashboard. The user is back to work within seconds.
@@ -73,6 +84,7 @@ export function AgentConsole({ embedded = false, immersive = false }: { embedded
     saveSession(s);
     setFocusActive(true); setCustomOpen(false); setCustomMin("");
     try { witness("focus_start", goal ?? undefined); } catch {}
+    try { recordNavUse(); } catch {}
     try { window.dispatchEvent(new CustomEvent("synapse:focus-start")); } catch {}
     const line = `Sounds good${goal ? ` \u2014 ${goal} it is` : ""}. I'll be right here if you need me: keeping time, quiet while you're in flow, and I'll only look in if it seems like you've drifted.`;
     setChat([...chat.filter((m) => m.id !== "intro"), { id: `a_${Date.now()}`, role: "assistant" as const, content: line }]);
@@ -247,6 +259,7 @@ export function AgentConsole({ embedded = false, immersive = false }: { embedded
     if (preGate(q).triggered) { setChat([...next, { id: `a_${Date.now()}`, role: "assistant", content: CRISIS_RESPONSE }]); setBusy(false); scrollDown(); return; }
     const nav = detectNavIntent(q);
     if (nav) {
+      recordNavUse();
       if (nav.talk) { try { sessionStorage.setItem("synapse.snapshot.mode", "talk"); sessionStorage.setItem("synapse.snapshot.seed", q); } catch {} }
       const line = nav.talk ? "Talking it through \u2014 taking you there now." : "On it \u2014 taking you to " + nav.label + " now.";
       setChat([...next, { id: `a_${Date.now()}`, role: "assistant" as const, content: line }]);
@@ -376,6 +389,15 @@ export function AgentConsole({ embedded = false, immersive = false }: { embedded
               </div>
             </div>
           )}
+          {showHints && (
+            <div className="mb-2.5 flex flex-wrap items-center gap-2">
+              <span className="text-xs text-muted">Try saying:</span>
+              {NAV_HINT_EXAMPLES.map((h) => (
+                <button key={h} onClick={() => send(h)} disabled={busy}
+                  className="rounded-full border border-dashed bg-surface px-3 py-1 text-xs text-muted transition-all hover:-translate-y-0.5 hover:border-solid hover:text-ink hover:shadow-soft disabled:opacity-50">{h}</button>
+              ))}
+            </div>
+          )}
           <div className="mb-2.5 flex items-center justify-between gap-2">
             <div className="flex flex-1 flex-wrap gap-2">
               {!busy && suggestions.map((s, i) => (
@@ -484,6 +506,15 @@ export function AgentConsole({ embedded = false, immersive = false }: { embedded
           </div>
         )}
         <WaitlistDialog plan="pro" open={waitlistOpen} onClose={() => setWaitlistOpen(false)} defaultEmail={email} />
+        {showHints && (
+          <div className="mb-2.5 flex flex-wrap items-center gap-2">
+            <span className="text-xs text-muted">Try saying:</span>
+            {NAV_HINT_EXAMPLES.map((h) => (
+              <button key={h} onClick={() => send(h)} disabled={busy}
+                className="rounded-full border border-dashed bg-surface px-3 py-1 text-xs text-muted transition-all hover:-translate-y-0.5 hover:border-solid hover:text-ink hover:shadow-soft disabled:opacity-50">{h}</button>
+            ))}
+          </div>
+        )}
         <div className="mb-2.5 flex flex-wrap gap-2">
           {suggestions.map((s) => (
             <button key={s} onClick={() => send(s)} disabled={busy}

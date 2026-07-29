@@ -28,6 +28,7 @@ import { readMomentum } from "@/lib/momentum";
 import { convictionContextLines } from "@/lib/convictions";
 import { activityContextBlock } from "@/lib/activity";
 import { detectNavIntent } from "@/lib/nav-intent";
+import { recordNavUse } from "@/lib/nav-hint";
 import { cn } from "@/lib/utils";
 
 interface Msg { id: string; from: "you" | "synapse"; text: string }
@@ -87,6 +88,7 @@ export function CompanionPresence() {
     const nav = detectNavIntent(q);
     const alreadyHere = !!nav && (here === nav.to || here.startsWith(nav.to + "/"));
     if (nav && !alreadyHere) {
+      recordNavUse();
       if (nav.talk) { try { sessionStorage.setItem("synapse.snapshot.mode", "talk"); sessionStorage.setItem("synapse.snapshot.seed", q); } catch {} }
       setMsgs((m) => [...m, { id: `a_${Date.now()}`, from: "synapse", text: nav.talk ? "Let's talk it through — come with me." : "Taking you to " + nav.label + " — I'm right here with you." }]);
       scroll();

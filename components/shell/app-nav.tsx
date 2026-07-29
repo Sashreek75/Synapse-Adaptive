@@ -34,12 +34,12 @@ const asks: Ask[] = [
 
 // Items that OPEN a real, interactive surface.
 const rooms: Room[] = [
-  { href: "/dashboard", label: "Talk", icon: Home, blurb: "The full conversation with Synapse" },
-  { href: "/daily", label: "Daily check-in", icon: CalendarCheck, blurb: "Today's snapshot" },
-  { href: "/report", label: "Weekly review", icon: FileText, blurb: "Our coaching sit-down" },
-  { href: "/stats", label: "Your numbers", icon: BarChart3, blurb: "The trends behind what I notice" },
-  { href: "/playbook", label: "You", icon: Sparkles, blurb: "What Synapse understands about you" },
-  { href: "/tools", label: "Focus", icon: Timer, blurb: "Timer, checklist \u2014 get moving" },
+  { href: "/dashboard", label: "Talk", icon: Home, blurb: "The main conversation" },
+  { href: "/daily", label: "Daily Snapshot", icon: CalendarCheck, blurb: "Capture or reflect on today" },
+  { href: "/tools", label: "Focus", icon: Timer, blurb: "Work with the companion beside you" },
+  { href: "/report", label: "Weekly Review", icon: FileText, blurb: "Your weekly reflection" },
+  { href: "/stats", label: "Your Numbers", icon: BarChart3, blurb: "Patterns and measurable trends" },
+  { href: "/playbook", label: "You", icon: Sparkles, blurb: "Everything Synapse believes it understands" },
 ];
 
 const manage: Room[] = [
@@ -108,11 +108,11 @@ export function RoomsMenu() {
         </div>
 
         <nav className="mt-5 min-h-0 flex-1 space-y-1 overflow-y-auto px-3 pb-4">
-          <p className="flex items-center gap-1.5 px-3 pb-1 pt-2 text-[11px] font-semibold uppercase tracking-wider text-muted/70"><Sparkles className="h-3 w-3 text-orange-500" /> Ask Synapse</p>
-          {asks.map((a) => <AskButton key={a.label} ask={a} onClick={() => askSynapse(a.prompt)} />)}
-
-          <p className="px-3 pb-1 pt-4 text-[11px] font-semibold uppercase tracking-wider text-muted/70">Go to</p>
+          <p className="px-3 pb-1 pt-2 text-[11px] font-semibold uppercase tracking-wider text-muted/70">Go to</p>
           {rooms.map((r) => <RoomLink key={r.href} room={r} active={isActive(pathname, r.href)} />)}
+
+          <p className="flex items-center gap-1.5 px-3 pb-1 pt-4 text-[11px] font-semibold uppercase tracking-wider text-muted/70"><Sparkles className="h-3 w-3 text-orange-500" /> Quick conversations</p>
+          {asks.map((a) => <AskButton key={a.label} ask={a} onClick={() => askSynapse(a.prompt)} />)}
 
           <p className="px-3 pb-1 pt-4 text-[11px] font-semibold uppercase tracking-wider text-muted/70">More</p>
           {manage.map((r) => <RoomLink key={r.href} room={r} active={isActive(pathname, r.href)} />)}
