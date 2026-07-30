@@ -32,13 +32,17 @@ export function detectNavIntent(text: string): NavIntent | null {
   const t = (text || "").toLowerCase().trim();
   if (!t) return null;
   const hasGo = DIRECTIVE.test(t);
-  // Asking to be told/shown/explained something → answer it, don't relocate them.
-  if (ANSWER_SEEKING.test(t)) return null;
-  if (/\?/.test(t) && !hasGo) return null;
-  const wordCount = t.split(/\s+/).filter(Boolean).length;
-  // A bare noun-phrase ("my numbers", "weekly report") reads as go; a question word never does.
-  const terse = wordCount <= 3 && !/^(what|why|how|who|when|which|is|are|do|does|can|should)\b/.test(t);
-  if (!hasGo && !terse) return null;
+  // An explicit "take me / go to / open …" wins outright — even if they also tack a question
+  // onto it ("take me to my numbers, what do they mean?"). Move them; they can ask more there.
+  if (!hasGo) {
+    // No movement verb: a question or a "just tell me…" reads as answer-in-place, not relocate.
+    if (ANSWER_SEEKING.test(t)) return null;
+    if (/\?/.test(t)) return null;
+    const wordCount = t.split(/\s+/).filter(Boolean).length;
+    // A bare noun-phrase ("my numbers", "weekly report") still reads as go; a question word never does.
+    const terse = wordCount <= 3 && !/^(what|why|how|who|when|which|is|are|do|does|can|should)\b/.test(t);
+    if (!terse) return null;
+  }
   for (const c of CATEGORIES) if (c.rx.test(t)) return { to: c.to, label: c.label, talk: c.talk };
   return null;
 }

@@ -16,7 +16,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter, usePathname } from "next/navigation";
-import { ArrowRight, X } from "lucide-react";
+import { ArrowRight, Home, X } from "lucide-react";
 import { SynapseOrb } from "@/components/synapse/orb";
 import { useHealth } from "@/components/providers/health-store";
 import { useSubscription } from "@/components/providers/subscription-provider";
@@ -104,7 +104,7 @@ export function CompanionPresence() {
       const recent = msgs.filter((m) => m.id !== "intro").slice(-6).map((m) => (m.from === "you" ? "User: " : "You: ") + m.text).join(NL);
       const ctx = [
         "Right now it is " + now + ".",
-        "You are Synapse, riding along in a small companion window the user opened over whatever page they're on — one continuous conversation that travels with them everywhere. Talk with them right here: answer their questions, explain what they're looking at, think things through together. Be brief, warm, and genuinely useful. Never mention pages, routes, or navigation — you are simply with them.",
+        "You are Synapse, riding along in a small companion window the user opened over whatever page they're on — one continuous conversation that travels with them everywhere. Answer right here in 1-3 short sentences: warm, specific, and immediately useful. Lead with the single most valuable thing and stop; never write a long paragraph or a wall of text — if it is getting long, cut it. Never mention pages, routes, or navigation — you are simply with them.",
         "The user is currently looking at " + describePage(here) + ". If they ask what something here means — a check-in question, one of their numbers, what the weekly report is saying — answer it directly and specifically, using what you know about them. They are already on this page, so never offer to take them where they already are.",
         goal ? "They are working to become: " + goal + "." : "",
         activityContextBlock(),
@@ -130,10 +130,12 @@ export function CompanionPresence() {
       {open && (
         <div role="dialog" aria-label="Talk to Synapse" className="flex w-[min(20rem,88vw)] flex-col overflow-hidden rounded-3xl border bg-surface/95 shadow-lift backdrop-blur animate-fade-up">
           <div className="flex items-center justify-between gap-3 border-b px-4 py-3">
-            <div className="flex items-center gap-2">
+            <button onClick={() => { setOpen(false); try { router.push("/dashboard"); } catch {} }} title="Back to home" aria-label="Back to home"
+              className="flex items-center gap-2 rounded-full py-0.5 pr-2 text-left transition-opacity hover:opacity-70">
               <SynapseOrb size={24} state={busy ? "thinking" : "idle"} />
-              <p className="text-sm font-semibold text-ink">Synapse</p>
-            </div>
+              <span className="text-sm font-semibold text-ink">Synapse</span>
+              <Home className="h-3.5 w-3.5 text-muted" />
+            </button>
             <button onClick={() => setOpen(false)} aria-label="Close" className="grid h-8 w-8 place-items-center rounded-full text-muted hover:bg-surface-2 hover:text-ink"><X className="h-4 w-4" /></button>
           </div>
           <div className="max-h-64 space-y-2 overflow-y-auto px-4 py-3">

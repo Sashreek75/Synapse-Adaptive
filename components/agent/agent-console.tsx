@@ -179,16 +179,10 @@ export function AgentConsole({ embedded = false, immersive = false }: { embedded
     return `${who}\n\nMetric trends (0-100):\n${lines.join("\n")}\n\n${activity}${currentFocus ? `\n\n${currentFocus}` : ""}${connections ? `\n\n${connections}` : ""}${beliefs ? `\n\n${beliefs}` : ""}${conclusions ? `\n\n${conclusions}` : ""}${openQuestionsCtx ? `\n\n${openQuestionsCtx}` : ""}${theories ? `\n\n${theories}` : ""}${habitsCtx ? `\n\n${habitsCtx}` : ""}${playbook ? `\n\n${playbook}` : ""}${expHistory ? `\n\n${expHistory}` : ""}`;
   }, [hasData, profile, series, weeksTracked, focus, consistency, weeklyScore, recentChanges, providerQuestions, checkIns, contextNotes, recommendationLog, mind, experiments]);
 
-  // Data-aware conversation starters — Synapse suggests what IT would ask about.
+  // The old suggestion bubbles were removed — the companion orb and the teach-once
+  // "try saying…" cue cover discovery now. up/down still feed the proactive opener.
   const up = recentChanges.find((c) => c.improving);
   const down = recentChanges.find((c) => !c.improving);
-  const suggestions = hasData
-    ? [
-        down ? `Why is my ${down.label.toLowerCase()} slipping?` : "What changed recently?",
-        up ? `What's helping my ${up.label.toLowerCase()}?` : "What should I focus on?",
-        "What patterns have you noticed?",
-      ]
-    : ["How do you learn about me?", "What should I focus on first?", "What can we work on?"];
 
   // THE PROACTIVE OPENER — Synapse initiates. It doesn't wait to be asked; it
   // arrives having already looked, and leads with the single most alive thing it
@@ -391,27 +385,21 @@ export function AgentConsole({ embedded = false, immersive = false }: { embedded
           )}
           {showHints && (
             <div className="mb-2.5 flex flex-wrap items-center gap-2">
-              <span className="text-xs text-muted">Try saying:</span>
+              <span className="text-sm text-muted">Try saying:</span>
               {NAV_HINT_EXAMPLES.map((h) => (
                 <button key={h} onClick={() => send(h)} disabled={busy}
-                  className="rounded-full border border-dashed bg-surface px-3 py-1 text-xs text-muted transition-all hover:-translate-y-0.5 hover:border-solid hover:text-ink hover:shadow-soft disabled:opacity-50">{h}</button>
+                  className="rounded-full border border-dashed bg-surface px-3.5 py-1.5 text-sm text-muted transition-all hover:-translate-y-0.5 hover:border-solid hover:text-ink hover:shadow-soft disabled:opacity-50">{h}</button>
               ))}
             </div>
           )}
-          <div className="mb-2.5 flex items-center justify-between gap-2">
-            <div className="flex flex-1 flex-wrap gap-2">
-              {!busy && suggestions.map((s, i) => (
-                <button key={s} onClick={() => send(s)} disabled={busy}
-                  className={cn("rounded-full border bg-surface px-3 py-1.5 text-sm text-muted transition-all hover:-translate-y-0.5 hover:text-ink hover:shadow-soft disabled:opacity-50", i >= 2 && "hidden sm:inline-flex")}>{s}</button>
-              ))}
-            </div>
-            {chat.length > 0 && (
+          {chat.length > 0 && (
+            <div className="mb-2.5 flex items-center justify-end">
               <button onClick={clearChat} title="Clear this space for a fresh start — Synapse still remembers everything"
                 className="inline-flex shrink-0 items-center gap-1.5 rounded-full border bg-surface px-3 py-1.5 text-xs font-medium text-muted transition hover:-translate-y-0.5 hover:text-ink hover:shadow-soft">
                 <Eraser className="h-3.5 w-3.5" /> Clear chat
               </button>
-            )}
-          </div>
+            </div>
+          )}
           <div className="flex gap-2 rounded-2xl border bg-surface p-2 shadow-lift">
             <input value={input} onChange={(e) => setInput(e.target.value)} onKeyDown={(e) => e.key === "Enter" && send(input)}
               placeholder="What do you want to make progress on?"
@@ -508,19 +496,13 @@ export function AgentConsole({ embedded = false, immersive = false }: { embedded
         <WaitlistDialog plan="pro" open={waitlistOpen} onClose={() => setWaitlistOpen(false)} defaultEmail={email} />
         {showHints && (
           <div className="mb-2.5 flex flex-wrap items-center gap-2">
-            <span className="text-xs text-muted">Try saying:</span>
+            <span className="text-sm text-muted">Try saying:</span>
             {NAV_HINT_EXAMPLES.map((h) => (
               <button key={h} onClick={() => send(h)} disabled={busy}
-                className="rounded-full border border-dashed bg-surface px-3 py-1 text-xs text-muted transition-all hover:-translate-y-0.5 hover:border-solid hover:text-ink hover:shadow-soft disabled:opacity-50">{h}</button>
+                className="rounded-full border border-dashed bg-surface px-3.5 py-1.5 text-sm text-muted transition-all hover:-translate-y-0.5 hover:border-solid hover:text-ink hover:shadow-soft disabled:opacity-50">{h}</button>
             ))}
           </div>
         )}
-        <div className="mb-2.5 flex flex-wrap gap-2">
-          {suggestions.map((s) => (
-            <button key={s} onClick={() => send(s)} disabled={busy}
-              className="rounded-full border bg-surface px-3 py-1.5 text-sm text-muted transition-all hover:-translate-y-0.5 hover:text-ink hover:shadow-soft disabled:opacity-50">{s}</button>
-          ))}
-        </div>
         <div className="flex gap-2 rounded-2xl border bg-surface p-2 shadow-soft">
           <input value={input} onChange={(e) => setInput(e.target.value)} onKeyDown={(e) => e.key === "Enter" && send(input)}
             placeholder="What are you working on? Talk to me."
