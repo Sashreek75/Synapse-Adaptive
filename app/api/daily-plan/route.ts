@@ -11,7 +11,7 @@ export const runtime = "nodejs";
  * their playbook, beliefs, open questions, trends, and recent notes. The model
  * authors every item (sliders, multiple-choice, open notes, an occasional
  * reaction game); code validates the shape, post-gates every text field, and
- * guarantees enough data is captured (>=2 scale items). On ANY failure we return
+ * guarantees enough data is captured (>=1 core-metric reading). On ANY failure we return
  * { plan: null } and the client falls back to its deterministic check-in.
  */
 
@@ -37,12 +37,17 @@ function clampCheckin(raw: unknown): DailyCheckinOutput | null {
   if (!parsed.success) return null;
   const plan = parsed.data;
 
-  // Need at least two scale items on core self-report metrics for data continuity.
-  const coreScales = plan.items.filter((i) => i.type === "scale" && CORE.has(i.metric));
-  if (coreScales.length < 2) return null;
+  // Need at least ONE reading of a core self-report metric so trends keep updating — a
+  // slider OR a "choice" option carrying a metric both count. Sliders are no longer required.
+  const coreCaptures = plan.items.filter(
+    (i) =>
+      (i.type === "scale" && CORE.has(i.metric)) ||
+      (i.type === "choice" && i.options.some((o) => o.metric && CORE.has(o.metric) && o.value != null)),
+  );
+  if (coreCaptures.length < 1) return null;
 
   // Post-gate every string the user will read.
-  const texts: string[] = [plan.greeting, plan.closing ?? ""];
+  const texts: string[] = [plan.greeting, plan.progressPrompt ?? "", plan.closing ?? ""];
   for (const it of plan.items) {
     texts.push(it.question);
     if (it.type === "scale") texts.push(it.lowLabel, it.highLabel);

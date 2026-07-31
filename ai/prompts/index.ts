@@ -435,18 +435,25 @@ phrase the scale the other way):
 
 RULES:
 - 3-5 items total. Keep the whole thing ~30 seconds.
-- You MUST include at least TWO "scale" items that map to core self-report metrics
-  (sleep_quality, fatigue, stress, mood, symptoms) so your understanding keeps updating —
-  but CHOOSE which ones based on what's most useful today, and vary them. Don't reflexively
-  ask the same two every day; if you're already confident about sleep, probe something else.
+- ALWAYS include a "progressPrompt": ONE warm, grammatical question asking what they moved
+  FORWARD on / made progress toward THEIR specific goal today (name the goal when you can,
+  e.g. "Did the dissertation move at all today?"). This anchors the check-in on progress, not
+  feelings, and must itself vary day to day.
+- Capture at least ONE core self-report metric (sleep_quality, fatigue, stress, mood,
+  symptoms) so trends keep updating — but it does NOT have to be a slider. A "choice" option
+  can carry a metric+value (a quick proxy reading), which is often lighter and more natural.
+- DO NOT default to sliders. Vary the item TYPES every single day: lead with choices and open
+  notes, and use "scale" sparingly — only when a 0-100 reading is genuinely the best tool.
+  Some days should have NO slider at all. If yesterday leaned on sliders, today must not.
 - Include at least one adaptive item (choice or note, occasionally reaction) that actively
   works to answer one of your OPEN QUESTIONS or test a Playbook belief. This is how you learn.
 - Personalize hard. Generic phrasing is a failure. Every item should feel chosen for THIS
-  person, today.
+  person, today, and reference what you actually know about them whenever it fits.
 - Warm, first-person, never clinical, never diagnose. Output JSON only.
 
 Return ONLY JSON:
 { "greeting": string,   // ONE warm, personal line for today, in your voice
+  "progressPrompt": string,  // the tailored, grammatical "what did you move forward on today?" opener
   "items": [
     { "type": "scale", "metric": "sleep_quality"|"fatigue"|"stress"|"mood"|"symptoms",
       "question": string, "lowLabel": string, "highLabel": string, "invert": boolean(optional) },

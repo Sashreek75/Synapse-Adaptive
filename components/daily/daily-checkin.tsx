@@ -57,6 +57,7 @@ const ENERGY_Q = ["Energy right now?", "How much is in the tank today?", "Where'
 const STRESS_Q = ["Stress level?", "How much pressure are you carrying today?", "How heavy is today feeling?"];
 const MOOD_Q = ["Mood today?", "How's your headspace today?", "How are you feeling, honestly?"];
 const EVENT_Q = ["Anything notable happen today?", "Anything I should know about today?", "Did today throw anything at you?"];
+const PROGRESS_Q = ["What did you move forward on today?", "What did you make progress on today?", "What's one thing you pushed forward today?", "What did you get done toward your goal today?", "Where did you make headway today?"];
 
 function daySeed(): number {
   const s = new Date().toISOString().slice(0, 10);
@@ -77,12 +78,13 @@ function isValidCheckin(p: unknown): p is DailyCheckinOutput {
   if (typeof plan.greeting !== "string" || !plan.greeting) return false;
   if (!Array.isArray(plan.items) || plan.items.length < 3) return false;
   const core = new Set(["sleep_quality", "fatigue", "stress", "mood", "symptoms"]);
-  let coreScales = 0;
+  let coreCaptures = 0;
   for (const it of plan.items) {
     if (!it || typeof (it as { type?: string }).type !== "string") return false;
-    if (it.type === "scale") { if (core.has(it.metric)) coreScales++; }
+    if (it.type === "scale" && core.has(it.metric)) coreCaptures++;
+    if (it.type === "choice" && Array.isArray(it.options) && it.options.some((o) => o.metric && core.has(o.metric) && o.value != null)) coreCaptures++;
   }
-  return coreScales >= 2;
+  return coreCaptures >= 1;
 }
 
 /** A brief, non-leading feeling summary (a secondary lens for the model). */
@@ -139,9 +141,10 @@ export function DailyCheckIn() {
     sleep: variant(SLEEP_Q, seed, 0), energy: variant(ENERGY_Q, seed, 1),
     stress: variant(STRESS_Q, seed, 2), mood: variant(MOOD_Q, seed, 3), event: variant(EVENT_Q, seed, 7),
   }), [seed]);
+  const progressLabel = useMemo(() => (plan && plan.progressPrompt) ? plan.progressPrompt : variant(PROGRESS_Q, seed, 9), [plan, seed]);
 
   useEffect(() => {
-    const key = `synapse.dailyplan.v2.${new Date().toISOString().slice(0, 10)}`;
+    const key = `synapse.dailyplan.v3.${new Date().toISOString().slice(0, 10)}`;
     try {
       const cached = JSON.parse(localStorage.getItem(key) || "null");
       if (isValidCheckin(cached)) { setPlan(cached); return; }
@@ -235,7 +238,7 @@ export function DailyCheckIn() {
         if (a.reaction != null) metrics.reaction_time = a.reaction;
       }
     });
-    if (progress.trim()) addContextNote("What I moved forward today", progress.trim());
+    if (progress.trim()) addContextNote(progressLabel, progress.trim());
     addCheckIn({ date, kind: "daily", metrics, note: "Daily check-in" });
     for (const n of notes) addContextNote(n.prompt, n.answer);
     void runInstantRead(metrics, date, [progress.trim(), ...notes.map((n) => n.answer)]);
@@ -245,7 +248,7 @@ export function DailyCheckIn() {
     const date = new Date().toISOString();
     const metrics: Partial<Record<MetricKey, number>> = { sleep_quality: sleep, fatigue: 100 - energy, stress, mood };
     if (hasSymptoms) metrics.symptoms = symptoms;
-    if (progress.trim()) addContextNote("What I moved forward today", progress.trim());
+    if (progress.trim()) addContextNote(progressLabel, progress.trim());
     addCheckIn({ date, kind: "daily", metrics, note: "Daily check-in" });
     if (fallbackAnswer.trim()) addContextNote(fq.event, fallbackAnswer.trim());
     if (lifeEvent.trim()) addContextNote(fq.event, lifeEvent.trim());
@@ -314,7 +317,7 @@ export function DailyCheckIn() {
         <SynapseOrb size={44} className="shrink-0" />
         <div>
           <h1 className="text-2xl font-semibold tracking-tight text-ink">Today&apos;s check-in</h1>
-          <p className="text-muted">A moment to reflect on your day — what you moved forward, and how you&apos;re doing.</p>
+          <p className="text-muted">A moment to reflect on your day — what you moved forward on, and how you&apos;re doing.</p>
           <p className="mt-0.5 text-xs text-muted">I tune this as I learn you. It only takes a moment.</p>
         </div>
       </header>
@@ -325,7 +328,7 @@ export function DailyCheckIn() {
         )}
 
         <div>
-          <p className="mb-1.5 flex items-center gap-2 text-sm font-medium text-ink"><Flag className="h-4 w-4 text-orange-500" /> What did you move forward today?</p>
+          <p className="mb-1.5 flex items-center gap-2 text-sm font-medium text-ink"><Flag className="h-4 w-4 text-orange-500" /> {progressLabel}</p>
           <input value={progress} onChange={(e) => setProgress(e.target.value)}
             placeholder="Even a small step — a task, a workout, a page written, a hard conversation…"
             className="w-full rounded-xl border bg-surface px-3 py-2.5 text-base text-ink placeholder:text-muted focus:outline-none" />

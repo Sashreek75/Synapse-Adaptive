@@ -113,6 +113,7 @@ export const dailyItemSchema = z.discriminatedUnion("type", [
 
 export const dailyCheckinSchema = z.object({
   greeting: z.string().min(1),
+  progressPrompt: z.string().min(1).optional(), // the tailored "what did you move forward on?" opener
   items: z.array(dailyItemSchema).min(3).max(6),
   closing: z.string().optional(),
 });
