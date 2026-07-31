@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { detectFocusIntent } from "@/lib/focus-intent";
+import { detectFocusIntent, type FocusIntent } from "@/lib/focus-intent";
 import { useRouter } from "next/navigation";
 import { detectNavIntent } from "@/lib/nav-intent";
 import { NAV_HINT_EXAMPLES, shouldShowNavHints, recordNavUse } from "@/lib/nav-hint";
@@ -56,6 +56,7 @@ export function AgentConsole({ embedded = false, immersive = false }: { embedded
   const [focusActive, setFocusActive] = useState(false);
   const [customOpen, setCustomOpen] = useState(false);
   const [customMin, setCustomMin] = useState("");
+  const [pendingFocus, setPendingFocus] = useState<FocusIntent | null>(null);
   const endRef = useRef<HTMLDivElement>(null);
   const router = useRouter();
   useEffect(() => {
@@ -82,14 +83,14 @@ export function AgentConsole({ embedded = false, immersive = false }: { embedded
   function startFocus(goal: string | undefined, minutes: number) {
     const s = newSession(goal ?? null, minutes, "focus");
     saveSession(s);
-    setFocusActive(true); setCustomOpen(false); setCustomMin("");
+    setFocusActive(true); setCustomOpen(false); setCustomMin(""); setPendingFocus(null);
     try { witness("focus_start", goal ?? undefined); } catch {}
     try { recordNavUse(); } catch {}
     try { window.dispatchEvent(new CustomEvent("synapse:focus-start")); } catch {}
     const line = `Sounds good${goal ? ` \u2014 ${goal} it is` : ""}. I'll be right here if you need me: keeping time, quiet while you're in flow, and I'll only look in if it seems like you've drifted.`;
     setChat([...chat.filter((m) => m.id !== "intro"), { id: `a_${Date.now()}`, role: "assistant" as const, content: line }]);
   }
-  const startCustom = () => { const m = Math.min(180, Math.max(5, parseInt(customMin, 10) || 25)); startFocus(focusHint.goal, m); };
+  const startCustom = () => { const m = Math.min(180, Math.max(5, parseInt(customMin, 10) || 25)); startFocus(pendingFocus?.goal, m); };
 
   const focus = getPath(profile.path).focusNoun;
 
@@ -231,12 +232,6 @@ export function AgentConsole({ embedded = false, immersive = false }: { embedded
 
   const messages: ChatMessage[] = chat.length ? chat : [{ id: "intro", role: "assistant", content: introContent }];
 
-  // Read the latest user message for "I'm starting a work session" intent.
-  const focusHint = useMemo(() => {
-    const lastUser = [...messages].reverse().find((m) => m.role === "user");
-    return lastUser ? detectFocusIntent(lastUser.content) : { focus: false as const };
-  }, [messages]);
-
   function scrollDown() { requestAnimationFrame(() => endRef.current?.scrollIntoView({ behavior: "smooth" })); }
 
   async function send(text: string) {
@@ -251,6 +246,11 @@ export function AgentConsole({ embedded = false, immersive = false }: { embedded
     setChat(next); setInput(""); setBusy(true); scrollDown();
     if (free) { const n = usedToday + 1; setUsedToday(n); try { localStorage.setItem(usageKey, String(n)); } catch {} }
     if (preGate(q).triggered) { setChat([...next, { id: `a_${Date.now()}`, role: "assistant", content: CRISIS_RESPONSE }]); setBusy(false); scrollDown(); return; }
+    // Locking in? Offer the timer immediately — deterministic, no model round-trip (that race
+    // was showing the chooser a message late). The chooser renders from pendingFocus below.
+    const fIntent = detectFocusIntent(q);
+    if (fIntent.focus && !focusActive && !loadSession()) { setPendingFocus(fIntent); setBusy(false); scrollDown(); return; }
+    setPendingFocus(null);
     const nav = detectNavIntent(q);
     if (nav) {
       recordNavUse();
@@ -364,12 +364,12 @@ export function AgentConsole({ embedded = false, immersive = false }: { embedded
             </div>
           )}
           <WaitlistDialog plan="pro" open={waitlistOpen} onClose={() => setWaitlistOpen(false)} defaultEmail={email} />
-          {focusHint.focus && !busy && !focusActive && (
+          {pendingFocus && !focusActive && (
             <div className="mb-2.5 rounded-xl border border-orange-300/60 bg-orange-500/10 px-3 py-2.5 text-sm text-ink">
-              <p className="flex items-center gap-2"><Timer className="h-4 w-4 shrink-0 text-orange-500" /> Sounds good{focusHint.goal ? ` — ${focusHint.goal}` : ""}. About how long would you like to focus?</p>
+              <p className="flex items-center gap-2"><Timer className="h-4 w-4 shrink-0 text-orange-500" /> Sounds good{pendingFocus.goal ? ` — ${pendingFocus.goal}` : ""}. About how long would you like to focus?</p>
               <div className="mt-2 flex flex-wrap items-center gap-2">
-                {(focusHint.minutes && !(DURATION_PRESETS as readonly number[]).includes(focusHint.minutes) ? [focusHint.minutes, ...DURATION_PRESETS] : DURATION_PRESETS).map((m) => (
-                  <button key={m} onClick={() => startFocus(focusHint.goal, m)} className="rounded-full border bg-surface px-3 py-1.5 text-sm font-medium text-ink transition hover:bg-surface-2">{m} min</button>
+                {(pendingFocus.minutes && !(DURATION_PRESETS as readonly number[]).includes(pendingFocus.minutes) ? [pendingFocus.minutes, ...DURATION_PRESETS] : DURATION_PRESETS).map((m) => (
+                  <button key={m} onClick={() => startFocus(pendingFocus.goal, m)} className="rounded-full border bg-surface px-3 py-1.5 text-sm font-medium text-ink transition hover:bg-surface-2">{m} min</button>
                 ))}
                 {!customOpen ? (
                   <button onClick={() => setCustomOpen(true)} className="rounded-full border bg-surface px-3 py-1.5 text-sm font-medium text-muted transition hover:text-ink">Custom</button>
@@ -380,6 +380,7 @@ export function AgentConsole({ embedded = false, immersive = false }: { embedded
                     <button onClick={startCustom} className="rounded-full bg-orange-500 px-3 py-1.5 text-sm font-medium text-white transition hover:bg-orange-600">Start</button>
                   </span>
                 )}
+                <button onClick={() => setPendingFocus(null)} className="rounded-full px-3 py-1.5 text-sm font-medium text-muted transition hover:text-ink">Not now</button>
               </div>
             </div>
           )}

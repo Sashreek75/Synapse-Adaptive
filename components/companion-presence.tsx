@@ -21,13 +21,14 @@ import { SynapseOrb } from "@/components/synapse/orb";
 import { useHealth } from "@/components/providers/health-store";
 import { useSubscription } from "@/components/providers/subscription-provider";
 import { preGate, CRISIS_RESPONSE } from "@/ai/safety";
-import { loadSession } from "@/lib/focus-session";
+import { loadSession, newSession, saveSession, DURATION_PRESETS } from "@/lib/focus-session";
 import { loadCommitments } from "@/lib/commitments";
 import { loadHistory } from "@/lib/focus-session";
 import { readMomentum } from "@/lib/momentum";
 import { convictionContextLines } from "@/lib/convictions";
-import { activityContextBlock } from "@/lib/activity";
+import { activityContextBlock, witness } from "@/lib/activity";
 import { detectNavIntent } from "@/lib/nav-intent";
+import { detectFocusIntent, type FocusIntent } from "@/lib/focus-intent";
 import { recordNavUse } from "@/lib/nav-hint";
 import { cn } from "@/lib/utils";
 
@@ -59,6 +60,7 @@ export function CompanionPresence() {
   const [msgs, setMsgs] = useState<Msg[]>([]);
   const [input, setInput] = useState("");
   const [busy, setBusy] = useState(false);
+  const [pendingFocus, setPendingFocus] = useState<FocusIntent | null>(null);
   const endRef = useRef<HTMLDivElement>(null);
 
   // Step aside whenever the Focus Companion owns the orb.
@@ -74,13 +76,30 @@ export function CompanionPresence() {
 
   const scroll = () => requestAnimationFrame(() => endRef.current?.scrollIntoView({ behavior: "smooth" }));
 
+  // Start a real focus session straight from the orb — the Focus Companion takes over the corner.
+  const startOrbFocus = useCallback((goal: string | undefined, minutes: number) => {
+    saveSession(newSession(goal ?? null, minutes, "focus"));
+    try { witness("focus_start", goal ?? undefined); } catch {}
+    try { window.dispatchEvent(new CustomEvent("synapse:focus-start")); } catch {}
+    setPendingFocus(null); setOpen(false);
+  }, []);
+
   const send = useCallback(async (text: string) => {
     const q = text.trim();
     if (!q || busy) return;
     setMsgs((m) => [...m.filter((x) => x.id !== "intro"), { id: `u_${Date.now()}`, from: "you", text: q }]);
-    setInput(""); scroll();
+    setInput(""); setPendingFocus(null); scroll();
 
     if (preGate(q).triggered) { setMsgs((m) => [...m, { id: `a_${Date.now()}`, from: "synapse", text: CRISIS_RESPONSE }]); return; }
+
+    // Locking in? Offer to keep time right here — the timer starts the moment they pick a length.
+    const fIntent = detectFocusIntent(q);
+    if (fIntent.focus && !loadSession()) {
+      setPendingFocus(fIntent);
+      setMsgs((m) => [...m, { id: `a_${Date.now()}`, from: "synapse", text: fIntent.goal ? "On it — " + fIntent.goal + ". How long shall I keep time?" : "On it. How long shall I keep time?" }]);
+      scroll();
+      return;
+    }
 
     // Only leave the room when they CLEARLY want to go somewhere else — and never somewhere
     // they already are. Everything else (questions, "what does this mean?") is answered in place.
@@ -147,6 +166,14 @@ export function CompanionPresence() {
             {busy && <p className="text-sm text-muted">Thinking…</p>}
             <div ref={endRef} />
           </div>
+          {pendingFocus && (
+            <div className="flex flex-wrap items-center gap-1.5 border-t px-3 py-2.5">
+              {(pendingFocus.minutes && !(DURATION_PRESETS as readonly number[]).includes(pendingFocus.minutes) ? [pendingFocus.minutes, ...DURATION_PRESETS] : DURATION_PRESETS).map((m) => (
+                <button key={m} onClick={() => startOrbFocus(pendingFocus.goal, m)} className="rounded-full border bg-surface px-3 py-1 text-xs font-medium text-ink transition hover:bg-surface-2">{m} min</button>
+              ))}
+              <button onClick={() => setPendingFocus(null)} className="rounded-full px-2.5 py-1 text-xs font-medium text-muted transition hover:text-ink">Not now</button>
+            </div>
+          )}
           <div className="flex items-center gap-2 border-t px-3 py-2.5">
             <input value={input} onChange={(e) => setInput(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") void send(input); }}
               placeholder="Ask Synapse anything…"

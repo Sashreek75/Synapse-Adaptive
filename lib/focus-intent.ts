@@ -25,6 +25,9 @@ const CUES: RegExp[] = [
   /\bkeep me (accountable|on track)\b/,
   /\bi'?m about to (work|start|study|write|focus)\b/,
   /\btime to (work|focus|study|write)\b/,
+  /\bheads?[\s-]?down\b/,
+  /\bhit (a|the|my|some) (work|study|focus|writing|reading|deep work)\b/,
+  /\bget in the zone\b/,
 ];
 
 export interface FocusIntent { focus: boolean; goal?: string; minutes?: number }
@@ -51,7 +54,9 @@ export function detectFocusIntent(text: string): FocusIntent {
       .replace(/\s+/g, " ")
       .trim();
     // Guard against grabbing filler ("on it", "for now").
-    if (/^(it|now|today|a bit|while|the next)\b/i.test(goal) || /^\d+\s*(m|mins?|minutes?|h|hours?)\b/i.test(goal) || goal.length < 3) goal = undefined;
+    if (/^(it|now|today|a bit|while|the next|an? hour|half an hour|hours?|a couple)\b/i.test(goal) || /^\d+\s*(m|mins?|minutes?|h|hours?)\b/i.test(goal) || goal.length < 3) goal = undefined;
+    // The intent phrase itself is not a goal ("hit a work session" isn't a task).
+    if (goal && /\b(work session|focus session|study session|deep work|lock in|heads?[\s-]?down|timer|pomodoro|the zone)\b/i.test(goal)) goal = undefined;
   }
   return { focus: true, goal, minutes };
 }
