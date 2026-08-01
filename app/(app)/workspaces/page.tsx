@@ -2,23 +2,25 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { ArrowRight, LayoutGrid, Sparkles } from "lucide-react";
+import { ArrowRight, LayoutGrid, Sparkles, Archive, ArchiveRestore, Trash2, Target } from "lucide-react";
 import { Button } from "@/components/ui/primitives";
 import { SynapseOrb } from "@/components/synapse/orb";
 import { useHealth } from "@/components/providers/health-store";
-import { loadWorkspaces, createWorkspaceFromRequest, type Workspace } from "@/lib/workspaces";
+import { loadWorkspaces, activeWorkspaces, archiveWorkspace, deleteWorkspace, createWorkspaceFromRequest, type Workspace } from "@/lib/workspaces";
+import { getGoal } from "@/lib/goals";
 
 const EXAMPLES = ["An SAT mistake tracker", "A mock interview", "A weekly planning board", "A space to analyze my writing"];
 
 export default function WorkspacesPage() {
   const router = useRouter();
   const { profile, mind } = useHealth();
-  const [list, setList] = useState<Workspace[]>([]);
+  const [all, setAll] = useState<Workspace[]>([]);
   const [req, setReq] = useState("");
   const [busy, setBusy] = useState(false);
+  const [showArchived, setShowArchived] = useState(false);
 
   useEffect(() => {
-    const sync = () => setList(loadWorkspaces());
+    const sync = () => setAll(loadWorkspaces());
     sync();
     window.addEventListener("synapse:workspaces", sync);
     return () => window.removeEventListener("synapse:workspaces", sync);
@@ -34,13 +36,16 @@ export default function WorkspacesPage() {
     } finally { setBusy(false); }
   };
 
+  const list = showArchived ? all.filter((w) => w.archived) : all.filter((w) => !w.archived);
+  const archivedCount = all.filter((w) => w.archived).length;
+
   return (
     <div className="space-y-6">
       <header className="flex items-center gap-3">
         <SynapseOrb size={40} state={busy ? "thinking" : "idle"} className="shrink-0" />
         <div>
           <h1 className="text-2xl font-semibold tracking-tight text-ink">Your spaces</h1>
-          <p className="text-sm text-muted">Tell me what you need and I&apos;ll build it — a tracker, a board, a place to practice.</p>
+          <p className="text-sm text-muted">Tools I build when they help — reopenable, attachable to a goal, archivable like documents.</p>
         </div>
       </header>
 
@@ -60,23 +65,46 @@ export default function WorkspacesPage() {
         </div>
       </div>
 
+      {archivedCount > 0 && (
+        <div className="flex justify-end">
+          <button onClick={() => setShowArchived((v) => !v)} className="inline-flex items-center gap-1.5 text-xs font-medium text-muted hover:text-ink">
+            <Archive className="h-3.5 w-3.5" /> {showArchived ? `Show active` : `Archived (${archivedCount})`}
+          </button>
+        </div>
+      )}
+
       {list.length === 0 ? (
         <div className="rounded-2xl border border-dashed bg-surface/50 p-8 text-center text-sm text-muted">
-          <LayoutGrid className="mx-auto mb-2 h-5 w-5" /> No spaces yet. Ask me for one above — or just say &ldquo;build me a…&rdquo; anywhere.
+          <LayoutGrid className="mx-auto mb-2 h-5 w-5" /> {showArchived ? "Nothing archived." : "No spaces yet. Ask me for one above — or just say “build me a…” anywhere."}
         </div>
       ) : (
         <div className="grid gap-3 sm:grid-cols-2">
-          {list.map((w) => (
-            <button key={w.id} onClick={() => router.push(`/workspaces/${w.id}`)}
-              className="group rounded-2xl border bg-surface p-5 text-left shadow-soft transition hover:-translate-y-0.5 hover:shadow-lift">
-              <div className="flex items-center justify-between">
-                <h3 className="font-semibold text-ink">{w.title}</h3>
-                <ArrowRight className="h-4 w-4 text-muted transition group-hover:translate-x-0.5 group-hover:text-ink" />
+          {list.map((w) => {
+            const goal = w.goalId ? getGoal(w.goalId) : null;
+            return (
+              <div key={w.id} className="group rounded-2xl border bg-surface p-5 shadow-soft transition hover:shadow-lift">
+                <button onClick={() => router.push(`/workspaces/${w.id}`)} className="w-full text-left">
+                  <div className="flex items-center justify-between">
+                    <h3 className="font-semibold text-ink">{w.title}</h3>
+                    <ArrowRight className="h-4 w-4 text-muted transition group-hover:translate-x-0.5 group-hover:text-ink" />
+                  </div>
+                  {w.purpose && <p className="mt-1 text-sm text-muted">{w.purpose}</p>}
+                </button>
+                <div className="mt-3 flex items-center justify-between">
+                  <div className="flex items-center gap-2 text-[11px] text-muted">
+                    {goal && <span className="inline-flex items-center gap-1 rounded-full bg-surface-2 px-2 py-0.5"><Target className="h-3 w-3 text-orange-500" />{goal.title}</span>}
+                    <span>{new Date(w.createdAt).toLocaleDateString()}</span>
+                  </div>
+                  <div className="flex items-center gap-1">
+                    <button onClick={() => archiveWorkspace(w.id, !w.archived)} title={w.archived ? "Restore" : "Archive"} className="grid h-7 w-7 place-items-center rounded-full text-muted hover:bg-surface-2 hover:text-ink">
+                      {w.archived ? <ArchiveRestore className="h-3.5 w-3.5" /> : <Archive className="h-3.5 w-3.5" />}
+                    </button>
+                    <button onClick={() => deleteWorkspace(w.id)} title="Delete" className="grid h-7 w-7 place-items-center rounded-full text-muted hover:bg-surface-2 hover:text-ink"><Trash2 className="h-3.5 w-3.5" /></button>
+                  </div>
+                </div>
               </div>
-              {w.purpose && <p className="mt-1 text-sm text-muted">{w.purpose}</p>}
-              <p className="mt-3 text-[11px] text-muted">{w.blocks.length} block{w.blocks.length === 1 ? "" : "s"}</p>
-            </button>
-          ))}
+            );
+          })}
         </div>
       )}
     </div>

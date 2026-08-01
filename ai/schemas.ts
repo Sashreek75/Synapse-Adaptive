@@ -136,6 +136,21 @@ export const workspaceSchema = z.object({
 });
 export type WorkspaceSpecOutput = z.infer<typeof workspaceSchema>;
 
+/** A living workspace evolves: an updated summary, and at most one EARNED change to approve. */
+export const wsSuggestionSchema = z.object({
+  label: z.string().min(1),
+  rationale: z.string().optional(),
+  action: z.discriminatedUnion("type", [
+    z.object({ type: z.literal("add_block"), block: wsBlockSchema }),
+    z.object({ type: z.literal("note"), text: z.string().min(1) }),
+  ]),
+});
+export const workspaceEvolveSchema = z.object({
+  summary: z.string().max(400).optional(),
+  suggestion: wsSuggestionSchema.optional(),
+});
+export type WorkspaceEvolveOutput = z.infer<typeof workspaceEvolveSchema>;
+
 /**
  * GOAL CAMPAIGN — Synapse decomposes a goal into the fronts that must be won, names the current
  * bottleneck, and picks the single next critical move. Turns a tracked goal into an executed one.
@@ -151,6 +166,12 @@ export const goalPlanSchema = z.object({
   fronts: z.array(frontSpecSchema).min(2).max(7),
   bottleneck: z.string().optional(),
   nextMove: z.object({ title: z.string().min(1), when: z.string().optional(), minutes: z.number().optional(), why: z.string().optional() }).optional(),
+  mission: z.string().optional(),
+  greatestRisk: z.string().optional(),
+  belief: z.string().optional(),
+  counterBelief: z.string().optional(),
+  openQuestion: z.string().optional(),
+  evidence: z.array(z.string()).max(6).optional(),
 });
 export type GoalPlanOutput = z.infer<typeof goalPlanSchema>;
 

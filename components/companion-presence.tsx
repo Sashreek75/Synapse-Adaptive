@@ -16,7 +16,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter, usePathname } from "next/navigation";
-import { ArrowRight, Home, X } from "lucide-react";
+import { ArrowRight, Home, Wrench, X } from "lucide-react";
 import { SynapseOrb } from "@/components/synapse/orb";
 import { useHealth } from "@/components/providers/health-store";
 import { useSubscription } from "@/components/providers/subscription-provider";
@@ -28,8 +28,8 @@ import { readMomentum } from "@/lib/momentum";
 import { convictionContextLines } from "@/lib/convictions";
 import { activityContextBlock, witness } from "@/lib/activity";
 import { detectNavIntent } from "@/lib/nav-intent";
-import { detectBuildIntent } from "@/lib/build-intent";
-import { createWorkspaceFromRequest } from "@/lib/workspaces";
+import { detectBuildIntent, extractBuildOffer } from "@/lib/build-intent";
+import { createWorkspaceFromRequest, workspaceContextBlock } from "@/lib/workspaces";
 import { goalsContextBlock, findOrCreateGoal, decomposeGoal } from "@/lib/goals";
 import { detectGoalIntent } from "@/lib/goal-intent";
 import { detectFocusIntent, type FocusIntent } from "@/lib/focus-intent";
@@ -79,6 +79,11 @@ export function CompanionPresence() {
   }, []);
 
   const scroll = () => requestAnimationFrame(() => endRef.current?.scrollIntoView({ behavior: "smooth" }));
+
+  // Synapse offered to build a tool — create it and open the space.
+  const buildFromOffer = useCallback((description: string) => {
+    createWorkspaceFromRequest(description).then((ws) => { setOpen(false); try { router.push("/workspaces/" + ws.id); } catch {} }).catch(() => {});
+  }, [router]);
 
   // Start a real focus session straight from the orb — the Focus Companion takes over the corner.
   const startOrbFocus = useCallback((goal: string | undefined, minutes: number) => {
@@ -142,6 +147,7 @@ export function CompanionPresence() {
         "The user is currently looking at " + describePage(here) + ". If they ask what something here means — a check-in question, one of their numbers, what the weekly report is saying — answer it directly and specifically, using what you know about them. They are already on this page, so never offer to take them where they already are.",
         goal ? "They are working to become: " + goal + "." : "",
         goalsContextBlock(),
+        workspaceContextBlock(),
         activityContextBlock(),
         ...convictionContextLines(),
         mom.observation ? "Momentum: " + mom.observation : "",
@@ -174,11 +180,21 @@ export function CompanionPresence() {
             <button onClick={() => setOpen(false)} aria-label="Close" className="grid h-8 w-8 place-items-center rounded-full text-muted hover:bg-surface-2 hover:text-ink"><X className="h-4 w-4" /></button>
           </div>
           <div className="max-h-64 space-y-2 overflow-y-auto px-4 py-3">
-            {msgs.map((m) => (
-              <div key={m.id} className={cn("flex", m.from === "you" ? "justify-end" : "justify-start")}>
-                <p className={cn("max-w-[85%] rounded-2xl px-3 py-1.5 text-sm leading-relaxed", m.from === "you" ? "bg-navy-900 text-white" : "bg-surface-2 text-ink")}>{m.text}</p>
-              </div>
-            ))}
+            {msgs.map((m) => {
+              const off = m.from === "synapse" ? extractBuildOffer(m.text) : { description: null as string | null, cleaned: m.text };
+              const desc = off.description;
+              return (
+                <div key={m.id} className={cn("flex flex-col gap-1", m.from === "you" ? "items-end" : "items-start")}>
+                  <p className={cn("max-w-[85%] rounded-2xl px-3 py-1.5 text-sm leading-relaxed", m.from === "you" ? "bg-navy-900 text-white" : "bg-surface-2 text-ink")}>{off.cleaned}</p>
+                  {desc && (
+                    <button onClick={() => buildFromOffer(desc)}
+                      className="inline-flex items-center gap-1.5 self-start rounded-full border border-orange-300/60 bg-orange-500/10 px-2.5 py-1 text-xs font-medium text-ink transition hover:bg-orange-500/15">
+                      <Wrench className="h-3.5 w-3.5 text-orange-500" /> Build it
+                    </button>
+                  )}
+                </div>
+              );
+            })}
             {busy && <p className="text-sm text-muted">Thinking…</p>}
             <div ref={endRef} />
           </div>

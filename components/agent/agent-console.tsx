@@ -2,9 +2,10 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { detectFocusIntent, type FocusIntent } from "@/lib/focus-intent";
-import { detectBuildIntent } from "@/lib/build-intent";
+import { detectBuildIntent, extractBuildOffer } from "@/lib/build-intent";
 import { createWorkspaceFromRequest } from "@/lib/workspaces";
 import { goalsContextBlock, findOrCreateGoal, decomposeGoal } from "@/lib/goals";
+import { workspaceContextBlock } from "@/lib/workspaces";
 import { detectGoalIntent } from "@/lib/goal-intent";
 import { useRouter } from "next/navigation";
 import { detectNavIntent } from "@/lib/nav-intent";
@@ -14,7 +15,7 @@ import { openCommitment, commitmentAwaitingReport, loadCommitments } from "@/lib
 import { readMomentum } from "@/lib/momentum";
 import { convictionContextLines } from "@/lib/convictions";
 import { witness, activityContextBlock } from "@/lib/activity";
-import { Send, Eye, BookOpen, Compass, Sparkles, Target, CalendarCheck, Activity, Eraser, Timer } from "lucide-react";
+import { Send, Eye, BookOpen, Compass, Sparkles, Target, CalendarCheck, Activity, Eraser, Timer, Wrench } from "lucide-react";
 import { preGate, CRISIS_RESPONSE } from "@/ai/safety";
 import { useHealth } from "@/components/providers/health-store";
 import { signalMeta } from "@/lib/signals";
@@ -102,6 +103,7 @@ export function AgentConsole({ embedded = false, immersive = false }: { embedded
     const who = [
       `Name: ${profile.displayName || "User"}`,
       goalsContextBlock(),
+      workspaceContextBlock(),
       (mind.trajectory?.statement || profile.definitionOfBetter) && `Working to become: ${mind.trajectory?.statement || profile.definitionOfBetter} (the objective — weigh advice against whether it moves them toward this)`,
       profile.aiSummary && `Profile: ${profile.aiSummary}`,
       `What they care about most: ${focus}`,
@@ -239,6 +241,19 @@ export function AgentConsole({ embedded = false, immersive = false }: { embedded
 
   function scrollDown() { requestAnimationFrame(() => endRef.current?.scrollIntoView({ behavior: "smooth" })); }
 
+  // Synapse offered to build a tool — turn that into a real workspace and open it.
+  async function buildFromOffer(description: string) {
+    try { const ws = await createWorkspaceFromRequest(description, { goals: profile.goals }); router.push(`/workspaces/${ws.id}`); } catch {}
+  }
+  function OfferButton({ desc }: { desc: string }) {
+    return (
+      <button onClick={() => void buildFromOffer(desc)}
+        className="mt-1 inline-flex items-center gap-1.5 rounded-full border border-orange-300/60 bg-orange-500/10 px-3 py-1.5 text-sm font-medium text-ink transition hover:-translate-y-0.5 hover:bg-orange-500/15">
+        <Wrench className="h-4 w-4 text-orange-500" /> Build it: {desc}
+      </button>
+    );
+  }
+
   async function send(text: string) {
     const q = text.trim(); if (!q || busy) return;
     if (free && usedToday >= FREE_CAP) {
@@ -345,7 +360,7 @@ export function AgentConsole({ embedded = false, immersive = false }: { embedded
                 <SynapseOrb size={28} state={busy ? "thinking" : "idle"} className="mt-1 shrink-0 sm:hidden" />
                 <SynapseOrb size={30} state={busy ? "thinking" : "idle"} className="mt-1 hidden shrink-0 sm:block" />
                 <div className="min-w-0 flex-1 space-y-2.5">
-                  {m.content && <RichText text={m.content} />}
+                  {m.content && (() => { const off = extractBuildOffer(m.content); const desc = off.description; return (<>{off.cleaned && <RichText text={off.cleaned} />}{desc && <OfferButton desc={desc} />}</>); })()}
                   {m.sections?.map((s, i) => {
                     const meta = sectionMeta[s.kind]; const Icon = meta.icon;
                     return (
@@ -470,7 +485,7 @@ export function AgentConsole({ embedded = false, immersive = false }: { embedded
             <div key={m.id} className="flex gap-3">
               <span className="grid h-8 w-8 shrink-0 place-items-center rounded-xl bg-gradient-to-br from-orange-500 to-navy-700 text-white"><Sparkles className="h-4 w-4" /></span>
               <div className="max-w-[82%] space-y-2.5">
-                {m.content && <div className="rounded-2xl rounded-tl-md border bg-surface-2 px-4 py-3 leading-relaxed text-ink">{m.content}</div>}
+                {m.content && (() => { const off = extractBuildOffer(m.content); const desc = off.description; return (<>{off.cleaned && <div className="rounded-2xl rounded-tl-md border bg-surface-2 px-4 py-3 leading-relaxed text-ink">{off.cleaned}</div>}{desc && <OfferButton desc={desc} />}</>); })()}
                 {m.sections?.map((s, i) => {
                   const meta = sectionMeta[s.kind]; const Icon = meta.icon;
                   return (

@@ -26,3 +26,17 @@ export function detectBuildIntent(text: string): boolean {
 export function buildRequestSummary(text: string): string {
   return (text || "").trim().replace(/\s+/g, " ").slice(0, 160);
 }
+
+/**
+ * PROACTIVE OFFERS — the companion doesn't just answer, it offers to BUILD when a tool would help
+ * more than a paragraph. The model appends an invisible tag `[[build: description]]`; we strip it
+ * from what the user reads and turn it into a "Build it" affordance. Deterministic, no engine.
+ */
+export function extractBuildOffer(text: string): { description: string | null; cleaned: string } {
+  const raw = text || "";
+  const m = raw.match(/\[\[\s*build\s*:\s*([^\]]+?)\s*\]\]/i);
+  if (!m) return { description: null, cleaned: raw };
+  const description = (m[1] || "").trim();
+  const cleaned = raw.replace(m[0], "").replace(/[ \t]+\n/g, "\n").replace(/\n{3,}/g, "\n\n").trim();
+  return { description: description || null, cleaned };
+}
