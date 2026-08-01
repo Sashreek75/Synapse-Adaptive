@@ -5,6 +5,7 @@ import { witness } from "@/lib/activity";
 import Link from "next/link";
 import { Printer, TrendingUp, TrendingDown, Eye, Lightbulb, LifeBuoy, Brain, MessageCircle, Activity, Sparkles, ListChecks, PencilLine, CalendarCheck, BookOpen, HelpCircle } from "lucide-react";
 import { ConvictionCard } from "@/components/dashboard/conviction-card";
+import { WeeklyMissions } from "@/components/report/weekly-missions";
 import { Card, CardBody, Button, ConfidenceChip, Skeleton } from "@/components/ui/primitives";
 import { SynapseOrb } from "@/components/synapse/orb";
 import { InsightExplain } from "@/components/synapse/insight-explain";
@@ -203,6 +204,8 @@ export default function WeeklyReportPage() {
           </>
         )}
       </CardBody></div></Card>
+
+      <WeeklyMissions />
 
       {/* THE FLAGSHIP COACHING SESSION — written for one person, not a summary. */}
       <Card className="overflow-hidden sa-rise-2"><CardBody className="sm:p-7">
