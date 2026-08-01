@@ -37,6 +37,11 @@ export const metadata: Metadata = {
     googleBot: { index: true, follow: true, "max-image-preview": "large", "max-snippet": -1, "max-video-preview": -1 },
   },
   category: "productivity",
+  // Google Search Console (URL-prefix property, "HTML tag" method).
+  // Renders <meta name="google-site-verification" content="..."> into <head>.
+  verification: {
+    google: "IyfD8XLrFQDIbEn3cv9FMGiPi6JtXDhAohKuCA73anc",
+  },
 };
 
 export const viewport = { themeColor: "#0b1f3a", width: "device-width", initialScale: 1, viewportFit: "cover" as const };
