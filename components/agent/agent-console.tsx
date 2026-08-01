@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { detectFocusIntent, type FocusIntent } from "@/lib/focus-intent";
+import { detectFocusIntent, extractFocusOffer, type FocusIntent } from "@/lib/focus-intent";
 import { detectBuildIntent, extractBuildOffer } from "@/lib/build-intent";
 import { createWorkspaceFromRequest } from "@/lib/workspaces";
 import { goalsContextBlock, findOrCreateGoal, decomposeGoal } from "@/lib/goals";
@@ -124,7 +124,7 @@ export function AgentConsole({ embedded = false, immersive = false }: { embedded
       })(),
       "App capability: their numbers exist behind the scenes, but lead with what they MEAN and where they're headed, not charts. If they want to SEE their numbers, the app takes them there when they ask, then summarize the key movements in plain words.",
       "If they want to check in, reflect, see their numbers, or open their weekly review, the app takes them there automatically the moment they ask, so NEVER hand out links or file paths (never write things like slash-daily). Refer to places by name: today's snapshot, your numbers, your weekly review, the You page.",
-      "You CAN start a focus timer / study session right here: when they ask for a timer or to focus, study, or work, a small \"how long?\" chooser appears in the chat — have them pick a length and you'll keep time beside them as a floating companion. Never say you can't set a timer.",
+      "A focus timer is a tool you OFFER when it would genuinely help them BEGIN deep work — offer it and append the tag [[focus: what they're working on | minutes]] (minutes optional); it becomes a \"Start a focus session\" button. Decide from context, never keywords: only when they're actually starting work, never when they're reflecting on a past session, venting, or need care. If they explicitly ask (\"time me for 25\"), a chooser appears automatically.",
       "Short cognitive 'sharpness' tasks exist if they want them; if you suggest one, just say so in plain words, no links or paths.",
     ].filter(Boolean).join("\n");
     if (!hasData) return who;
@@ -253,6 +253,15 @@ export function AgentConsole({ embedded = false, immersive = false }: { embedded
       </button>
     );
   }
+  function startFocusFromOffer(goal?: string, minutes?: number) { setPendingFocus({ focus: true, goal, minutes }); scrollDown(); }
+  function FocusOfferButton({ goal, minutes }: { goal?: string; minutes?: number }) {
+    return (
+      <button onClick={() => startFocusFromOffer(goal, minutes)}
+        className="mt-1 inline-flex items-center gap-1.5 rounded-full border border-orange-300/60 bg-orange-500/10 px-3 py-1.5 text-sm font-medium text-ink transition hover:-translate-y-0.5 hover:bg-orange-500/15">
+        <Timer className="h-4 w-4 text-orange-500" /> Start a focus session{goal ? `: ${goal}` : ""}
+      </button>
+    );
+  }
 
   async function send(text: string) {
     const q = text.trim(); if (!q || busy) return;
@@ -360,7 +369,7 @@ export function AgentConsole({ embedded = false, immersive = false }: { embedded
                 <SynapseOrb size={28} state={busy ? "thinking" : "idle"} className="mt-1 shrink-0 sm:hidden" />
                 <SynapseOrb size={30} state={busy ? "thinking" : "idle"} className="mt-1 hidden shrink-0 sm:block" />
                 <div className="min-w-0 flex-1 space-y-2.5">
-                  {m.content && (() => { const off = extractBuildOffer(m.content); const desc = off.description; return (<>{off.cleaned && <RichText text={off.cleaned} />}{desc && <OfferButton desc={desc} />}</>); })()}
+                  {m.content && (() => { const bo = extractBuildOffer(m.content); const fo = extractFocusOffer(bo.cleaned); const desc = bo.description; return (<>{fo.cleaned && <RichText text={fo.cleaned} />}{desc && <OfferButton desc={desc} />}{fo.offered && <FocusOfferButton goal={fo.goal} minutes={fo.minutes} />}</>); })()}
                   {m.sections?.map((s, i) => {
                     const meta = sectionMeta[s.kind]; const Icon = meta.icon;
                     return (
@@ -485,7 +494,7 @@ export function AgentConsole({ embedded = false, immersive = false }: { embedded
             <div key={m.id} className="flex gap-3">
               <span className="grid h-8 w-8 shrink-0 place-items-center rounded-xl bg-gradient-to-br from-orange-500 to-navy-700 text-white"><Sparkles className="h-4 w-4" /></span>
               <div className="max-w-[82%] space-y-2.5">
-                {m.content && (() => { const off = extractBuildOffer(m.content); const desc = off.description; return (<>{off.cleaned && <div className="rounded-2xl rounded-tl-md border bg-surface-2 px-4 py-3 leading-relaxed text-ink">{off.cleaned}</div>}{desc && <OfferButton desc={desc} />}</>); })()}
+                {m.content && (() => { const bo = extractBuildOffer(m.content); const fo = extractFocusOffer(bo.cleaned); const desc = bo.description; return (<>{fo.cleaned && <div className="rounded-2xl rounded-tl-md border bg-surface-2 px-4 py-3 leading-relaxed text-ink">{fo.cleaned}</div>}{desc && <OfferButton desc={desc} />}{fo.offered && <FocusOfferButton goal={fo.goal} minutes={fo.minutes} />}</>); })()}
                 {m.sections?.map((s, i) => {
                   const meta = sectionMeta[s.kind]; const Icon = meta.icon;
                   return (

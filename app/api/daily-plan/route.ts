@@ -27,6 +27,8 @@ interface DailyPlanRequest {
   openQuestions?: string[];
   checkInCount?: number;
   dayOfWeek?: string;
+  partOfDay?: string;
+  localTime?: string;
 }
 
 const CORE = new Set(["sleep_quality", "fatigue", "stress", "mood", "symptoms"]);
@@ -76,6 +78,7 @@ export async function POST(req: Request) {
   const user = [
     `Path focus: ${body.focusNoun || body.pathLabel || body.path || "personal growth"}`,
     `Day of week: ${body.dayOfWeek || new Date().toLocaleDateString("en-US", { weekday: "long" })}`,
+    `Time of day: ${body.partOfDay || "unknown"}${body.localTime ? ` (${body.localTime})` : ""} — ask questions that fit THIS moment: morning = last night's sleep + energy + what they intend today; midday/afternoon = energy now + what's moved SO FAR (the day is NOT over); evening = reflect on how today went.`,
     `Check-ins so far: ${body.checkInCount ?? 0}`,
     `Goals: ${(body.goals ?? []).slice(0, 5).join("; ") || "none stated yet"}`,
     "",

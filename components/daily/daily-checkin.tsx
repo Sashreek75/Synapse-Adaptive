@@ -141,12 +141,12 @@ function buildFallbackPlan(seed: number): DailyCheckinOutput {
     [moodScale, sleepScale, stressChoice, eventNote],
     [stressScale, energyChoice, moodChoice, eventNote],
   ];
-  const greeting = variant([
-    "Let's take a quick read on today.",
-    "A quick moment to check in — how did today actually go?",
-    "Here's today's check-in, tuned a little differently than last time.",
-    "Let's capture today while it's fresh.",
-  ], seed, 4);
+  const gh = new Date().getHours();
+  const greeting = gh < 12
+    ? variant(["Morning — let's line up today.", "A quick morning check-in before you dive in.", "Let's set the tone for today."], seed, 4)
+    : gh < 18
+    ? variant(["A midday check-in — how's it going so far?", "Quick pulse on your day so far.", "Let's catch where today's at."], seed, 4)
+    : variant(["Let's take a quick read on how today went.", "Evening check-in — how did today go?", "Let's capture today while it's fresh."], seed, 4);
   return { greeting, items: templates[seed % templates.length] };
 }
 
@@ -179,7 +179,13 @@ export function DailyCheckIn() {
     sleep: variant(SLEEP_Q, seed, 0), energy: variant(ENERGY_Q, seed, 1),
     stress: variant(STRESS_Q, seed, 2), mood: variant(MOOD_Q, seed, 3), event: variant(EVENT_Q, seed, 7),
   }), [seed]);
-  const progressLabel = useMemo(() => (plan && plan.progressPrompt) ? plan.progressPrompt : variant(PROGRESS_Q, seed, 9), [plan, seed]);
+  const progressLabel = useMemo(() => {
+    if (plan && plan.progressPrompt) return plan.progressPrompt;
+    const h = new Date().getHours();
+    if (h < 12) return "What do you want to move forward today?";
+    if (h < 18) return variant(["What have you moved forward so far today?", "What's one thing you've pushed forward so far?", "Where have you made headway so far?"], seed, 9);
+    return variant(PROGRESS_Q, seed, 9);
+  }, [plan, seed]);
 
   useEffect(() => {
     const key = `synapse.dailyplan.v3.${new Date().toISOString().slice(0, 10)}`;
@@ -203,6 +209,8 @@ export function DailyCheckIn() {
         openQuestions: mind.openQuestions.filter((q) => q.status === "open").map((q) => q.question),
         checkInCount: checkIns.length,
         dayOfWeek: new Date().toLocaleDateString(undefined, { weekday: "long" }),
+        partOfDay: (() => { const h = new Date().getHours(); return h < 12 ? "morning" : h < 17 ? "afternoon" : h < 21 ? "evening" : "night"; })(),
+        localTime: new Date().toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" }),
       }),
     })
       .then((r) => r.json())

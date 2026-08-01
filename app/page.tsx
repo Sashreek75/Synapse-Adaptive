@@ -88,18 +88,18 @@ function Hero() {
               <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-orange-400 opacity-60" />
               <span className="relative inline-flex h-2 w-2 rounded-full bg-orange-500" />
             </span>
-            Not a chatbot — a companion who helps you follow through
+            Not a chatbot — an operating system for your goals
           </div>
 
           <h1 className="animate-fade-up mt-6 text-balance text-5xl font-bold leading-[1.05] tracking-tight text-ink sm:text-6xl xl:text-7xl">
-            The companion who helps you follow through
-            <span className="block sa-gradient-text">and become who you want to be.</span>
+            The support for your
+            <span className="block sa-gradient-text">embarrassingly big goals.</span>
           </h1>
 
           <p className="animate-fade-up mx-auto mt-6 max-w-xl text-lg leading-relaxed text-muted lg:mx-0">
-            Synapse is an adaptive companion for the long run. It remembers what
-            you&apos;re working toward, notices when you drift, and keeps you moving —
-            turning good intentions into real progress, day after day.
+            Synapse turns the goals you&apos;re almost afraid to say out loud into missions it
+            helps you actually win — breaking each one down, hunting the real bottleneck, building
+            the tools you need, and refusing to let it quietly slip.
           </p>
 
           <div className="animate-fade-up mt-9 flex flex-col items-center justify-center gap-3 sm:flex-row lg:justify-start">
@@ -112,8 +112,8 @@ function Hero() {
           </div>
 
           <div className="animate-fade-up mt-8 flex flex-wrap items-center justify-center gap-x-6 gap-y-2 text-sm text-muted lg:justify-start">
-            <span className="inline-flex items-center gap-1.5"><Timer className="h-4 w-4 text-navy-400" /> Keeps you moving</span>
-            <span className="inline-flex items-center gap-1.5"><ShieldCheck className="h-4 w-4 text-navy-400" /> Remembers what matters</span>
+            <span className="inline-flex items-center gap-1.5"><Timer className="h-4 w-4 text-navy-400" /> Turns goals into missions</span>
+            <span className="inline-flex items-center gap-1.5"><ShieldCheck className="h-4 w-4 text-navy-400" /> Builds the tools you need</span>
             <span className="inline-flex items-center gap-1.5"><Lock className="h-4 w-4 text-navy-400" /> Private by design</span>
           </div>
 
@@ -430,12 +430,11 @@ function CTA() {
         <div className="relative">
           <div className="mx-auto mb-7 w-fit"><SynapseOrb size={72} /></div>
           <h2 className="mx-auto max-w-2xl text-balance text-3xl font-semibold tracking-tight sm:text-4xl">
-            Meet the companion who helps you actually follow through.
+            Meet the support for your embarrassingly big goals.
           </h2>
           <p className="mx-auto mt-4 max-w-xl text-navy-100/80">
-            Not another tracker — a companion that remembers what you&apos;re working toward,
-            protects your momentum, and helps you become who you want to be. The longer you
-            use it, the more it&apos;s worth.
+            Name the goal you keep putting off. Synapse turns it into a mission it helps you
+            win — the plan, the tools, the accountability — and won&apos;t let it quietly disappear.
           </p>
           <Link href="/login" className="mt-9 inline-block">
             <Button size="lg" className="sa-shine">Meet Synapse <ArrowRight className="h-4 w-4" /></Button>

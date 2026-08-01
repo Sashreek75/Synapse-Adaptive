@@ -1,15 +1,13 @@
 "use client";
 
 /**
- * FIRST-RUN GUIDE — a short, friendly walkthrough of how to get around the new
- * Synapse. It runs once, right after onboarding, so a first-time user never has
- * to guess where things are. Deliberately not anchored to specific DOM nodes
- * (which move as the UI evolves) — it's a calm, self-contained set of cards.
- * Replayable from Settings via resetTour().
+ * FIRST-RUN GUIDE — a short walkthrough of how Synapse works, centred on GOALS. It runs once,
+ * right after onboarding. Deliberately not anchored to DOM nodes (which move as the UI evolves)
+ * — it's a calm, self-contained set of cards. Replayable from Settings via resetTour().
  */
 
 import { useState } from "react";
-import { ArrowRight, Menu, Sun, LineChart, Eraser, MessageCircle, Timer } from "lucide-react";
+import { ArrowRight, Target, Flag, MessageCircle, Wrench, CalendarCheck, ShieldCheck } from "lucide-react";
 import { useHealth } from "@/components/providers/health-store";
 import { SynapseOrb } from "@/components/synapse/orb";
 import { Button } from "@/components/ui/primitives";
@@ -17,34 +15,34 @@ import { cn } from "@/lib/utils";
 
 const steps = [
   {
+    icon: Target,
+    title: "Start with your goals",
+    body: "Synapse is a goal operating system. Name the things you're working toward — even the embarrassingly big ones. Just the goal is enough; it learns the rest as you go.",
+  },
+  {
+    icon: Flag,
+    title: "Each goal becomes a mission",
+    body: "Synapse breaks a goal into the fronts you have to win, hunts the real bottleneck (often not the obvious one), and always leaves you one clear next move — then reassesses as reality changes.",
+  },
+  {
     icon: MessageCircle,
-    title: "This is a conversation",
-    body: "Synapse is the product — not a dashboard. Just talk to it like a coach who knows you. It reasons over your own history and always ends with one clear next step.",
+    title: "Talk to it anywhere",
+    body: "The orb travels with you on every page. Ask anything, and it can take you where you need to go, keep you accountable, or notice when an important goal is quietly slipping.",
   },
   {
-    icon: Menu,
-    title: "The menu is how you ask",
-    body: "Tap the menu (top-right): Talk, Focus, and You, plus your weekly review. Most items drop a question straight into the chat and Synapse answers right away.",
+    icon: Wrench,
+    title: "It builds what you need",
+    body: "When a tool would help more than a paragraph — a mock interview, a tracker, a study plan — Synapse offers to build it. Your spaces attach to your goals, remember your progress, and improve over time.",
   },
   {
-    icon: Sun,
-    title: "Check in to get smarter",
-    body: "A 20-second daily check-in is how Synapse learns your patterns. The more you check in, the more personal — and more useful — it becomes each week.",
+    icon: CalendarCheck,
+    title: "Check in, review weekly",
+    body: "A quick daily check-in keeps things sharp. Each week, your review lands focused on your missions and follow-through — what moved, what's stuck, and what to do next.",
   },
   {
-    icon: Timer,
-    title: "A focus companion, on tap",
-    body: "Tell Synapse what you are working on and it tucks into the corner as a quiet orb — it keeps time, stays out of your way, and you can talk to it any moment without losing your flow. Pop it out and it stays beside you even in other tabs.",
-  },
-  {
-    icon: LineChart,
-    title: "You — how Synapse sees you",
-    body: "Open You any time to see what Synapse has learned about how you work — your patterns, what's helping, and what it's still figuring out.",
-  },
-  {
-    icon: Eraser,
-    title: "Start fresh anytime",
-    body: "Hit “Clear chat” for a clean space whenever you like. Synapse still remembers everything that matters — clearing is just for you.",
+    icon: ShieldCheck,
+    title: "It won't let goals slip",
+    body: "Synapse's job isn't to answer questions — it's to help you actually reach the goals you chose, and to stay with you until something has really changed.",
   },
 ];
 
@@ -80,7 +78,7 @@ export function FeatureTour() {
           <div className="flex items-center gap-2">
             {!last && <button onClick={completeTour} className="rounded-full px-3 py-2 text-sm text-muted hover:text-ink">Skip</button>}
             <Button size="sm" onClick={() => (last ? completeTour() : setI((n) => n + 1))}>
-              {last ? "Start talking" : "Next"} <ArrowRight className="h-4 w-4" />
+              {last ? "Name your first goal" : "Next"} <ArrowRight className="h-4 w-4" />
             </Button>
           </div>
         </div>

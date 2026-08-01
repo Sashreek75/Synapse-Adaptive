@@ -33,9 +33,8 @@ export default function GoalsPage() {
   const add = () => {
     const t = title.trim();
     if (!t) return;
-    const g = addGoal({ title: t });
+    addGoal({ title: t });
     setTitle("");
-    router.push(`/goals/${g.id}`);
   };
 
   return (
@@ -44,7 +43,7 @@ export default function GoalsPage() {
         <SynapseOrb size={40} className="shrink-0" />
         <div>
           <h1 className="text-2xl font-semibold tracking-tight text-ink">Your goals</h1>
-          <p className="text-sm text-muted">The things that matter most — everything I do is in service of these.</p>
+          <p className="text-sm text-muted">List the things you&apos;re working toward — big or small. Just the goal is enough; I&apos;ll learn the rest as we go.</p>
         </div>
       </header>
 

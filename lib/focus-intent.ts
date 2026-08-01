@@ -37,6 +37,18 @@ export function detectFocusIntent(text: string): FocusIntent {
   const t = raw.toLowerCase();
   if (!CUES.some((r) => r.test(t))) return { focus: false };
 
+  // VETO — a timer is for STARTING work, not for reflecting on a session that already happened,
+  // venting, or asking for care. Unless they EXPLICITLY ask to start one, back off so the
+  // conversation can respond with understanding instead of shoving a stopwatch at them.
+  const STRONG_START = /\b(start (a|the|my)? ?(timer|focus|session|pomodoro|clock)|time me|set (a|the) timer|pomodoro|lock in|i'?m about to)\b/;
+  const PAST = /\b(just|already|earlier|yesterday|last night|this morning|today|a while ago)\s+(hit|did|had|finished|completed|wrapped|got through|got out of|studied|worked|practiced|went)\b/;
+  const REFLECT = /\b(didn'?t|don'?t think i|not sure i|feel like i|felt|wasn'?t (great|good|productive)|went (badly|poorly|terribly|ok|okay|alright|fine))\b/;
+  const EMOTION = /\b(sad|upset|discouraged|defeated|demoralized|burn(ed|t)[\s-]?out|exhausted|drained|overwhelmed|unmotivated|frustrated|hopeless|miserable|deflated)\b|\b(feeling|feel|i'?m|im|so|really|a bit|bit|pretty|kind of|kinda|a little|little|quite) (down|low|blue)\b/;
+  const ASK_HELP = /\b(what (should|do|can) i do|make (the rest of )?my day better|how (do|can) i (feel|get) better|don'?t know what to do|rest of my day)\b/;
+  if (!STRONG_START.test(t) && (PAST.test(t) || REFLECT.test(t) || EMOTION.test(t) || ASK_HELP.test(t))) {
+    return { focus: false };
+  }
+
   // Duration, if mentioned ("25 min", "for an hour", "90m").
   let minutes: number | undefined;
   const mm = t.match(/(\d{1,3})\s*(?:minutes?|mins?|m)\b/);
@@ -59,4 +71,24 @@ export function detectFocusIntent(text: string): FocusIntent {
     if (goal && /\b(work session|focus session|study session|deep work|lock in|heads?[\s-]?down|timer|pomodoro|the zone)\b/i.test(goal)) goal = undefined;
   }
   return { focus: true, goal, minutes };
+}
+
+/**
+ * MODEL-DRIVEN FOCUS OFFER — Synapse decides (from context, not keywords) that a timer would help
+ * and appends `[[focus: goal | minutes]]`. We strip it and turn it into a "Start a focus session"
+ * affordance. This is what makes focus part of the adaptive companion rather than a trigger word.
+ */
+export function extractFocusOffer(text: string): { offered: boolean; goal?: string; minutes?: number; cleaned: string } {
+  const raw = text || "";
+  const m = raw.match(/\[\[\s*focus\s*:\s*([^\]]*?)\s*\]\]/i);
+  if (!m) return { offered: false, cleaned: raw };
+  let goal: string | undefined;
+  let minutes: number | undefined;
+  for (const part of (m[1] || "").split("|").map((s) => s.trim()).filter(Boolean)) {
+    const mm = part.match(/^(\d{1,3})\s*(?:m|min|mins|minutes)?$/i);
+    if (mm) minutes = Math.min(180, Math.max(5, parseInt(mm[1], 10)));
+    else if (!goal) goal = part;
+  }
+  const cleaned = raw.replace(m[0], "").replace(/[ \t]+\n/g, "\n").replace(/\n{3,}/g, "\n\n").trim();
+  return { offered: true, goal, minutes, cleaned };
 }

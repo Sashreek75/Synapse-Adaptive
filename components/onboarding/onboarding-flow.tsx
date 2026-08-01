@@ -92,7 +92,8 @@ export function OnboardingFlow() {
     const statement = aspiration.trim() || `make progress on ${pathLabel.toLowerCase()}`;
     saveMind({ ...mind, trajectory: { statement, horizon: "months", updatedAt: new Date().toISOString() } });
     try { witness("trajectory_changed", statement); witness("onboarding_updated"); } catch {}
-    router.push("/dashboard");
+    // Goals are the center — the first thing after onboarding is naming what you're working toward.
+    router.push("/goals");
   }
 
   return (

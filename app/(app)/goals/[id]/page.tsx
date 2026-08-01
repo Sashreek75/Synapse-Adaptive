@@ -35,6 +35,7 @@ export default function GoalDetailPage() {
   const [newFront, setNewFront] = useState("");
   const [planning, setPlanning] = useState(false);
   const [buildingKit, setBuildingKit] = useState(false);
+  const [showDetail, setShowDetail] = useState(false);
   const [outcomeOpen, setOutcomeOpen] = useState(false);
   const [outcomeText, setOutcomeText] = useState("");
   const [verdict, setVerdict] = useState<OutcomeVerdict | "">("");
@@ -192,7 +193,7 @@ export default function GoalDetailPage() {
           <h2 className="text-sm font-semibold text-ink">The campaign</h2>
           {goal.fronts.length > 0 && <button onClick={breakIntoPlan} disabled={planning} className="inline-flex items-center gap-1 text-xs font-medium text-muted hover:text-ink"><RefreshCw className={cn("h-3.5 w-3.5", planning && "animate-spin")} /> Reassess</button>}
         </div>
-        <div className="mt-2"><Field label="Current bottleneck (the real reason it isn't moving)"><input value={goal.bottleneck ?? ""} onChange={(e) => set({ bottleneck: e.target.value })} placeholder="e.g. math timing, not effort" className={inputCls} /></Field></div>
+        <div className="mt-2"><Field label="Current bottleneck (optional — or let me find it)"><input value={goal.bottleneck ?? ""} onChange={(e) => set({ bottleneck: e.target.value })} placeholder="Leave it blank and hit Break into a plan — I'll figure it out" className={inputCls} /></Field></div>
         {goal.fronts.length > 0 && (
           <div className="mt-3 space-y-2">
             {goal.fronts.map((f) => (
@@ -256,18 +257,27 @@ export default function GoalDetailPage() {
         </div>
       )}
 
-      {/* THE LIVING GOAL */}
-      <div className="grid gap-4 sm:grid-cols-3">
-        <Field label="Priority"><select value={goal.priority} onChange={(e) => set({ priority: e.target.value as Goal["priority"] })} className={inputCls}>{PRIORITIES.map((p) => <option key={p} value={p}>{p}</option>)}</select></Field>
-        <Field label="Momentum"><select value={goal.momentum} onChange={(e) => set({ momentum: e.target.value as Goal["momentum"] })} className={inputCls}>{MOMENTA.map((m) => <option key={m} value={m}>{m}</option>)}</select></Field>
-        <Field label="Status"><select value={goal.status} onChange={(e) => set({ status: e.target.value as Goal["status"] })} className={inputCls}>{STATUSES.map((s) => <option key={s} value={s}>{s}</option>)}</select></Field>
+      {/* THE LIVING GOAL — optional; Synapse learns most of this over time, so it stays tucked away. */}
+      <div>
+        <button onClick={() => setShowDetail((v) => !v)} className="inline-flex items-center gap-1.5 text-xs font-medium text-muted hover:text-ink">
+          {showDetail ? "Hide detail" : "Add more detail (optional) — I'll learn most of this as we go"}
+        </button>
       </div>
-      <Field label="Why it matters"><textarea value={goal.why ?? ""} onChange={(e) => set({ why: e.target.value })} rows={2} placeholder="The real reason this matters to you…" className={inputCls} /></Field>
-      <div className="grid gap-4 sm:grid-cols-3">
-        <Field label="Obstacles"><textarea value={obstacles} onChange={(e) => setObstacles(e.target.value)} onBlur={() => set({ obstacles: lines(obstacles) })} rows={3} className={inputCls} /></Field>
-        <Field label="What's worked"><textarea value={works} onChange={(e) => setWorks(e.target.value)} onBlur={() => set({ whatWorks: lines(works) })} rows={3} className={inputCls} /></Field>
-        <Field label="What hasn't"><textarea value={hasnt} onChange={(e) => setHasnt(e.target.value)} onBlur={() => set({ whatHasnt: lines(hasnt) })} rows={3} className={inputCls} /></Field>
-      </div>
+      {showDetail && (
+        <div className="space-y-4">
+          <div className="grid gap-4 sm:grid-cols-3">
+            <Field label="Priority"><select value={goal.priority} onChange={(e) => set({ priority: e.target.value as Goal["priority"] })} className={inputCls}>{PRIORITIES.map((p) => <option key={p} value={p}>{p}</option>)}</select></Field>
+            <Field label="Momentum"><select value={goal.momentum} onChange={(e) => set({ momentum: e.target.value as Goal["momentum"] })} className={inputCls}>{MOMENTA.map((m) => <option key={m} value={m}>{m}</option>)}</select></Field>
+            <Field label="Status"><select value={goal.status} onChange={(e) => set({ status: e.target.value as Goal["status"] })} className={inputCls}>{STATUSES.map((s) => <option key={s} value={s}>{s}</option>)}</select></Field>
+          </div>
+          <Field label="Why it matters"><textarea value={goal.why ?? ""} onChange={(e) => set({ why: e.target.value })} rows={2} placeholder="The real reason this matters to you…" className={inputCls} /></Field>
+          <div className="grid gap-4 sm:grid-cols-3">
+            <Field label="Obstacles"><textarea value={obstacles} onChange={(e) => setObstacles(e.target.value)} onBlur={() => set({ obstacles: lines(obstacles) })} rows={3} className={inputCls} /></Field>
+            <Field label="What's worked"><textarea value={works} onChange={(e) => setWorks(e.target.value)} onBlur={() => set({ whatWorks: lines(works) })} rows={3} className={inputCls} /></Field>
+            <Field label="What hasn't"><textarea value={hasnt} onChange={(e) => setHasnt(e.target.value)} onBlur={() => set({ whatHasnt: lines(hasnt) })} rows={3} className={inputCls} /></Field>
+          </div>
+        </div>
+      )}
 
       <p className="flex items-center gap-1.5 px-1 text-xs text-muted"><AlertTriangle className="h-3.5 w-3.5 text-orange-500" /> This is a live mission — I reassess it from what actually happens, attack the bottleneck, and bring it up when it needs you.</p>
     </div>

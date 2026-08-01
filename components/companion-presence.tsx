@@ -16,7 +16,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter, usePathname } from "next/navigation";
-import { ArrowRight, Home, Wrench, X } from "lucide-react";
+import { ArrowRight, Home, Timer, Wrench, X } from "lucide-react";
 import { SynapseOrb } from "@/components/synapse/orb";
 import { useHealth } from "@/components/providers/health-store";
 import { useSubscription } from "@/components/providers/subscription-provider";
@@ -32,7 +32,7 @@ import { detectBuildIntent, extractBuildOffer } from "@/lib/build-intent";
 import { createWorkspaceFromRequest, workspaceContextBlock } from "@/lib/workspaces";
 import { goalsContextBlock, findOrCreateGoal, decomposeGoal } from "@/lib/goals";
 import { detectGoalIntent } from "@/lib/goal-intent";
-import { detectFocusIntent, type FocusIntent } from "@/lib/focus-intent";
+import { detectFocusIntent, extractFocusOffer, type FocusIntent } from "@/lib/focus-intent";
 import { recordNavUse } from "@/lib/nav-hint";
 import { cn } from "@/lib/utils";
 
@@ -181,15 +181,22 @@ export function CompanionPresence() {
           </div>
           <div className="max-h-64 space-y-2 overflow-y-auto px-4 py-3">
             {msgs.map((m) => {
-              const off = m.from === "synapse" ? extractBuildOffer(m.text) : { description: null as string | null, cleaned: m.text };
-              const desc = off.description;
+              const bo = m.from === "synapse" ? extractBuildOffer(m.text) : { description: null as string | null, cleaned: m.text };
+              const fo = m.from === "synapse" ? extractFocusOffer(bo.cleaned) : { offered: false, goal: undefined as string | undefined, minutes: undefined as number | undefined, cleaned: bo.cleaned };
+              const desc = bo.description;
               return (
                 <div key={m.id} className={cn("flex flex-col gap-1", m.from === "you" ? "items-end" : "items-start")}>
-                  <p className={cn("max-w-[85%] rounded-2xl px-3 py-1.5 text-sm leading-relaxed", m.from === "you" ? "bg-navy-900 text-white" : "bg-surface-2 text-ink")}>{off.cleaned}</p>
+                  <p className={cn("max-w-[85%] rounded-2xl px-3 py-1.5 text-sm leading-relaxed", m.from === "you" ? "bg-navy-900 text-white" : "bg-surface-2 text-ink")}>{fo.cleaned}</p>
                   {desc && (
                     <button onClick={() => buildFromOffer(desc)}
                       className="inline-flex items-center gap-1.5 self-start rounded-full border border-orange-300/60 bg-orange-500/10 px-2.5 py-1 text-xs font-medium text-ink transition hover:bg-orange-500/15">
                       <Wrench className="h-3.5 w-3.5 text-orange-500" /> Build it
+                    </button>
+                  )}
+                  {fo.offered && (
+                    <button onClick={() => setPendingFocus({ focus: true, goal: fo.goal, minutes: fo.minutes })}
+                      className="inline-flex items-center gap-1.5 self-start rounded-full border border-orange-300/60 bg-orange-500/10 px-2.5 py-1 text-xs font-medium text-ink transition hover:bg-orange-500/15">
+                      <Timer className="h-3.5 w-3.5 text-orange-500" /> Start focus{fo.goal ? `: ${fo.goal}` : ""}
                     </button>
                   )}
                 </div>
