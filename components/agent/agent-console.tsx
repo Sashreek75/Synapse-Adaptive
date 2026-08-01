@@ -2,6 +2,10 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { detectFocusIntent, type FocusIntent } from "@/lib/focus-intent";
+import { detectBuildIntent } from "@/lib/build-intent";
+import { createWorkspaceFromRequest } from "@/lib/workspaces";
+import { goalsContextBlock, findOrCreateGoal, decomposeGoal } from "@/lib/goals";
+import { detectGoalIntent } from "@/lib/goal-intent";
 import { useRouter } from "next/navigation";
 import { detectNavIntent } from "@/lib/nav-intent";
 import { NAV_HINT_EXAMPLES, shouldShowNavHints, recordNavUse } from "@/lib/nav-hint";
@@ -97,6 +101,7 @@ export function AgentConsole({ embedded = false, immersive = false }: { embedded
   const context = useMemo(() => {
     const who = [
       `Name: ${profile.displayName || "User"}`,
+      goalsContextBlock(),
       (mind.trajectory?.statement || profile.definitionOfBetter) && `Working to become: ${mind.trajectory?.statement || profile.definitionOfBetter} (the objective — weigh advice against whether it moves them toward this)`,
       profile.aiSummary && `Profile: ${profile.aiSummary}`,
       `What they care about most: ${focus}`,
@@ -246,6 +251,15 @@ export function AgentConsole({ embedded = false, immersive = false }: { embedded
     setChat(next); setInput(""); setBusy(true); scrollDown();
     if (free) { const n = usedToday + 1; setUsedToday(n); try { localStorage.setItem(usageKey, String(n)); } catch {} }
     if (preGate(q).triggered) { setChat([...next, { id: `a_${Date.now()}`, role: "assistant", content: CRISIS_RESPONSE }]); setBusy(false); scrollDown(); return; }
+    // Reshape the product on request — compose a space and take them into it. Never refuse.
+    if (detectBuildIntent(q)) {
+      setChat([...next, { id: `a_${Date.now()}`, role: "assistant" as const, content: "On it — building you a space for that." }]);
+      setBusy(false); scrollDown();
+      createWorkspaceFromRequest(q, { goal: mind.trajectory?.statement, goals: profile.goals }).then((ws) => { try { router.push("/workspaces/" + ws.id); } catch {} }).catch(() => {});
+      return;
+    }
+    // A declared ambition becomes a campaign: create + decompose quietly; the reply still talks it through.
+    try { const gi = detectGoalIntent(q); if (gi) { const { goal, created } = findOrCreateGoal(gi.goal); if (created) decomposeGoal(goal.id).catch(() => {}); } } catch {}
     // Locking in? Offer the timer immediately — deterministic, no model round-trip (that race
     // was showing the chooser a message late). The chooser renders from pendingFocus below.
     const fIntent = detectFocusIntent(q);

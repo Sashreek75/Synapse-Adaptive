@@ -1,0 +1,256 @@
+/**
+ * GOALS — the operating system of Synapse. Everything else orbits these, and a goal is not
+ * "tracked", it is EXECUTED: it decomposes into a campaign of fronts, names its current
+ * bottleneck, and always knows the single next critical move. The product's job is to help
+ * the person actually WIN these — reasoning constantly about "if this goal isn't moving, why?"
+ * and refusing to let an important goal quietly disappear while energy drifts elsewhere.
+ *
+ * Decoupled from the statistical engine / Person Model / memory internals — it only stores
+ * user- and model-authored goal structure. No engine involvement.
+ */
+
+export type GoalPriority = "primary" | "high" | "medium" | "someday";
+export type GoalStatus = "active" | "paused" | "achieved" | "dropped";
+export type GoalMomentum = "new" | "building" | "steady" | "slipping" | "stalled";
+export type FrontStatus = "open" | "active" | "won" | "paused";
+
+export interface Front {
+  id: string;
+  title: string;
+  status: FrontStatus;
+  bottleneck?: string;
+  nextMove?: string;
+  target?: string;   // e.g. SAT 1600
+  current?: string;  // e.g. 1450
+}
+export interface NextMove { title: string; when?: string; minutes?: number; why?: string }
+
+export interface Goal {
+  id: string;
+  title: string;
+  why?: string;
+  priority: GoalPriority;
+  timeline?: string;
+  momentum: GoalMomentum;
+  strategy?: string;
+  obstacles: string[];
+  whatWorks: string[];
+  whatHasnt: string[];
+  notes?: string;
+  fronts: Front[];
+  bottleneck?: string;
+  nextMove?: NextMove;
+  lastProgressAt?: string;
+  status: GoalStatus;
+  createdAt: string;
+  updatedAt: string;
+  order: number;
+}
+
+export const PRIORITIES: GoalPriority[] = ["primary", "high", "medium", "someday"];
+export const MOMENTA: GoalMomentum[] = ["new", "building", "steady", "slipping", "stalled"];
+export const STATUSES: GoalStatus[] = ["active", "paused", "achieved", "dropped"];
+export const FRONT_STATUSES: FrontStatus[] = ["open", "active", "won", "paused"];
+
+const PRIORITY_RANK: Record<GoalPriority, number> = { primary: 0, high: 1, medium: 2, someday: 3 };
+export const MOMENTUM_LABEL: Record<GoalMomentum, string> = {
+  new: "just started", building: "building", steady: "steady", slipping: "slipping", stalled: "stalled",
+};
+
+const KEY = "synapse.goals.v1";
+const EVT = "synapse:goals";
+const canStore = () => typeof window !== "undefined" && !!window.localStorage;
+
+/** Backfill defaults so goals saved before the campaign fields never crash a renderer. */
+function normalize(g: Goal): Goal {
+  return {
+    ...g,
+    obstacles: Array.isArray(g.obstacles) ? g.obstacles : [],
+    whatWorks: Array.isArray(g.whatWorks) ? g.whatWorks : [],
+    whatHasnt: Array.isArray(g.whatHasnt) ? g.whatHasnt : [],
+    fronts: Array.isArray(g.fronts) ? g.fronts : [],
+  };
+}
+
+export function loadGoals(): Goal[] {
+  if (!canStore()) return [];
+  try {
+    const raw = JSON.parse(localStorage.getItem(KEY) || "[]");
+    return Array.isArray(raw)
+      ? (raw as Goal[]).filter((g) => g && typeof g.id === "string" && typeof g.title === "string").map(normalize)
+      : [];
+  } catch { return []; }
+}
+
+export function saveGoals(list: Goal[]): void {
+  if (!canStore()) return;
+  try { localStorage.setItem(KEY, JSON.stringify(list.slice(0, 40))); window.dispatchEvent(new CustomEvent(EVT)); } catch {}
+}
+
+function slug(s: string): string {
+  return (s || "goal").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 32) || "goal";
+}
+function uid(prefix: string): string { return `${prefix}${Date.now().toString(36)}${Math.random().toString(36).slice(2, 5)}`; }
+
+export function addGoal(input: { title: string; why?: string; priority?: GoalPriority; timeline?: string }): Goal {
+  const now = new Date().toISOString();
+  const list = loadGoals();
+  const goal: Goal = {
+    id: `${slug(input.title)}-${Date.now().toString(36)}`,
+    title: input.title.trim(),
+    why: input.why?.trim() || undefined,
+    priority: input.priority || (list.some((g) => g.priority === "primary" && g.status === "active") ? "high" : "primary"),
+    timeline: input.timeline?.trim() || undefined,
+    momentum: "new",
+    strategy: undefined,
+    obstacles: [], whatWorks: [], whatHasnt: [],
+    notes: undefined,
+    fronts: [],
+    bottleneck: undefined,
+    nextMove: undefined,
+    lastProgressAt: undefined,
+    status: "active",
+    createdAt: now, updatedAt: now,
+    order: list.length,
+  };
+  saveGoals([...list, goal]);
+  return goal;
+}
+
+export function updateGoal(id: string, patch: Partial<Omit<Goal, "id" | "createdAt">>): Goal | null {
+  const list = loadGoals();
+  let updated: Goal | null = null;
+  const next = list.map((g) => (g.id === id ? (updated = { ...g, ...patch, updatedAt: new Date().toISOString() }) : g));
+  if (updated) saveGoals(next);
+  return updated;
+}
+
+export function deleteGoal(id: string): void { saveGoals(loadGoals().filter((g) => g.id !== id)); }
+export function getGoal(id: string): Goal | null { return loadGoals().find((g) => g.id === id) ?? null; }
+
+export function activeGoals(): Goal[] {
+  return loadGoals()
+    .filter((g) => g.status === "active")
+    .sort((a, b) => PRIORITY_RANK[a.priority] - PRIORITY_RANK[b.priority] || a.order - b.order);
+}
+
+/* ---- Campaign structure (fronts + bottleneck + next move) ---- */
+export function setCampaign(goalId: string, plan: { fronts?: Front[]; bottleneck?: string; nextMove?: NextMove }): Goal | null {
+  const patch: Partial<Goal> = {};
+  if (plan.fronts) patch.fronts = plan.fronts;
+  if (plan.bottleneck !== undefined) patch.bottleneck = plan.bottleneck;
+  if (plan.nextMove !== undefined) patch.nextMove = plan.nextMove;
+  return updateGoal(goalId, patch);
+}
+export function addFront(goalId: string, title: string): Goal | null {
+  const g = getGoal(goalId); if (!g) return null;
+  return updateGoal(goalId, { fronts: [...g.fronts, { id: uid("f"), title: title.trim(), status: "open" }] });
+}
+export function updateFront(goalId: string, frontId: string, patch: Partial<Omit<Front, "id">>): Goal | null {
+  const g = getGoal(goalId); if (!g) return null;
+  return updateGoal(goalId, { fronts: g.fronts.map((f) => (f.id === frontId ? { ...f, ...patch } : f)) });
+}
+export function removeFront(goalId: string, frontId: string): Goal | null {
+  const g = getGoal(goalId); if (!g) return null;
+  return updateGoal(goalId, { fronts: g.fronts.filter((f) => f.id !== frontId) });
+}
+
+/** Mark that real work happened on a goal today — feeds momentum + drift detection. */
+export function logProgress(goalId: string): Goal | null {
+  const g = getGoal(goalId); if (!g) return null;
+  const momentum: GoalMomentum = g.momentum === "stalled" || g.momentum === "slipping" || g.momentum === "new" ? "building" : g.momentum;
+  return updateGoal(goalId, { lastProgressAt: new Date().toISOString(), momentum });
+}
+
+/** Match an existing goal by title (case-insensitive) or create one. */
+export function findOrCreateGoal(title: string): { goal: Goal; created: boolean } {
+  const t = title.trim();
+  const existing = loadGoals().find((g) => g.title.toLowerCase() === t.toLowerCase());
+  if (existing) return { goal: existing, created: false };
+  return { goal: addGoal({ title: t }), created: true };
+}
+
+/** Days since a goal last saw real progress (null if never). */
+export function daysSinceProgress(g: Goal): number | null {
+  const ts = g.lastProgressAt || g.createdAt;
+  if (!ts) return null;
+  return Math.floor((Date.now() - new Date(ts).getTime()) / 86_400_000);
+}
+
+/**
+ * DETERMINISTIC DECOMPOSITION — if the model is unavailable, still turn a goal into a campaign.
+ */
+export function campaignFallback(title: string): string[] {
+  const t = (title || "").toLowerCase();
+  const has = (...w: string[]) => w.some((x) => t.includes(x));
+  if (has("stanford", "college", "university", "admission", "get in", "ivy")) return ["Test prep (SAT/ACT)", "Coursework & GPA", "Research or projects", "Extracurriculars & leadership", "Applications & essays"];
+  if (has("fit", "weight", "gym", "muscle", "strength", "run", "marathon", "health")) return ["Training consistency", "Nutrition", "Sleep", "Recovery", "Weekly review"];
+  if (has("startup", "business", "launch", "company", "product")) return ["MVP", "First real users", "Landing page", "Marketing", "Funding"];
+  if (has("job", "internship", "promotion", "career", "offer", "hired")) return ["Resume & profile", "Interview prep", "Applications & outreach", "Networking", "Portfolio / projects"];
+  if (has("learn", "guitar", "language", "spanish", "master", "skill", "code")) return ["Fundamentals", "Daily practice", "A feedback loop", "Real-world use", "Milestone check"];
+  return ["Define what done looks like", "The first concrete step", "Remove the biggest obstacle", "A weekly review rhythm"];
+}
+
+/** Ask the model to decompose a goal into a campaign; fall back deterministically. Client-side. */
+export async function decomposeGoal(goalId: string): Promise<Goal | null> {
+  const g = getGoal(goalId); if (!g) return null;
+  let plan: { fronts?: { title: string; bottleneck?: string; nextMove?: string; target?: string; current?: string }[]; bottleneck?: string; nextMove?: NextMove } | null = null;
+  try {
+    const res = await fetch("/api/goal-plan", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ title: g.title, why: g.why, timeline: g.timeline }) });
+    const data = await res.json();
+    if (data && data.plan && Array.isArray(data.plan.fronts) && data.plan.fronts.length) plan = data.plan;
+  } catch { /* fall through */ }
+
+  type RawFront = { title: string; bottleneck?: string; nextMove?: string; target?: string; current?: string };
+  const rawFronts: RawFront[] = plan?.fronts ?? campaignFallback(g.title).map((title) => ({ title }));
+  const fronts: Front[] = rawFronts.slice(0, 7).map((f, i) => ({
+    id: uid(`f${i}`),
+    title: String(f.title),
+    status: "open" as FrontStatus,
+    bottleneck: f.bottleneck || undefined,
+    nextMove: f.nextMove || undefined,
+    target: f.target || undefined,
+    current: f.current || undefined,
+  }));
+  return setCampaign(goalId, { fronts, bottleneck: plan?.bottleneck, nextMove: plan?.nextMove });
+}
+
+/** One-time seed from an existing trajectory so Goals never start empty for an existing user. */
+export function seedGoalFromTrajectory(statement?: string | null): void {
+  if (!statement || !statement.trim()) return;
+  if (loadGoals().length > 0) return;
+  addGoal({ title: statement.trim(), priority: "primary", why: "The person you're working to become." });
+}
+
+/**
+ * The block injected into every conversation. Beyond listing goals, it surfaces each goal's
+ * bottleneck, next move, campaign progress, and how long since it last moved — so Synapse
+ * reasons about EXECUTION: attack the bottleneck, protect priorities, and call out drift.
+ */
+export function goalsContextBlock(): string {
+  const goals = activeGoals();
+  if (!goals.length) return "";
+  const nl = String.fromCharCode(10);
+  const lines = goals.map((g) => {
+    const head = `[${g.priority}${g.momentum !== "new" ? `, ${MOMENTUM_LABEL[g.momentum]}` : ""}]`;
+    const extra: string[] = [];
+    if (g.why) extra.push(`why: ${g.why}`);
+    if (g.timeline) extra.push(`by: ${g.timeline}`);
+    if (g.bottleneck) extra.push(`BOTTLENECK: ${g.bottleneck}`);
+    if (g.nextMove) extra.push(`next move: ${g.nextMove.title}${g.nextMove.minutes ? ` (${g.nextMove.minutes}m)` : ""}`);
+    if (g.fronts.length) extra.push(`fronts: ${g.fronts.filter((f) => f.status === "won").length}/${g.fronts.length} won`);
+    const d = daysSinceProgress(g);
+    if (d != null) extra.push(`last moved: ${d === 0 ? "today" : `${d}d ago`}`);
+    return `- ${head} ${g.title}${extra.length ? ` (${extra.join(" | ")})` : ""}`;
+  });
+  // Drift signal: a high-priority goal untouched while lower-priority ones move.
+  const stale = goals.filter((g) => (g.priority === "primary" || g.priority === "high") && (daysSinceProgress(g) ?? 0) >= 8);
+  const driftLine = stale.length
+    ? `POSSIBLE DRIFT — these important goals haven't moved in over a week: ${stale.map((g) => g.title).join("; ")}. If their energy has gone elsewhere, name it directly and ask whether the priority changed or they're drifting.`
+    : "";
+  return [
+    "THE GOALS YOU ARE HELPING THEM EXECUTE — this is the point of everything. Don't merely track them: move ONE forward. Always reason about the real BOTTLENECK ('if this goal isn't moving, why?') and attack that, not the obvious surface task. Protect the top priorities from quiet drift, notice when goals compete and when one should temporarily lead, and end with a concrete next move. Never let an important goal silently disappear.",
+    ...lines,
+    driftLine,
+  ].filter(Boolean).join(nl);
+}

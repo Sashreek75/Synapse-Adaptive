@@ -35,7 +35,11 @@ const schema = z.object({
 export const env = schema.parse({
   NEXT_PUBLIC_APP_URL: process.env.NEXT_PUBLIC_APP_URL,
   NEXT_PUBLIC_FOUNDER_EMAILS: process.env.NEXT_PUBLIC_FOUNDER_EMAILS,
-  GEMINI_API_KEY: process.env.GEMINI_API_KEY,
+  GEMINI_API_KEY:
+    process.env.GEMINI_API_KEY ||
+    process.env.GOOGLE_API_KEY ||
+    process.env.GOOGLE_GENERATIVE_AI_API_KEY ||
+    process.env.GEMINI_KEY,
   GEMINI_MODEL: process.env.GEMINI_MODEL,
   GEMINI_FAST_MODEL: process.env.GEMINI_FAST_MODEL,
   NEXT_PUBLIC_SUPABASE_URL: process.env.NEXT_PUBLIC_SUPABASE_URL,

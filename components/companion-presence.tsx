@@ -28,6 +28,10 @@ import { readMomentum } from "@/lib/momentum";
 import { convictionContextLines } from "@/lib/convictions";
 import { activityContextBlock, witness } from "@/lib/activity";
 import { detectNavIntent } from "@/lib/nav-intent";
+import { detectBuildIntent } from "@/lib/build-intent";
+import { createWorkspaceFromRequest } from "@/lib/workspaces";
+import { goalsContextBlock, findOrCreateGoal, decomposeGoal } from "@/lib/goals";
+import { detectGoalIntent } from "@/lib/goal-intent";
 import { detectFocusIntent, type FocusIntent } from "@/lib/focus-intent";
 import { recordNavUse } from "@/lib/nav-hint";
 import { cn } from "@/lib/utils";
@@ -92,6 +96,17 @@ export function CompanionPresence() {
 
     if (preGate(q).triggered) { setMsgs((m) => [...m, { id: `a_${Date.now()}`, from: "synapse", text: CRISIS_RESPONSE }]); return; }
 
+    // Reshape the product: build them a space and take them into it — never "I can't".
+    if (detectBuildIntent(q)) {
+      setMsgs((m) => [...m, { id: `a_${Date.now()}`, from: "synapse", text: "On it — building you a space for that." }]);
+      scroll();
+      createWorkspaceFromRequest(q, { goal: mind?.trajectory?.statement }).then((ws) => { setOpen(false); try { router.push("/workspaces/" + ws.id); } catch {} }).catch(() => {});
+      return;
+    }
+
+    // A declared ambition becomes a campaign: create + decompose quietly; the reply still talks it through.
+    try { const gi = detectGoalIntent(q); if (gi) { const { goal, created } = findOrCreateGoal(gi.goal); if (created) decomposeGoal(goal.id).catch(() => {}); } } catch {}
+
     // Locking in? Offer to keep time right here — the timer starts the moment they pick a length.
     const fIntent = detectFocusIntent(q);
     if (fIntent.focus && !loadSession()) {
@@ -126,6 +141,7 @@ export function CompanionPresence() {
         "You are Synapse, riding along in a small companion window the user opened over whatever page they're on — one continuous conversation that travels with them everywhere. Answer right here in 1-3 short sentences: warm, specific, and immediately useful. Lead with the single most valuable thing and stop; never write a long paragraph or a wall of text — if it is getting long, cut it. Never mention pages, routes, or navigation — you are simply with them.",
         "The user is currently looking at " + describePage(here) + ". If they ask what something here means — a check-in question, one of their numbers, what the weekly report is saying — answer it directly and specifically, using what you know about them. They are already on this page, so never offer to take them where they already are.",
         goal ? "They are working to become: " + goal + "." : "",
+        goalsContextBlock(),
         activityContextBlock(),
         ...convictionContextLines(),
         mom.observation ? "Momentum: " + mom.observation : "",

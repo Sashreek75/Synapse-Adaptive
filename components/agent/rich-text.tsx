@@ -23,16 +23,24 @@ type Block =
   | { type: "p"; lines: string[] }
   | { type: "h"; text: string }
   | { type: "ul"; items: string[] }
-  | { type: "ol"; items: string[] };
+  | { type: "ol"; items: { n: number; text: string }[] };
 
 function parse(text: string): Block[] {
   const blocks: Block[] = [];
   let para: string[] = [];
   let ul: string[] = [];
-  let ol: string[] = [];
+  let ol: { n: number; text: string }[] = [];
   const flushPara = () => { if (para.length) { blocks.push({ type: "p", lines: para }); para = []; } };
   const flushUl = () => { if (ul.length) { blocks.push({ type: "ul", items: ul }); ul = []; } };
-  const flushOl = () => { if (ol.length) { blocks.push({ type: "ol", items: ol }); ol = []; } };
+  const flushOl = () => {
+    if (!ol.length) return;
+    // Merge into the previous ordered list if only blank lines separated them, so numbering
+    // stays continuous instead of restarting at 1 for every item.
+    const last = blocks[blocks.length - 1];
+    if (last && last.type === "ol") last.items.push(...ol);
+    else blocks.push({ type: "ol", items: ol });
+    ol = [];
+  };
   const flushAll = () => { flushPara(); flushUl(); flushOl(); };
 
   for (const raw of text.replace(/\r/g, "").split("\n")) {
@@ -40,10 +48,10 @@ function parse(text: string): Block[] {
     if (!line.trim()) { flushAll(); continue; }
     const heading = line.match(/^#{1,3}\s+(.*)$/);
     const bullet = line.match(/^\s*[-*]\s+(.*)$/);
-    const ordered = line.match(/^\s*\d+\.\s+(.*)$/);
+    const ordered = line.match(/^\s*(\d+)\.\s+(.*)$/);
     if (heading) { flushAll(); blocks.push({ type: "h", text: heading[1] }); }
     else if (bullet) { flushPara(); flushOl(); ul.push(bullet[1]); }
-    else if (ordered) { flushPara(); flushUl(); ol.push(ordered[1]); }
+    else if (ordered) { flushPara(); flushUl(); ol.push({ n: parseInt(ordered[1], 10), text: ordered[2] }); }
     else { flushUl(); flushOl(); para.push(line); }
   }
   flushAll();
@@ -72,8 +80,8 @@ export function RichText({ text, className }: { text: string; className?: string
           <ol key={bi} className="space-y-1.5">
             {b.items.map((it, i) => (
               <li key={i} className="flex gap-2.5">
-                <span className="mt-0.5 grid h-5 w-5 shrink-0 place-items-center rounded-full bg-surface-2 text-[11px] font-semibold text-navy-500">{i + 1}</span>
-                <span>{renderInline(it, `${bi}-${i}`)}</span>
+                <span className="mt-0.5 grid h-5 w-5 shrink-0 place-items-center rounded-full bg-surface-2 text-[11px] font-semibold text-navy-500">{it.n}</span>
+                <span>{renderInline(it.text, `${bi}-${i}`)}</span>
               </li>
             ))}
           </ol>

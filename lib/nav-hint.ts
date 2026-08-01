@@ -12,9 +12,9 @@ const LEARNED_AT = 3; // once they've driven themselves around this many times, 
 
 export const NAV_HINT_EXAMPLES = [
   "Let's reflect.",
-  "Take me to my weekly review.",
   "Show me my numbers.",
   "Help me focus.",
+  "Build me a habit tracker.",
 ];
 
 export function navHintUses(): number {

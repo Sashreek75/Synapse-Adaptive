@@ -5,26 +5,38 @@ import { AuthProvider } from "@/components/providers/auth-provider";
 
 const inter = Inter({ subsets: ["latin"], variable: "--font-sans", display: "swap" });
 
-const appUrl = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
-const title = "Synapse Adaptive — Your adaptive AI partner";
+const appUrl = process.env.NEXT_PUBLIC_APP_URL || "https://synapse-adaptive.vercel.app";
+const title = "Synapse Adaptive — AI Accountability Partner for Your Goals";
 const description =
-  "An adaptive companion that remembers what you're working toward, notices when you drift, and keeps you moving toward it — turning good intentions into real progress. Not another tracker.";
+  "Synapse is an AI goal operating system and accountability partner. It remembers what you're working toward, helps you lock in and follow through, adapts when life changes, and never lets your important goals quietly disappear. ChatGPT helps you think — Synapse helps you achieve.";
 
 export const metadata: Metadata = {
   metadataBase: new URL(appUrl),
   title: { default: title, template: "%s · Synapse Adaptive" },
   description,
   applicationName: "Synapse Adaptive",
-  keywords: ["adaptive companion", "AI coach", "accountability", "momentum", "follow through", "personal growth"],
+  keywords: [
+    "AI accountability partner", "accountability", "AI accountability", "accountability app",
+    "AI partner for locking in", "lock in", "AI goal tracker", "goal operating system",
+    "achieve your goals", "AI coach", "AI productivity partner", "follow through", "momentum",
+    "adaptive AI companion", "AI goal planner", "Synapse Adaptive",
+  ],
+  alternates: { canonical: "/" },
   openGraph: {
     type: "website",
     siteName: "Synapse Adaptive",
     title,
     description,
     url: appUrl,
+    locale: "en_US",
   },
-  twitter: { card: "summary_large_image", title, description },
-  robots: { index: true, follow: true },
+  twitter: { card: "summary_large_image", title, description, creator: "@synapseadaptive" },
+  robots: {
+    index: true,
+    follow: true,
+    googleBot: { index: true, follow: true, "max-image-preview": "large", "max-snippet": -1, "max-video-preview": -1 },
+  },
+  category: "productivity",
 };
 
 export const viewport = { themeColor: "#0b1f3a", width: "device-width", initialScale: 1, viewportFit: "cover" as const };

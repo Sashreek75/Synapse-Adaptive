@@ -112,6 +112,44 @@ function parseReflection(text: string): DailyReflection | null {
   return { lead: lead || t, points: insight ? [insight] : [], action: action || null, watch: watch || null, confidence: "moderate" };
 }
 
+/**
+ * DETERMINISTIC FALLBACK — composed, and DIFFERENT each day, so an offline check-in still
+ * feels alive instead of four identical sliders. Rotates item TYPES and phrasing by day seed
+ * and renders through the same pipeline as a model-authored plan. Only used when the model is
+ * unavailable (no key / quota / error).
+ */
+function buildFallbackPlan(seed: number): DailyCheckinOutput {
+  const sleepScale: DailyItemOutput = { type: "scale", metric: "sleep_quality", question: variant(SLEEP_Q, seed, 0), lowLabel: "Rough", highLabel: "Great" };
+  const energyScale: DailyItemOutput = { type: "scale", metric: "fatigue", question: variant(ENERGY_Q, seed, 1), lowLabel: "Drained", highLabel: "Energized", invert: true };
+  const stressScale: DailyItemOutput = { type: "scale", metric: "stress", question: variant(STRESS_Q, seed, 2), lowLabel: "Calm", highLabel: "Very high" };
+  const moodScale: DailyItemOutput = { type: "scale", metric: "mood", question: variant(MOOD_Q, seed, 3), lowLabel: "Low", highLabel: "Great" };
+  const moodChoice: DailyItemOutput = { type: "choice", question: variant(MOOD_Q, seed, 5), options: [
+    { label: "Low", metric: "mood", value: 15 }, { label: "Flat", metric: "mood", value: 38 }, { label: "Okay", metric: "mood", value: 58 }, { label: "Good", metric: "mood", value: 80 }, { label: "Great", metric: "mood", value: 95 },
+  ] };
+  const energyChoice: DailyItemOutput = { type: "choice", question: variant(ENERGY_Q, seed, 6), options: [
+    { label: "Drained", metric: "fatigue", value: 90 }, { label: "Low", metric: "fatigue", value: 68 }, { label: "Okay", metric: "fatigue", value: 45 }, { label: "Good", metric: "fatigue", value: 25 }, { label: "Strong", metric: "fatigue", value: 10 },
+  ] };
+  const stressChoice: DailyItemOutput = { type: "choice", question: variant(STRESS_Q, seed, 8), options: [
+    { label: "Calm", metric: "stress", value: 12 }, { label: "A bit", metric: "stress", value: 38 }, { label: "Moderate", metric: "stress", value: 58 }, { label: "High", metric: "stress", value: 80 }, { label: "Very high", metric: "stress", value: 95 },
+  ] };
+  const weighNote: DailyItemOutput = { type: "note", question: "Anything weighing on you today?", chips: ["Nothing much", "Work", "Sleep", "People", "Health", "A lot"] };
+  const eventNote: DailyItemOutput = { type: "note", question: variant(EVENT_Q, seed, 7), chips: ["Nothing big", "Busy day", "Rough patch", "Good news"] };
+
+  const templates: DailyItemOutput[][] = [
+    [sleepScale, energyChoice, stressScale, weighNote],
+    [moodChoice, energyScale, weighNote],
+    [moodScale, sleepScale, stressChoice, eventNote],
+    [stressScale, energyChoice, moodChoice, eventNote],
+  ];
+  const greeting = variant([
+    "Let's take a quick read on today.",
+    "A quick moment to check in — how did today actually go?",
+    "Here's today's check-in, tuned a little differently than last time.",
+    "Let's capture today while it's fresh.",
+  ], seed, 4);
+  return { greeting, items: templates[seed % templates.length] };
+}
+
 export function DailyCheckIn() {
   const router = useRouter();
   const { dailyDoneToday, addCheckIn, addContextNote, recentChanges, contextNotes, profile, series, checkIns, mind } = useHealth();
@@ -171,9 +209,9 @@ export function DailyCheckIn() {
       .then((d) => {
         if (!active) return;
         if (isValidCheckin(d?.plan)) { setPlan(d.plan); try { localStorage.setItem(key, JSON.stringify(d.plan)); } catch {} }
-        else setPlan(null);
+        else setPlan(buildFallbackPlan(seed));
       })
-      .catch(() => { if (active) setPlan(null); });
+      .catch(() => { if (active) setPlan(buildFallbackPlan(seed)); });
     return () => { active = false; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);

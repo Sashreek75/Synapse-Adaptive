@@ -121,6 +121,40 @@ export type DailyItemOutput = z.infer<typeof dailyItemSchema>;
 export type DailyCheckinOutput = z.infer<typeof dailyCheckinSchema>;
 
 /**
+ * ADAPTIVE WORKSPACE — Synapse composes a persistent mini-tool from a small, safe block
+ * vocabulary when the user asks it to reshape the product ("build me a tracker/board/etc").
+ */
+const wsChecklistSchema = z.object({ kind: z.literal("checklist"), title: z.string().min(1), items: z.array(z.string()).min(1).max(12) });
+const wsTrackerSchema = z.object({ kind: z.literal("tracker"), title: z.string().min(1), columns: z.array(z.string().min(1)).min(1).max(6), addLabel: z.string().optional() });
+const wsNotesSchema = z.object({ kind: z.literal("notes"), title: z.string().min(1), placeholder: z.string().optional() });
+const wsPromptsSchema = z.object({ kind: z.literal("prompts"), title: z.string().min(1), questions: z.array(z.string().min(1)).min(1).max(10), reviewable: z.boolean().optional() });
+export const wsBlockSchema = z.discriminatedUnion("kind", [wsChecklistSchema, wsTrackerSchema, wsNotesSchema, wsPromptsSchema]);
+export const workspaceSchema = z.object({
+  title: z.string().min(1).max(60),
+  purpose: z.string().max(240).optional(),
+  blocks: z.array(wsBlockSchema).min(1).max(5),
+});
+export type WorkspaceSpecOutput = z.infer<typeof workspaceSchema>;
+
+/**
+ * GOAL CAMPAIGN — Synapse decomposes a goal into the fronts that must be won, names the current
+ * bottleneck, and picks the single next critical move. Turns a tracked goal into an executed one.
+ */
+const frontSpecSchema = z.object({
+  title: z.string().min(1),
+  bottleneck: z.string().optional(),
+  nextMove: z.string().optional(),
+  target: z.string().optional(),
+  current: z.string().optional(),
+});
+export const goalPlanSchema = z.object({
+  fronts: z.array(frontSpecSchema).min(2).max(7),
+  bottleneck: z.string().optional(),
+  nextMove: z.object({ title: z.string().min(1), when: z.string().optional(), minutes: z.number().optional(), why: z.string().optional() }).optional(),
+});
+export type GoalPlanOutput = z.infer<typeof goalPlanSchema>;
+
+/**
  * CLINICAL REASONING output — Synapse thinks before it speaks. The model weighs
  * multiple hypotheses, commits to the strongest, chooses ONE priority, and shows
  * its working. Code owns the metric set + confidence ceilings; the model owns the

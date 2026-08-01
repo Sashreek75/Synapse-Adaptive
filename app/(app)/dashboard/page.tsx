@@ -22,6 +22,7 @@ import { GeneratedDashboard } from "@/components/dashboard/generated-dashboard";
 import { FirstWeek } from "@/components/dashboard/first-week";
 import { CommitmentPrompt } from "@/components/dashboard/commitment-prompt";
 import { ConvictionCard } from "@/components/dashboard/conviction-card";
+import { GoalsStrip } from "@/components/goals/goals-strip";
 import { AgentConsole } from "@/components/agent/agent-console";
 import { sessionOpener } from "@/lib/intelligence";
 import { copy } from "@/lib/copy";
@@ -89,6 +90,7 @@ export default function HomePage() {
 
       {/* Proactive: it's a new day — lead with the core loop, the check-in */}
       <div className="sa-rise-2 space-y-4">
+        <GoalsStrip />
         <ConvictionCard />
         <CommitmentPrompt />
         {!dailyDoneToday ? (

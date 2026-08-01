@@ -14,7 +14,7 @@ import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { Home, CreditCard, Settings, FileText, CalendarCheck, Menu, X, LogOut, LogIn, Target, Sparkles, MessageCircle, Timer, BarChart3 } from "lucide-react";
+import { Home, CreditCard, Settings, FileText, CalendarCheck, Menu, X, LogOut, LogIn, Target, Sparkles, MessageCircle, Timer, BarChart3, LayoutGrid } from "lucide-react";
 import { SynapseOrb } from "@/components/synapse/orb";
 import { ThemeToggle } from "@/components/shell/theme-toggle";
 import { useAuth } from "@/components/providers/auth-provider";
@@ -35,11 +35,13 @@ const asks: Ask[] = [
 // Items that OPEN a real, interactive surface.
 const rooms: Room[] = [
   { href: "/dashboard", label: "Talk", icon: Home, blurb: "The main conversation" },
+  { href: "/goals", label: "Goals", icon: Target, blurb: "What you're working toward" },
   { href: "/daily", label: "Daily Snapshot", icon: CalendarCheck, blurb: "Capture or reflect on today" },
   { href: "/tools", label: "Focus", icon: Timer, blurb: "Work with the companion beside you" },
   { href: "/report", label: "Weekly Review", icon: FileText, blurb: "Your weekly reflection" },
   { href: "/stats", label: "Your Numbers", icon: BarChart3, blurb: "Patterns and measurable trends" },
   { href: "/playbook", label: "You", icon: Sparkles, blurb: "Everything Synapse believes it understands" },
+  { href: "/workspaces", label: "Spaces", icon: LayoutGrid, blurb: "Tools Synapse built for you" },
 ];
 
 const manage: Room[] = [

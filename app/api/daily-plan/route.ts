@@ -100,7 +100,10 @@ export async function POST(req: Request) {
   ].join("\n");
 
   try {
-    const raw = await callModel({ system: DAILY_PROMPT.system, user, maxTokens: 800, temperature: 0.85 });
+    // Roomy budget: the full check-in JSON (greeting + progressPrompt + 3-5 items with
+    // options/labels) overruns a tight cap, truncates mid-JSON, fails to parse, and silently
+    // drops us to the fallback. Thinking is already off, so this all goes to the visible JSON.
+    const raw = await callModel({ system: DAILY_PROMPT.system, user, maxTokens: 2048, temperature: 0.85 });
     const plan = raw ? clampCheckin(extractJson(raw)) : null;
     return NextResponse.json({ plan });
   } catch {

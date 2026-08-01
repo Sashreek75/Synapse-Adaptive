@@ -14,6 +14,7 @@ const CATEGORIES: { rx: RegExp; to: string; label: string; talk?: boolean }[] = 
   { rx: /\b(reflect|talk (it|things|this|that)?\s*(through|out)|process (my|the|today'?s) day|vent|clear my head|think (this|things|it) through|unpack (my|the|today))\b/, to: "/daily", label: "reflect together", talk: true },
   { rx: /\b(check[\s-]?in|daily snapshot|snapshot|log (my|today|this)|do (my|today'?s)? ?(daily|check[\s-]?in)|today'?s entry|capture today)\b/, to: "/daily", label: "today's snapshot" },
   { rx: /\b(numbers|stats|statistics|the data|my data|charts?|trend lines?|my trends?)\b/, to: "/stats", label: "your numbers" },
+  { rx: /\b(my )?goals?\b|what i'?m working toward|my objectives?/, to: "/goals", label: "your goals" },
   { rx: /\b(weekly (review|report|recap|sit[\s-]?down)|review my week|my week look|how'?s my week)\b/, to: "/report", label: "your weekly review" },
   { rx: /\b(what have you learned|how do you see me|the you page|about[\s-]?me page|my playbook|what you (know|understand) about me)\b/, to: "/playbook", label: "what I understand about you" },
 ];

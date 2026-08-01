@@ -24,6 +24,7 @@ import { PLANS, PLAN_ORDER } from "@/lib/billing/plans";
 export default function LandingPage() {
   return (
     <div className="min-h-screen">
+      <StructuredData />
       <SiteHeader />
       <Hero />
       <Problem />
@@ -554,6 +555,38 @@ function Pricing() {
       <p className="mt-5 text-center text-xs text-muted">Prices in USD. Cancel anytime. Private by design — your data is yours.</p>
     </Section>
   );
+}
+
+/* ── SEO: structured data so search engines understand what Synapse is ──── */
+function StructuredData() {
+  const base = process.env.NEXT_PUBLIC_APP_URL || "https://synapse-adaptive.vercel.app";
+  const data = {
+    "@context": "https://schema.org",
+    "@graph": [
+      {
+        "@type": "Organization",
+        name: "Synapse Adaptive",
+        url: base,
+        description: "An AI accountability partner and goal operating system that helps people follow through and achieve their goals.",
+      },
+      {
+        "@type": "WebSite",
+        name: "Synapse Adaptive",
+        url: base,
+      },
+      {
+        "@type": "SoftwareApplication",
+        name: "Synapse Adaptive",
+        applicationCategory: "ProductivityApplication",
+        operatingSystem: "Web, iOS, Android",
+        description:
+          "Synapse is an AI accountability partner and goal operating system. It remembers what you're working toward, helps you lock in and follow through, breaks big goals into campaigns, adapts when life changes, and never lets your important goals quietly disappear.",
+        url: base,
+        offers: { "@type": "Offer", price: "0", priceCurrency: "USD" },
+      },
+    ],
+  };
+  return <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(data) }} />;
 }
 
 /* ── small layout helpers ─────────────────────────────────────────────── */
