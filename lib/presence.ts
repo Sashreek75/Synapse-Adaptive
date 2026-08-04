@@ -25,24 +25,30 @@ import { activeGoals, daysSinceProgress, type Goal } from "@/lib/goals";
 import { readMomentum } from "@/lib/momentum";
 import { loadHistory } from "@/lib/focus-session";
 import { computeStreak } from "@/lib/intelligence";
+import { pftCooldownFactor } from "@/lib/pft";
 import type { Mind, CheckIn } from "@/types";
 
-export type PresenceKind = "commitment" | "drift" | "pre_failure" | "observation" | "celebration";
+export type PresenceKind = "commitment" | "opportunity" | "drift" | "pre_failure" | "observation" | "celebration";
 
 export interface PresenceSignal {
   id: string;                 // stable per (kind + subject) so it dedupes across evaluations
   kind: PresenceKind;
-  headline: string;           // what Synapse would say — its voice, not a system string
+  headline: string;           // the CONVERSATION Synapse would open — authored, not a system string
   why: string;                // the internal justification (why now) — used as chat context
   ask: string;                // what to seed into the conversation if the user engages
   goalId?: string;
   urgency: "now" | "soon" | "ambient";
 }
 
+/** What happened after a proactive message — how Synapse learns whether reaching out that way
+ * actually helps. "opened"/"acted" are the reach-out landing; "ignored"/"dismissed" are it missing. */
+export type PresenceOutcome = "opened" | "acted" | "dismissed" | "ignored";
+
 interface PresenceLog {
   seen: Record<string, string>;       // signalId -> ISO last surfaced
   dismissed: Record<string, string>;  // signalId -> ISO last dismissed
   lastShownAt?: string;               // ISO — any proactive surfacing, for the global quiet gap
+  outcomes?: { kind: PresenceKind; outcome: PresenceOutcome; at: string }[]; // capped history for learning
 }
 
 const KEY = "synapse.presence";
@@ -54,6 +60,7 @@ const GLOBAL_GAP_MS = 4 * H;
 // How long a given signal stays quiet after being shown or dismissed. Restraint lives here.
 const COOLDOWN_MS: Record<PresenceKind, number> = {
   commitment: 6 * H,
+  opportunity: 5 * H,
   drift: 40 * H,
   pre_failure: 40 * H,
   observation: 5 * DAY,
@@ -62,7 +69,7 @@ const COOLDOWN_MS: Record<PresenceKind, number> = {
 
 function load(): PresenceLog {
   if (typeof window === "undefined") return { seen: {}, dismissed: {} };
-  try { const r = JSON.parse(localStorage.getItem(KEY) || "null"); if (r && typeof r === "object") return { seen: r.seen ?? {}, dismissed: r.dismissed ?? {}, lastShownAt: r.lastShownAt }; } catch {}
+  try { const r = JSON.parse(localStorage.getItem(KEY) || "null"); if (r && typeof r === "object") return { seen: r.seen ?? {}, dismissed: r.dismissed ?? {}, lastShownAt: r.lastShownAt, outcomes: r.outcomes ?? [] }; } catch {}
   return { seen: {}, dismissed: {} };
 }
 function save(l: PresenceLog): void {
@@ -76,9 +83,36 @@ function within(iso: string | undefined, ms: number, now: number): boolean {
   return Number.isFinite(t) && now - t < ms;
 }
 
-/** Is this specific signal currently on cooldown (recently shown or dismissed)? */
+/**
+ * INTERRUPTION QUALITY — Synapse learning whether reaching out THIS way actually helps. Not for
+ * engagement: the only thing it does is make a kind of reach-out that keeps getting ignored RARER,
+ * and one that keeps landing slightly more available. Restraint that adapts is still restraint.
+ */
+function kindStats(kind: PresenceKind, log: PresenceLog): { shows: number; rate: number | null } {
+  const evs = (log.outcomes ?? []).filter((o) => o.kind === kind).slice(-8);
+  if (evs.length === 0) return { shows: 0, rate: null };
+  const pos = evs.filter((o) => o.outcome === "opened" || o.outcome === "acted").length;
+  return { shows: evs.length, rate: pos / evs.length };
+}
+
+/** How much to stretch (or gently shorten) a kind's cooldown based on how it's been landing. */
+function cooldownMultiplier(kind: PresenceKind, log: PresenceLog): number {
+  const { shows, rate } = kindStats(kind, log);
+  if (shows < 4 || rate == null) return 1;       // not enough evidence — leave it alone
+  if (rate < 0.25) return 3;                      // keeps getting ignored → reach out far less
+  if (rate >= 0.6) return 0.75;                   // keeps landing → slightly more willing
+  return 1;
+}
+
+// Accountability kinds should check back SOONER when this person's follow-through is shaky.
+const PFT_SENSITIVE: Record<PresenceKind, boolean> = {
+  commitment: true, drift: true, pre_failure: true, opportunity: false, observation: false, celebration: false,
+};
+
+/** Is this specific signal currently on cooldown (recently shown or dismissed)? Adaptive. */
 function onCooldown(sig: PresenceSignal, log: PresenceLog, now: number): boolean {
-  const cd = COOLDOWN_MS[sig.kind];
+  const pftFactor = PFT_SENSITIVE[sig.kind] ? pftCooldownFactor(new Date(now)) : 1;
+  const cd = COOLDOWN_MS[sig.kind] * cooldownMultiplier(sig.kind, log) * pftFactor;
   return within(log.seen[sig.id], cd, now) || within(log.dismissed[sig.id], cd, now);
 }
 
@@ -97,9 +131,26 @@ function commitmentCandidate(now: Date): PresenceSignal | null {
   return {
     id: `commitment:${c.id}`,
     kind: "commitment",
-    headline: `You told me this mattered: "${c.text}". Still on?`,
-    why: "A promise you made in an earlier session is still open and hasn't been reported back — the single strongest reason to reach out, because unspoken promises quietly expire.",
-    ask: `Earlier I committed to: "${c.text}". Let's talk about whether it's happening.`,
+    headline: `You told me this mattered: "${c.text}". Do you still feel the same?`,
+    why: "A promise you made in an earlier session is still open and hasn't been reported back — the single strongest reason to start a conversation, because unspoken promises quietly expire. An invitation to revisit it, never a command to do it.",
+    ask: `Earlier I committed to: "${c.text}". Let's talk about whether it still matters and what's actually happening with it.`,
+    urgency: "now",
+  };
+}
+
+// Presence shouldn't only catch problems — it should notice opportunity. Right after a win is when
+// momentum is highest and the drop-off usually starts; offering (never pushing) to extend it helps.
+function opportunityCandidate(now: Date): PresenceSignal | null {
+  const t = now.getTime();
+  const recent = loadHistory().filter((f) => f.completed && typeof f.at === "number" && t - f.at < 15 * 60 * 1000);
+  if (recent.length === 0) return null;
+  const last = recent[recent.length - 1];
+  return {
+    id: `opportunity:${last.at}`,
+    kind: "opportunity",
+    headline: "You just finished a focused block — you're warm right now, and this is the cheapest twenty more minutes you'll get all day. Want to use it, or is this a good place to stop?",
+    why: "A focused session completed minutes ago. Momentum is highest immediately after a win and the drop-off usually starts right here — an invitation to ride it (with a genuine option to stop) raises follow-through without any pressure.",
+    ask: `I just finished a focus block${last.goal ? ` on ${last.goal}` : ""} and I'm still warm. Help me decide whether to keep going and put the next twenty minutes to work.`,
     urgency: "now",
   };
 }
@@ -186,8 +237,9 @@ export function evaluatePresence(ctx: { mind: Mind; checkIns: CheckIn[]; now?: D
   // Strongest reason first; skip any candidate that's still on its cooldown.
   const candidates = [
     commitmentCandidate(now),
-    driftCandidate(),
+    opportunityCandidate(now),
     preFailureCandidate(now),
+    driftCandidate(),
     observationCandidate(ctx.mind),
     celebrationCandidate(ctx.checkIns),
   ];
@@ -212,6 +264,13 @@ export function dismissPresence(sig: PresenceSignal, now = new Date()): void {
   const iso = now.toISOString();
   log.dismissed[sig.id] = iso;
   log.lastShownAt = iso;
+  save(log);
+}
+
+/** Record how a reach-out landed, so Synapse can learn to reach out this way more or less often. */
+export function recordPresenceOutcome(kind: PresenceKind, outcome: PresenceOutcome, now = new Date()): void {
+  const log = load();
+  log.outcomes = (log.outcomes ?? []).concat({ kind, outcome, at: now.toISOString() }).slice(-40);
   save(log);
 }
 

@@ -37,7 +37,9 @@ import { goalsContextBlock, findOrCreateGoal, decomposeGoal } from "@/lib/goals"
 import { detectGoalIntent } from "@/lib/goal-intent";
 import { detectFocusIntent, extractFocusOffer, type FocusIntent } from "@/lib/focus-intent";
 import { recordNavUse } from "@/lib/nav-hint";
-import { evaluatePresence, markPresenceShown, dismissPresence, maybeNotify, presenceContextBlock, type PresenceSignal } from "@/lib/presence";
+import { evaluatePresence, markPresenceShown, dismissPresence, recordPresenceOutcome, maybeNotify, presenceContextBlock, type PresenceSignal } from "@/lib/presence";
+import { evidenceContextBlock } from "@/lib/evidence";
+import { pftContextBlock } from "@/lib/pft";
 import { cn } from "@/lib/utils";
 
 interface Msg { id: string; from: "you" | "synapse"; text: string }
@@ -70,6 +72,7 @@ export function CompanionPresence() {
   const [busy, setBusy] = useState(false);
   const [pendingFocus, setPendingFocus] = useState<FocusIntent | null>(null);
   const [presence, setPresence] = useState<PresenceSignal | null>(null);
+  const shownRef = useRef<PresenceSignal | null>(null); // the surfaced-but-unresolved signal, for learning
   const endRef = useRef<HTMLDivElement>(null);
 
   // Step aside whenever the Focus Companion owns the orb.
@@ -95,11 +98,18 @@ export function CompanionPresence() {
     return () => { clearTimeout(t0); clearInterval(iv); evs.forEach((e) => window.removeEventListener(e, check)); };
   }, [focusActive, open, mind, checkIns]);
 
-  // When a signal actually surfaces, start its cooldown and (if allowed) mirror it to the OS.
-  useEffect(() => { if (presence) { markPresenceShown(presence); maybeNotify(presence); } }, [presence]);
+  // When a signal actually surfaces, start its cooldown, mark it unresolved (for learning), and
+  // (if allowed) mirror it to the OS.
+  useEffect(() => { if (presence) { markPresenceShown(presence); shownRef.current = presence; maybeNotify(presence); } }, [presence]);
 
-  const openPresence = (sig: PresenceSignal) => { setPresence(null); setPendingFocus(null); setMsgs([{ id: "intro", from: "synapse", text: sig.headline }]); setOpen(true); };
-  const clearPresence = (sig: PresenceSignal) => { dismissPresence(sig); setPresence(null); };
+  // If Synapse reached out and the user just left the page without engaging, that's an "ignored" —
+  // exactly the feedback that should make this kind of reach-out rarer over time.
+  useEffect(() => {
+    return () => { if (shownRef.current) { recordPresenceOutcome(shownRef.current.kind, "ignored"); shownRef.current = null; } };
+  }, [pathname]);
+
+  const openPresence = (sig: PresenceSignal) => { recordPresenceOutcome(sig.kind, "opened"); shownRef.current = null; setPresence(null); setPendingFocus(null); setMsgs([{ id: "intro", from: "synapse", text: sig.headline }]); setOpen(true); };
+  const clearPresence = (sig: PresenceSignal) => { recordPresenceOutcome(sig.kind, "dismissed"); shownRef.current = null; dismissPresence(sig); setPresence(null); };
 
   const scroll = () => requestAnimationFrame(() => endRef.current?.scrollIntoView({ behavior: "smooth" }));
 
@@ -174,6 +184,8 @@ export function CompanionPresence() {
         decisionsContextBlock(),
         principlesContextBlock(),
         workspaceContextBlock(),
+        evidenceContextBlock(checkIns),
+        pftContextBlock(),
         presenceContextBlock(),
         activityContextBlock(),
         ...convictionContextLines(),
@@ -270,7 +282,13 @@ export function CompanionPresence() {
         </div>
       )}
 
-      <button onClick={() => setOpen((v) => !v)} aria-label={open ? "Close Synapse" : "Talk to Synapse"}
+      <button
+        onClick={() => {
+          // Opening the orb yourself while a reach-out is waiting = you didn't take that one up.
+          if (!open && shownRef.current) { recordPresenceOutcome(shownRef.current.kind, "ignored"); shownRef.current = null; setPresence(null); }
+          setOpen((v) => !v);
+        }}
+        aria-label={open ? "Close Synapse" : "Talk to Synapse"}
         className="grid h-14 w-14 place-items-center rounded-full transition-transform hover:scale-[1.04] active:scale-95">
         <SynapseOrb size={44} state={busy ? "thinking" : "idle"} />
       </button>

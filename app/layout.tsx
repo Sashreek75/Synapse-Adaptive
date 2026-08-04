@@ -6,9 +6,9 @@ import { AuthProvider } from "@/components/providers/auth-provider";
 const inter = Inter({ subsets: ["latin"], variable: "--font-sans", display: "swap" });
 
 const appUrl = process.env.NEXT_PUBLIC_APP_URL || "https://synapse-adaptive.vercel.app";
-const title = "Synapse Adaptive — Your Execution Partner";
+const title = "Synapse Adaptive — Your Partner in Follow-Through";
 const description =
-  "Synapse is your execution partner: it helps you consistently follow through on the goals that matter most — bringing clarity when you are overwhelmed, accountability when you are drifting, and support when you are struggling, so your intentions become outcomes. A coach gives advice; a partner stays on the hook until your behaviour changes.";
+  "Synapse is your partner in follow-through: it helps you consistently finish what you start on the goals that matter most — bringing clarity when you are overwhelmed, accountability when you are drifting, and support when you are struggling, so your intentions become outcomes. A coach gives advice; a partner stays on the hook until your behaviour changes.";
 
 export const metadata: Metadata = {
   metadataBase: new URL(appUrl),
@@ -16,7 +16,7 @@ export const metadata: Metadata = {
   description,
   applicationName: "Synapse Adaptive",
   keywords: [
-    "execution partner", "accountability partner", "personal execution coach", "AI accountability partner", "accountability", "accountability app",
+    "partner in follow-through", "follow through", "follow-through partner", "execution partner", "accountability partner", "AI accountability partner", "accountability", "accountability app",
     "AI partner for locking in", "lock in", "AI goal tracker", "goal operating system",
     "achieve your goals", "AI coach", "AI productivity partner", "follow through", "momentum",
     "adaptive AI companion", "AI goal planner", "Synapse Adaptive",

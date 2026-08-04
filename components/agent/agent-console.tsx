@@ -9,6 +9,8 @@ import { challengeContextBlock } from "@/lib/coaching";
 import { extractRecTag, recordRecommendation, decisionsContextBlock } from "@/lib/decisions";
 import { extractPrincipleTag, extractMindShiftTag, addPrinciple, addMindShift, principlesContextBlock } from "@/lib/principles";
 import { workspaceContextBlock } from "@/lib/workspaces";
+import { evidenceContextBlock } from "@/lib/evidence";
+import { pftContextBlock } from "@/lib/pft";
 import { detectGoalIntent } from "@/lib/goal-intent";
 import { useRouter } from "next/navigation";
 import { detectNavIntent } from "@/lib/nav-intent";
@@ -110,6 +112,8 @@ export function AgentConsole({ embedded = false, immersive = false }: { embedded
       decisionsContextBlock(),
       principlesContextBlock(),
       workspaceContextBlock(),
+      evidenceContextBlock(checkIns),
+      pftContextBlock(),
       (mind.trajectory?.statement || profile.definitionOfBetter) && `Working to become: ${mind.trajectory?.statement || profile.definitionOfBetter} (the objective — weigh advice against whether it moves them toward this)`,
       profile.aiSummary && `Profile: ${profile.aiSummary}`,
       `What they care about most: ${focus}`,
