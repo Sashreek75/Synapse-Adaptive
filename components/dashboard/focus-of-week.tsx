@@ -30,7 +30,7 @@ function mergePlaybook(existing: PlaybookEntry[], additions: PlaybookEntry[]): P
   return [...map.values()].slice(-40);
 }
 
-export function FocusOfWeek() {
+export function FocusOfWeek({ silent = false }: { silent?: boolean } = {}) {
   const { profile, series, recentChanges, checkIns, experiments, saveExperiments, contextNotes, mind, saveMind, weeksTracked } = useHealth();
   const { plan } = useSubscription();
   const wk = currentWeekKey();
@@ -126,6 +126,10 @@ export function FocusOfWeek() {
   }, [view?.weekKey, view?.metric, experiments.length]);
 
   if (!view) return null; // nothing to focus on yet — Home's hero carries the moment
+
+  // Home mounts this only to keep the weekly-reasoning engine warm; the focus itself
+  // lives in the Weekly Review now, so render nothing here.
+  if (silent) return null;
 
   const escalate = !!view.escalate;
 

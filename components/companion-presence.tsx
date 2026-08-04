@@ -30,10 +30,14 @@ import { activityContextBlock, witness } from "@/lib/activity";
 import { detectNavIntent } from "@/lib/nav-intent";
 import { detectBuildIntent, extractBuildOffer } from "@/lib/build-intent";
 import { createWorkspaceFromRequest, workspaceContextBlock } from "@/lib/workspaces";
+import { challengeContextBlock } from "@/lib/coaching";
+import { extractRecTag, recordRecommendation, decisionsContextBlock } from "@/lib/decisions";
+import { extractPrincipleTag, extractMindShiftTag, addPrinciple, addMindShift, principlesContextBlock } from "@/lib/principles";
 import { goalsContextBlock, findOrCreateGoal, decomposeGoal } from "@/lib/goals";
 import { detectGoalIntent } from "@/lib/goal-intent";
 import { detectFocusIntent, extractFocusOffer, type FocusIntent } from "@/lib/focus-intent";
 import { recordNavUse } from "@/lib/nav-hint";
+import { evaluatePresence, markPresenceShown, dismissPresence, maybeNotify, presenceContextBlock, type PresenceSignal } from "@/lib/presence";
 import { cn } from "@/lib/utils";
 
 interface Msg { id: string; from: "you" | "synapse"; text: string }
@@ -57,7 +61,7 @@ function describePage(p: string): string {
 export function CompanionPresence() {
   const router = useRouter();
   const pathname = usePathname();
-  const { mind } = useHealth();
+  const { mind, checkIns } = useHealth();
   const { plan: tier } = useSubscription();
   const [focusActive, setFocusActive] = useState(false);
   const [open, setOpen] = useState(false);
@@ -65,6 +69,7 @@ export function CompanionPresence() {
   const [input, setInput] = useState("");
   const [busy, setBusy] = useState(false);
   const [pendingFocus, setPendingFocus] = useState<FocusIntent | null>(null);
+  const [presence, setPresence] = useState<PresenceSignal | null>(null);
   const endRef = useRef<HTMLDivElement>(null);
 
   // Step aside whenever the Focus Companion owns the orb.
@@ -77,6 +82,24 @@ export function CompanionPresence() {
     window.addEventListener("storage", h);
     return () => { window.removeEventListener("synapse:focus-start", h); window.removeEventListener("synapse:focus-end", h); window.removeEventListener("storage", h); };
   }, []);
+
+  // PRESENCE — reach out first, but only when it's earned. Evaluates only while the orb is
+  // closed; most of the time it finds nothing, which is exactly the point.
+  useEffect(() => {
+    if (focusActive) return;
+    const check = () => { if (!open) setPresence((cur) => cur ?? evaluatePresence({ mind, checkIns })); };
+    const t0 = setTimeout(check, 1200); // a beat after load, never an instant pop
+    const iv = setInterval(check, 90_000);
+    const evs = ["synapse:goals", "synapse:commitments", "synapse:decisions", "synapse:focus-end"];
+    evs.forEach((e) => window.addEventListener(e, check));
+    return () => { clearTimeout(t0); clearInterval(iv); evs.forEach((e) => window.removeEventListener(e, check)); };
+  }, [focusActive, open, mind, checkIns]);
+
+  // When a signal actually surfaces, start its cooldown and (if allowed) mirror it to the OS.
+  useEffect(() => { if (presence) { markPresenceShown(presence); maybeNotify(presence); } }, [presence]);
+
+  const openPresence = (sig: PresenceSignal) => { setPresence(null); setPendingFocus(null); setMsgs([{ id: "intro", from: "synapse", text: sig.headline }]); setOpen(true); };
+  const clearPresence = (sig: PresenceSignal) => { dismissPresence(sig); setPresence(null); };
 
   const scroll = () => requestAnimationFrame(() => endRef.current?.scrollIntoView({ behavior: "smooth" }));
 
@@ -147,7 +170,11 @@ export function CompanionPresence() {
         "The user is currently looking at " + describePage(here) + ". If they ask what something here means — a check-in question, one of their numbers, what the weekly report is saying — answer it directly and specifically, using what you know about them. They are already on this page, so never offer to take them where they already are.",
         goal ? "They are working to become: " + goal + "." : "",
         goalsContextBlock(),
+        challengeContextBlock(),
+        decisionsContextBlock(),
+        principlesContextBlock(),
         workspaceContextBlock(),
+        presenceContextBlock(),
         activityContextBlock(),
         ...convictionContextLines(),
         mom.observation ? "Momentum: " + mom.observation : "",
@@ -155,7 +182,13 @@ export function CompanionPresence() {
       ].filter(Boolean).join(NL);
       const res = await fetch("/api/chat", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ message: q, tier, context: ctx }) });
       const data = await res.json();
-      setMsgs((m) => [...m, { id: `a_${Date.now()}`, from: "synapse", text: (data && data.content) || "I'm here — say a little more?" }]);
+      const rec = extractRecTag(String((data && data.content) || ""));
+      if (rec.text) { try { recordRecommendation(rec.text, rec.goalId); } catch {} }
+      const pr = extractPrincipleTag(rec.cleaned);
+      if (pr.text) { try { addPrinciple(pr.text); } catch {} }
+      const ms = extractMindShiftTag(pr.cleaned);
+      if (ms.to) { try { addMindShift({ from: ms.from ?? "", to: ms.to }); } catch {} }
+      setMsgs((m) => [...m, { id: `a_${Date.now()}`, from: "synapse", text: ms.cleaned || "I'm here — say a little more?" }]);
     } catch { setMsgs((m) => [...m, { id: `a_${Date.now()}`, from: "synapse", text: "I couldn't reach my reasoning just now — give it a second." }]); }
     finally { setBusy(false); scroll(); }
   }, [busy, mind, tier, router, pathname, msgs]);
@@ -219,6 +252,21 @@ export function CompanionPresence() {
               className="min-w-0 flex-1 rounded-full border bg-surface px-3 py-1.5 text-sm text-ink placeholder:text-muted focus:outline-none" />
             <button onClick={() => void send(input)} disabled={busy || !input.trim()} aria-label="Send" className="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-orange-500 text-white transition hover:bg-orange-600 disabled:opacity-50"><ArrowRight className="h-4 w-4" /></button>
           </div>
+        </div>
+      )}
+
+      {/* PRESENCE — the orb already waiting with the one thing that matters. Rare by design. */}
+      {presence && !open && (
+        <div className="animate-fade-up flex w-[min(20rem,88vw)] items-start gap-2.5 rounded-3xl border bg-surface/95 p-3.5 shadow-lift backdrop-blur">
+          <SynapseOrb size={26} className="mt-0.5 shrink-0" />
+          <div className="min-w-0 flex-1">
+            <p className="text-sm leading-relaxed text-ink">{presence.headline}</p>
+            <div className="mt-2 flex items-center gap-2">
+              <button onClick={() => openPresence(presence)} className="rounded-full bg-orange-500 px-3 py-1 text-xs font-semibold text-white transition hover:bg-orange-600">Talk about it</button>
+              <button onClick={() => clearPresence(presence)} className="rounded-full px-2.5 py-1 text-xs font-medium text-muted transition hover:text-ink">Not now</button>
+            </div>
+          </div>
+          <button onClick={() => clearPresence(presence)} aria-label="Dismiss" className="grid h-7 w-7 shrink-0 place-items-center rounded-full text-muted hover:bg-surface-2 hover:text-ink"><X className="h-4 w-4" /></button>
         </div>
       )}
 

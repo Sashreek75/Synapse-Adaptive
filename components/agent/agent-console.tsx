@@ -5,6 +5,9 @@ import { detectFocusIntent, extractFocusOffer, type FocusIntent } from "@/lib/fo
 import { detectBuildIntent, extractBuildOffer } from "@/lib/build-intent";
 import { createWorkspaceFromRequest } from "@/lib/workspaces";
 import { goalsContextBlock, findOrCreateGoal, decomposeGoal } from "@/lib/goals";
+import { challengeContextBlock } from "@/lib/coaching";
+import { extractRecTag, recordRecommendation, decisionsContextBlock } from "@/lib/decisions";
+import { extractPrincipleTag, extractMindShiftTag, addPrinciple, addMindShift, principlesContextBlock } from "@/lib/principles";
 import { workspaceContextBlock } from "@/lib/workspaces";
 import { detectGoalIntent } from "@/lib/goal-intent";
 import { useRouter } from "next/navigation";
@@ -103,6 +106,9 @@ export function AgentConsole({ embedded = false, immersive = false }: { embedded
     const who = [
       `Name: ${profile.displayName || "User"}`,
       goalsContextBlock(),
+      challengeContextBlock(),
+      decisionsContextBlock(),
+      principlesContextBlock(),
       workspaceContextBlock(),
       (mind.trajectory?.statement || profile.definitionOfBetter) && `Working to become: ${mind.trajectory?.statement || profile.definitionOfBetter} (the objective — weigh advice against whether it moves them toward this)`,
       profile.aiSummary && `Profile: ${profile.aiSummary}`,
@@ -312,7 +318,13 @@ export function AgentConsole({ embedded = false, immersive = false }: { embedded
       const fullContext = `${nowLine}\n\n${memoryPreamble}${context}${transcript ? `\n\nRecent conversation:\n${transcript}` : ""}`;
       const res = await fetch("/api/chat", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ message: q, tier: plan, context: fullContext }) });
       const data = await res.json();
-      setChat([...next, { id: `a_${Date.now()}`, role: "assistant", content: data.content ?? "", sections: data.sections, evidenceUsed: data.evidenceUsed }]);
+      const rec = extractRecTag(String(data.content ?? ""));
+      if (rec.text) { try { recordRecommendation(rec.text, rec.goalId); } catch {} }
+      const pr = extractPrincipleTag(rec.cleaned);
+      if (pr.text) { try { addPrinciple(pr.text); } catch {} }
+      const ms = extractMindShiftTag(pr.cleaned);
+      if (ms.to) { try { addMindShift({ from: ms.from ?? "", to: ms.to }); } catch {} }
+      setChat([...next, { id: `a_${Date.now()}`, role: "assistant", content: ms.cleaned, sections: data.sections, evidenceUsed: data.evidenceUsed }]);
     } catch {
       setChat([...next, { id: `a_${Date.now()}`, role: "assistant", content: "I couldn't reach my reasoning engine just now — give it a moment and try again." }]);
     } finally { setBusy(false); scrollDown(); }

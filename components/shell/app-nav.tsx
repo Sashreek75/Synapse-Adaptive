@@ -37,16 +37,15 @@ const rooms: Room[] = [
   { href: "/dashboard", label: "Talk", icon: Home, blurb: "The main conversation" },
   { href: "/goals", label: "Goals", icon: Target, blurb: "What you're working toward" },
   { href: "/daily", label: "Daily Snapshot", icon: CalendarCheck, blurb: "Capture or reflect on today" },
-  { href: "/tools", label: "Focus", icon: Timer, blurb: "Work with the companion beside you" },
   { href: "/report", label: "Weekly Review", icon: FileText, blurb: "Your weekly reflection" },
-  { href: "/stats", label: "Your Numbers", icon: BarChart3, blurb: "Patterns and measurable trends" },
-  { href: "/playbook", label: "You", icon: Sparkles, blurb: "Everything Synapse believes it understands" },
-  { href: "/workspaces", label: "Spaces", icon: LayoutGrid, blurb: "Tools Synapse built for you" },
+  { href: "/stats", label: "Progress", icon: BarChart3, blurb: "Am I actually getting better?" },
+  { href: "/playbook", label: "Who You're Becoming", icon: Sparkles, blurb: "The person I think you're becoming" },
 ];
 
 const manage: Room[] = [
+  { href: "/workspaces", label: "Spaces", icon: LayoutGrid, blurb: "Anything I've built for you" },
   { href: "/settings", label: "Settings", icon: Settings, blurb: "Preferences, data & privacy" },
-  { href: "/billing", label: "Plan & billing", icon: CreditCard, blurb: "How deeply I reason" },
+  { href: "/billing", label: "Plan & billing", icon: CreditCard, blurb: "Your plan" },
 ];
 
 export function RoomsMenu() {

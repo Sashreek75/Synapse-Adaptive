@@ -6,9 +6,9 @@ import { AuthProvider } from "@/components/providers/auth-provider";
 const inter = Inter({ subsets: ["latin"], variable: "--font-sans", display: "swap" });
 
 const appUrl = process.env.NEXT_PUBLIC_APP_URL || "https://synapse-adaptive.vercel.app";
-const title = "Synapse Adaptive — AI Accountability Partner for Your Goals";
+const title = "Synapse Adaptive — Your Execution Partner";
 const description =
-  "Synapse is an AI goal operating system and accountability partner. It remembers what you're working toward, helps you lock in and follow through, adapts when life changes, and never lets your important goals quietly disappear. ChatGPT helps you think — Synapse helps you achieve.";
+  "Synapse is your execution partner: it helps you consistently follow through on the goals that matter most — bringing clarity when you are overwhelmed, accountability when you are drifting, and support when you are struggling, so your intentions become outcomes. A coach gives advice; a partner stays on the hook until your behaviour changes.";
 
 export const metadata: Metadata = {
   metadataBase: new URL(appUrl),
@@ -16,7 +16,7 @@ export const metadata: Metadata = {
   description,
   applicationName: "Synapse Adaptive",
   keywords: [
-    "AI accountability partner", "accountability", "AI accountability", "accountability app",
+    "execution partner", "accountability partner", "personal execution coach", "AI accountability partner", "accountability", "accountability app",
     "AI partner for locking in", "lock in", "AI goal tracker", "goal operating system",
     "achieve your goals", "AI coach", "AI productivity partner", "follow through", "momentum",
     "adaptive AI companion", "AI goal planner", "Synapse Adaptive",

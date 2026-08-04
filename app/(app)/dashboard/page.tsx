@@ -4,24 +4,25 @@
  * HOME — not a dashboard. The beginning of a conversation with someone who has
  * been paying attention.
  *
- * Founding doc, verbatim intent: "The homepage should feel like opening ChatGPT.
- * Large. Minimal. Elegant. Conversation-first." So Home is: a calm greeting and
- * the ONE thing worth knowing, the single focus for the week (compact), a quietly
- * generated read of what's actually moving — and then the conversation, which is
- * the interface itself. Everything heavier lives in a room you step into.
+ * It answers three things and nothing else:
+ *   1. What am I working toward?            → the lead goal + its one next action (GoalsStrip)
+ *   2. What's the one thing worth my energy? → the hero line + that next action
+ *   3. Anything I should hear before I begin? → at most one quiet card (an open promise,
+ *      a real win, or drift) via CommitmentPrompt, which hides itself when there's nothing.
+ *
+ * Everything heavier — charts, the weekly focus write-up, what Synapse has learned —
+ * lives in a room you choose to step into. The conversation is the interface itself.
  */
 
 import { useMemo } from "react";
 import Link from "next/link";
-import { Sun, ArrowRight, CheckCircle2 } from "lucide-react";
+import { Sun, ArrowRight } from "lucide-react";
 import { useHealth } from "@/components/providers/health-store";
 import { Button, Skeleton } from "@/components/ui/primitives";
 import { SynapseOrb } from "@/components/synapse/orb";
 import { FocusOfWeek } from "@/components/dashboard/focus-of-week";
-import { GeneratedDashboard } from "@/components/dashboard/generated-dashboard";
 import { FirstWeek } from "@/components/dashboard/first-week";
 import { CommitmentPrompt } from "@/components/dashboard/commitment-prompt";
-import { ConvictionCard } from "@/components/dashboard/conviction-card";
 import { GoalsStrip } from "@/components/goals/goals-strip";
 import { AgentConsole } from "@/components/agent/agent-console";
 import { sessionOpener } from "@/lib/intelligence";
@@ -36,7 +37,7 @@ export default function HomePage() {
   );
 
   // The first seven days are their own experience — an unfolding investigation —
-  // shown in place of the engine strips until there's enough data for a real read.
+  // shown in place of the goal strip until there's enough of a picture.
   const distinctDays = useMemo(() => new Set(checkIns.map((c) => c.date.slice(0, 10))).size, [checkIns]);
   const inFirstWeek = !!profile.onboardedAt && distinctDays < 7;
 
@@ -88,36 +89,28 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* Proactive: it's a new day — lead with the core loop, the check-in */}
       <div className="sa-rise-2 space-y-4">
-        <GoalsStrip />
-        <ConvictionCard />
-        <CommitmentPrompt />
-        {!dailyDoneToday ? (
-          <section className="overflow-hidden rounded-3xl border bg-surface shadow-soft">
-            <div className="mesh flex flex-col gap-3 p-5 sm:flex-row sm:items-center sm:justify-between sm:p-6">
-              <div className="min-w-0">
-                <p className="inline-flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wider text-orange-600 dark:text-orange-400"><Sun className="h-3.5 w-3.5" /> A new day</p>
-                <h2 className="mt-1 text-lg font-semibold text-ink">Let&apos;s do today&apos;s check-in</h2>
-                <p className="mt-0.5 text-sm text-muted">
-                  {opener.recommendation?.title ? `A minute now, and I'll fold it into today's thinking — ${opener.recommendation.title.toLowerCase()}.` : "A minute now sharpens everything I notice for you."}
-                </p>
-              </div>
-              <Link href="/daily" className="shrink-0"><Button>Check in <ArrowRight className="h-4 w-4" /></Button></Link>
-            </div>
-          </section>
-        ) : (
-          <p className="flex items-center gap-2 px-1 text-sm text-muted"><CheckCircle2 className="h-4 w-4 shrink-0 text-emerald-500" /> You&apos;ve checked in today — I&apos;m folding it into what I know about you.</p>
-        )}
-
         {inFirstWeek ? (
           <FirstWeek />
         ) : (
           <>
-            <FocusOfWeek />
-            <GeneratedDashboard />
+            {/* 1 + 2: what you're working toward and the one next action */}
+            <GoalsStrip />
+            {/* 3: the one thing to hear before you begin — hides itself when there's nothing */}
+            <CommitmentPrompt />
           </>
         )}
+
+        {/* A quiet nudge, not a competing card */}
+        {!dailyDoneToday && (
+          <Link href="/daily" className="flex items-center justify-between gap-3 rounded-2xl border border-dashed bg-surface/60 px-4 py-3 text-sm transition hover:bg-surface-2">
+            <span className="flex items-center gap-2 text-muted"><Sun className="h-4 w-4 text-orange-500" /> A minute on today&apos;s snapshot sharpens everything I notice for you.</span>
+            <ArrowRight className="h-4 w-4 shrink-0 text-muted" />
+          </Link>
+        )}
+
+        {/* Mounted only to keep the weekly-reasoning engine warm — renders nothing. */}
+        <FocusOfWeek silent />
       </div>
 
       {/* The conversation — the interface itself */}

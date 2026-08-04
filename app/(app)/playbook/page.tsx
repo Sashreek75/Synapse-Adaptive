@@ -1,40 +1,26 @@
 "use client";
 
 /**
- * WHAT SYNAPSE HAS LEARNED ABOUT YOU — the Experience-phase surface that REVEALS
- * the (frozen) intelligence engine. This screen only makes sense because Synapse
- * has spent weeks studying one person: it shows the living relationship — theories
- * forming and being confirmed, minds changed, habits that are paying off, and the
- * questions still open — rather than a dashboard of numbers. Reads only from the
- * persisted `mind`; it never recomputes intelligence.
+ * WHO YOU'RE BECOMING — a mirror, not a report.
+ *
+ * This is the most emotional surface in the product, so it stays emotional. It shows
+ * the things that make a person stop and think "that's exactly me" or "I hadn't
+ * realised I'd changed" — the direction they're growing in, what Synapse has changed
+ * its mind about, the one most-alive thing it can honestly say, what's quietly
+ * becoming part of them, and how they tend to work. No confidence chips, no evidence
+ * counts, no lifecycle of hypotheses, no charts. The machinery still runs underneath;
+ * it just doesn't show its work here.
  */
 
 import { useEffect, useMemo } from "react";
-import { witness } from "@/lib/activity";
 import Link from "next/link";
-import { Sparkles, GitBranch, Lightbulb, RefreshCw, Trophy, HelpCircle, Check, CheckCircle2, FlaskConical, Compass, Repeat } from "lucide-react";
-import { Card, CardBody, Button, SectionLabel, ConfidenceChip, Skeleton } from "@/components/ui/primitives";
+import { witness } from "@/lib/activity";
+import { Sparkles, Compass, Trophy, GitBranch } from "lucide-react";
+import { Card, CardBody, Button, SectionLabel, Skeleton } from "@/components/ui/primitives";
 import { SynapseOrb } from "@/components/synapse/orb";
 import { useHealth } from "@/components/providers/health-store";
-import { understandingDepth } from "@/lib/person-model";
-import { UnderstandingEvolution } from "@/components/profile/understanding-evolution";
-import type { TrackedHypothesis, Habit, HypothesisStatus, WeeklyFocusReasoning } from "@/types";
-
-/* ── Lifecycle presentation — warm headings, ordered as a story ─────────────── */
-const LIFECYCLE: { status: HypothesisStatus; heading: string; blurb: string; icon: typeof Lightbulb; tint: string }[] = [
-  { status: "confirmed", heading: "Ideas we've confirmed", blurb: "Held up long enough that I trust them.", icon: CheckCircle2, tint: "text-emerald-600" },
-  { status: "supported", heading: "What I'm learning about you", blurb: "Evidence is building for these.", icon: Compass, tint: "text-orange-500" },
-  { status: "testing", heading: "Things I'm testing right now", blurb: "We're running a small test to find out.", icon: FlaskConical, tint: "text-navy-500" },
-  { status: "forming", heading: "Things we're figuring out", blurb: "Early hunches I'm still watching.", icon: Lightbulb, tint: "text-navy-400" },
-  { status: "weakened", heading: "Ideas I'm rethinking", blurb: "New data is pushing back on these.", icon: RefreshCw, tint: "text-amber-600" },
-  { status: "rejected", heading: "Ideas I changed my mind about", blurb: "I thought these mattered — the evidence said otherwise. That's worth knowing.", icon: RefreshCw, tint: "text-slate-500" },
-];
-
-function evidenceLine(h: TrackedHypothesis): string {
-  const s = h.supportingObservations;
-  const base = `${s} observation${s === 1 ? "" : "s"} behind this`;
-  return h.contradictingObservations > 0 ? `${base} · some pushback too` : base;
-}
+import { ChangedMyMind } from "@/components/profile/changed-my-mind";
+import type { TrackedHypothesis, Habit, WeeklyFocusReasoning } from "@/types";
 
 /** The single most "alive" thing Synapse can honestly say right now, drawn only
  * from what it has already recorded. Shown quietly — never manufactured. */
@@ -50,14 +36,8 @@ function livingVoice(weekly: WeeklyFocusReasoning | undefined, hypotheses: Track
   return null;
 }
 
-const HABIT_STYLE: Record<Habit["status"], { chip: string; label: string }> = {
-  established: { chip: "bg-emerald-100 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-300", label: "Sticking" },
-  building: { chip: "bg-orange-100 text-orange-700 dark:bg-orange-500/15 dark:text-orange-300", label: "Building" },
-  lapsed: { chip: "bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-400", label: "Slipped lately" },
-};
-
 export default function PlaybookPage() {
-  const { hydrated, mind, weeksTracked, profile } = useHealth();
+  const { hydrated, mind, profile } = useHealth();
 
   useEffect(() => { witness("you_opened"); }, []);
   const weekly = useMemo(() => {
@@ -65,64 +45,49 @@ export default function PlaybookPage() {
     return wk ? mind.weekly[wk] : undefined;
   }, [mind.weekly]);
 
-  const byStatus = useMemo(() => {
-    const g = new Map<HypothesisStatus, TrackedHypothesis[]>();
-    for (const h of mind.hypotheses) {
-      if (!g.has(h.status)) g.set(h.status, []);
-      g.get(h.status)!.push(h);
-    }
-    return g;
-  }, [mind.hypotheses]);
-
   if (!hydrated) return <Skeleton className="h-96 w-full rounded-2xl" />;
 
   const voice = livingVoice(weekly, mind.hypotheses, mind.habits);
-  const depth = understandingDepth(mind);
-  const depthLine = depth === "strong" ? "I know how you work pretty well now, and I keep refining it."
-    : depth === "developing" ? "I'm getting to know how you work — this sharpens every week."
-    : "Still early in reading you — but I don't need weeks to be useful; the picture just gets sharper as we go.";
-  const activeHabits = mind.habits.filter((h) => h.status !== "lapsed");
-  const lapsedHabits = mind.habits.filter((h) => h.status === "lapsed");
-  const openQ = mind.openQuestions.filter((q) => q.status === "open");
-  const answeredQ = mind.openQuestions.filter((q) => q.status === "answered");
-  const confirmedCount = (byStatus.get("confirmed") ?? []).length;
-
-  const nothingYet = !mind.hypotheses.length && !mind.habits.length && !weekly && !openQ.length;
+  const becoming = mind.habits.filter((h) => h.status === "established" || h.status === "building");
+  const nothingYet = !voice && becoming.length === 0 && !mind.playbook.length && !mind.trajectory?.statement && !(profile.goals && profile.goals.length);
 
   return (
     <div className="mx-auto max-w-2xl space-y-6">
       <header className="flex items-center gap-3">
         <SynapseOrb size={44} className="shrink-0" />
         <div>
-          <h1 className="text-2xl font-semibold tracking-tight text-ink">You</h1>
-          <p className="text-sm text-muted">{"Everything I learn about you here has one purpose: helping you make better calls, day to day."}</p>
-          <p className="mt-0.5 text-xs text-muted">{depthLine}</p>
+          <h1 className="text-2xl font-semibold tracking-tight text-ink">Who you&apos;re becoming</h1>
+          <p className="text-sm text-muted">{"Not a report on you — a mirror. Here's the person I see taking shape."}</p>
         </div>
       </header>
 
+      <ChangedMyMind />
+
       {(mind.trajectory?.statement || (profile.goals && profile.goals.length > 0)) && (
         <Card className="overflow-hidden"><div className="mesh"><CardBody className="sm:p-6">
-          <SectionLabel className="mb-2 flex items-center gap-1.5"><Compass className="h-3.5 w-3.5 text-orange-500" /> Who you&apos;re becoming</SectionLabel>
-          {mind.trajectory?.statement && <p className="mb-3 text-ink">{`You're working to become: ${mind.trajectory.statement}. I weigh what I notice against that.`}</p>}
-          <ul className="space-y-1.5">
-            {profile.goals.map((g, i) => (
-              <li key={i} className="flex items-start gap-2 text-ink">
-                <span className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-orange-500" />{g}
-              </li>
-            ))}
-          </ul>
+          <SectionLabel className="mb-2 flex items-center gap-1.5"><Compass className="h-3.5 w-3.5 text-orange-500" /> The direction you&apos;re growing in</SectionLabel>
+          {mind.trajectory?.statement && <p className="mb-3 text-ink">{`You're working to become: ${mind.trajectory.statement}.`}</p>}
+          {profile.goals && profile.goals.length > 0 && (
+            <ul className="space-y-1.5">
+              {profile.goals.map((g, i) => (
+                <li key={i} className="flex items-start gap-2 text-ink">
+                  <span className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-orange-500" />{g}
+                </li>
+              ))}
+            </ul>
+          )}
           {profile.definitionOfBetter && <p className="mt-3 text-sm text-muted">{`What better looks like: ${profile.definitionOfBetter}`}</p>}
         </CardBody></div></Card>
       )}
 
       {nothingYet ? (
         <Card><CardBody className="py-10 text-center">
-          <p className="mx-auto max-w-md text-muted">{"This page fills in as we work together — but don't wait for it. Tell me what you're working toward and let's move on something today; I'll capture what I learn here as we go."}</p>
+          <p className="mx-auto max-w-md text-muted">{"This mirror fills in as we work together — but don't wait for it. Tell me what you're working toward and let's move on something today; I'll notice who you're becoming as we go."}</p>
           <Link href="/daily" className="mt-5 inline-block"><Button>Do today&apos;s check-in <Sparkles className="h-4 w-4" /></Button></Link>
         </CardBody></Card>
       ) : (
         <>
-          {/* THE LIVING VOICE — the one most alive thing, quietly. */}
+          {/* THE ONE MOST-ALIVE THING — said quietly, as a person would. */}
           {voice && (
             <Card className="overflow-hidden"><div className="mesh"><CardBody className="sm:p-6">
               <div className="flex items-start gap-3">
@@ -135,101 +100,21 @@ export default function PlaybookPage() {
             </CardBody></div></Card>
           )}
 
-          {/* RECENT DISCOVERY — the non-obvious thing, with why it's non-obvious. */}
-          {weekly?.surprise && (
-            <Card><CardBody className="sm:p-6">
-              <SectionLabel className="mb-2 flex items-center gap-1.5"><Sparkles className="h-3.5 w-3.5 text-orange-500" /> A recent discovery</SectionLabel>
-              <p className="text-ink">{weekly.surprise.observation}</p>
-              <p className="mt-1.5 text-sm text-muted">{weekly.surprise.whyNonObvious}</p>
-              <div className="mt-3 flex items-center gap-2">
-                <ConfidenceChip level={weekly.surprise.confidence} />
-                <span className="text-xs text-muted">{weekly.surprise.recurrence}</span>
-              </div>
-            </CardBody></Card>
-          )}
-
-          {/* THEORIES BY LIFECYCLE — forming → confirmed → rethought. The heart of
-              "this thing is observing, updating, and revising." */}
-          {LIFECYCLE.filter((l) => (byStatus.get(l.status) ?? []).length > 0).map((l) => {
-            const Icon = l.icon;
-            const items = byStatus.get(l.status)!;
-            const muted = l.status === "rejected" || l.status === "weakened";
-            return (
-              <section key={l.status}>
-                <p className="mb-1 flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wider text-muted"><Icon className={`h-3.5 w-3.5 ${l.tint}`} /> {l.heading}</p>
-                <p className="mb-2 text-xs text-muted">{l.blurb}</p>
-                <div className="space-y-2">
-                  {items.map((h) => (
-                    <Card key={h.id}><CardBody className="p-4">
-                      <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
-                        <p className={muted ? "text-muted line-through decoration-slate-300" : "text-ink"}>{h.statement}</p>
-                        {!muted && <div className="shrink-0"><ConfidenceChip level={h.confidence} /></div>}
-                      </div>
-                      {!muted && <p className="mt-1.5 text-xs text-muted">{evidenceLine(h)}</p>}
-                      {h.status === "testing" && h.suggestedExperiment && (
-                        <p className="mt-2 flex items-start gap-1.5 rounded-xl bg-surface-2 p-2.5 text-xs text-ink"><FlaskConical className="mt-0.5 h-3.5 w-3.5 shrink-0 text-navy-500" /> {h.suggestedExperiment}</p>
-                      )}
-                    </CardBody></Card>
-                  ))}
-                </div>
-              </section>
-            );
-          })}
-
-          {/* HABITS THAT SEEM TO BE HELPING — where the loop pays off. */}
-          {(activeHabits.length > 0 || lapsedHabits.length > 0) && (
+          {/* WHAT'S BECOMING PART OF YOU — habits, stated as identity, no counts. */}
+          {becoming.length > 0 && (
             <section>
-              <p className="mb-2 flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wider text-muted"><Trophy className="h-3.5 w-3.5 text-emerald-600" /> Habits that seem to be helping</p>
+              <p className="mb-2 flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wider text-muted"><Trophy className="h-3.5 w-3.5 text-emerald-600" /> What&apos;s becoming part of you</p>
               <div className="space-y-2">
-                {[...activeHabits, ...lapsedHabits].map((h) => {
-                  const st = HABIT_STYLE[h.status];
-                  return (
-                    <Card key={h.id}><CardBody className="p-4">
-                      <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
-                        <p className={h.status === "lapsed" ? "text-muted" : "text-ink"}>{h.statement}</p>
-                        <span className={`shrink-0 rounded-full px-2.5 py-1 text-xs font-medium ${st.chip}`}>{st.label}</span>
-                      </div>
-                      {h.reinforcements > 0 && h.status !== "lapsed" && (
-                        <p className="mt-1.5 flex items-center gap-1.5 text-xs text-muted"><Repeat className="h-3.5 w-3.5" /> {"Held up across "}{h.reinforcements}{h.reinforcements === 1 ? " experiment" : " experiments"}</p>
-                      )}
-                    </CardBody></Card>
-                  );
-                })}
+                {becoming.map((h) => (
+                  <Card key={h.id}><CardBody className="p-4">
+                    <p className="text-ink">{h.statement}</p>
+                  </CardBody></Card>
+                ))}
               </div>
             </section>
           )}
 
-          {/* QUESTIONS I'M WATCHING — makes "still figuring you out" visible. */}
-          {(openQ.length > 0 || answeredQ.length > 0) && (
-            <Card><CardBody className="sm:p-6">
-              <SectionLabel className="mb-2 flex items-center gap-1.5"><HelpCircle className="h-3.5 w-3.5 text-orange-500" /> Questions I&apos;m watching</SectionLabel>
-              {openQ.length ? (
-                <ul className="space-y-2.5">
-                  {openQ.slice(0, 5).map((q) => (
-                    <li key={q.id} className="flex items-start gap-2.5 text-ink">
-                      <span className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-orange-500" />
-                      <span>{q.question}{q.whyItMatters && <span className="block text-sm text-muted">{q.whyItMatters}</span>}</span>
-                    </li>
-                  ))}
-                </ul>
-              ) : <p className="text-sm text-muted">{"Nothing open right now — I'll add questions as your patterns raise them."}</p>}
-              {answeredQ.length > 0 && (
-                <div className="mt-4 border-t pt-4">
-                  <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-muted">Ones we&apos;ve answered</p>
-                  <ul className="space-y-2">
-                    {answeredQ.slice(-4).map((q) => (
-                      <li key={q.id} className="flex items-start gap-2.5">
-                        <Check className="mt-0.5 h-4 w-4 shrink-0 text-emerald-600" />
-                        <span className="text-sm"><span className="text-muted">{q.question}</span>{q.answer && <span className="block text-ink">{q.answer}</span>}</span>
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              )}
-            </CardBody></Card>
-          )}
-
-          {/* HOW YOU WORK — the durable Playbook learnings, condensed (no graphs). */}
+          {/* HOW YOU WORK — durable self-recognition, in words. */}
           {mind.playbook.length > 0 && (
             <Card><CardBody className="sm:p-6">
               <SectionLabel className="mb-2 flex items-center gap-1.5"><GitBranch className="h-3.5 w-3.5 text-orange-500" /> How you work</SectionLabel>
@@ -243,18 +128,6 @@ export default function PlaybookPage() {
               </ul>
             </CardBody></Card>
           )}
-
-          {/* HOW MY UNDERSTANDING HAS EVOLVED — folded in from the old profile;
-              also records today's understanding snapshot (memory capture). */}
-          <UnderstandingEvolution />
-
-          {/* PROGRESS — growth, stated in words, not charts. */}
-          <p className="flex items-start gap-2 rounded-2xl bg-surface-2 p-3 text-xs text-muted">
-            <Sparkles className="mt-0.5 h-3.5 w-3.5 shrink-0 text-orange-500" />
-            {weeksTracked > 0
-              ? `We've been at this across ${weeksTracked} check-in${weeksTracked === 1 ? "" : "s"}${confirmedCount ? ` — ${confirmedCount} idea${confirmedCount === 1 ? "" : "s"} confirmed so far` : ""}. It compounds, it follows you, and it's all in service of one thing: better decisions, day to day.`
-              : "This compounds the longer we work together — so the calls I help you make keep getting sharper."}
-          </p>
         </>
       )}
     </div>

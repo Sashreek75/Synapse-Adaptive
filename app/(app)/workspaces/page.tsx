@@ -1,22 +1,27 @@
 "use client";
 
+/**
+ * SPACES — an implementation detail that occasionally becomes visible.
+ *
+ * The user doesn't browse a library of tools or operate a builder here. They work
+ * with Synapse in conversation; when a space would genuinely help, Synapse offers
+ * one, and it shows up here so it can be reopened. If someone never visits this
+ * page, that's perfectly fine. So this is just a quiet shelf of what Synapse has
+ * made, with a soft pointer back to the conversation — no build box, no example
+ * chips, nothing to manage.
+ */
+
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { ArrowRight, LayoutGrid, Sparkles, Archive, ArchiveRestore, Trash2, Target } from "lucide-react";
-import { Button } from "@/components/ui/primitives";
+import { ArrowRight, LayoutGrid, Archive, ArchiveRestore, Trash2, Target, MessageCircle } from "lucide-react";
+import Link from "next/link";
 import { SynapseOrb } from "@/components/synapse/orb";
-import { useHealth } from "@/components/providers/health-store";
-import { loadWorkspaces, activeWorkspaces, archiveWorkspace, deleteWorkspace, createWorkspaceFromRequest, type Workspace } from "@/lib/workspaces";
+import { loadWorkspaces, archiveWorkspace, deleteWorkspace, type Workspace } from "@/lib/workspaces";
 import { getGoal } from "@/lib/goals";
-
-const EXAMPLES = ["An SAT mistake tracker", "A mock interview", "A weekly planning board", "A space to analyze my writing"];
 
 export default function WorkspacesPage() {
   const router = useRouter();
-  const { profile, mind } = useHealth();
   const [all, setAll] = useState<Workspace[]>([]);
-  const [req, setReq] = useState("");
-  const [busy, setBusy] = useState(false);
   const [showArchived, setShowArchived] = useState(false);
 
   useEffect(() => {
@@ -26,56 +31,36 @@ export default function WorkspacesPage() {
     return () => window.removeEventListener("synapse:workspaces", sync);
   }, []);
 
-  const build = async (request: string) => {
-    const r = request.trim();
-    if (!r || busy) return;
-    setBusy(true);
-    try {
-      const ws = await createWorkspaceFromRequest(r, { goal: mind?.trajectory?.statement, goals: profile.goals });
-      router.push(`/workspaces/${ws.id}`);
-    } finally { setBusy(false); }
-  };
-
   const list = showArchived ? all.filter((w) => w.archived) : all.filter((w) => !w.archived);
   const archivedCount = all.filter((w) => w.archived).length;
 
   return (
-    <div className="space-y-6">
+    <div className="mx-auto max-w-2xl space-y-6">
       <header className="flex items-center gap-3">
-        <SynapseOrb size={40} state={busy ? "thinking" : "idle"} className="shrink-0" />
+        <SynapseOrb size={40} className="shrink-0" />
         <div>
           <h1 className="text-2xl font-semibold tracking-tight text-ink">Your spaces</h1>
-          <p className="text-sm text-muted">Tools I build when they help — reopenable, attachable to a goal, archivable like documents.</p>
+          <p className="text-sm text-muted">Places I build when they&apos;ll help. You don&apos;t manage these — just ask me for one in the conversation and it&apos;ll appear here.</p>
         </div>
       </header>
-
-      <div className="rounded-2xl border bg-surface p-4 shadow-soft">
-        <div className="flex gap-2">
-          <input value={req} onChange={(e) => setReq(e.target.value)} onKeyDown={(e) => e.key === "Enter" && build(req)}
-            placeholder="Describe a space you want..." className="min-w-0 flex-1 rounded-xl border bg-surface px-3 py-2.5 text-sm text-ink placeholder:text-muted focus:outline-none" />
-          <Button onClick={() => build(req)} disabled={busy || !req.trim()}>{busy ? "Building..." : "Build it"} <ArrowRight className="h-4 w-4" /></Button>
-        </div>
-        <div className="mt-3 flex flex-wrap gap-2">
-          {EXAMPLES.map((e) => (
-            <button key={e} onClick={() => build(e)} disabled={busy}
-              className="rounded-full border border-dashed bg-surface px-3 py-1 text-xs text-muted transition hover:border-solid hover:text-ink disabled:opacity-50">
-              <Sparkles className="mr-1 inline h-3 w-3 text-orange-500" />{e}
-            </button>
-          ))}
-        </div>
-      </div>
 
       {archivedCount > 0 && (
         <div className="flex justify-end">
           <button onClick={() => setShowArchived((v) => !v)} className="inline-flex items-center gap-1.5 text-xs font-medium text-muted hover:text-ink">
-            <Archive className="h-3.5 w-3.5" /> {showArchived ? `Show active` : `Archived (${archivedCount})`}
+            <Archive className="h-3.5 w-3.5" /> {showArchived ? "Show active" : `Archived (${archivedCount})`}
           </button>
         </div>
       )}
 
       {list.length === 0 ? (
         <div className="rounded-2xl border border-dashed bg-surface/50 p-8 text-center text-sm text-muted">
-          <LayoutGrid className="mx-auto mb-2 h-5 w-5" /> {showArchived ? "Nothing archived." : "No spaces yet. Ask me for one above — or just say “build me a…” anywhere."}
+          <LayoutGrid className="mx-auto mb-2 h-5 w-5" />
+          {showArchived ? "Nothing archived." : "No spaces yet — and that's fine. When something would help you follow through, I'll make it."}
+          {!showArchived && (
+            <Link href="/dashboard#conversation" className="mt-4 inline-flex items-center gap-1.5 text-xs font-medium text-orange-600 hover:text-orange-500 dark:text-orange-400">
+              <MessageCircle className="h-3.5 w-3.5" /> Ask me for one
+            </Link>
+          )}
         </div>
       ) : (
         <div className="grid gap-3 sm:grid-cols-2">

@@ -88,7 +88,7 @@ function Hero() {
               <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-orange-400 opacity-60" />
               <span className="relative inline-flex h-2 w-2 rounded-full bg-orange-500" />
             </span>
-            Not a chatbot — an operating system for your goals
+            Not a chatbot — your execution partner
           </div>
 
           <h1 className="animate-fade-up mt-6 text-balance text-5xl font-bold leading-[1.05] tracking-tight text-ink sm:text-6xl xl:text-7xl">
@@ -456,7 +456,7 @@ function Footer() {
               Synapse Adaptive
             </div>
             <p className="mt-3 max-w-sm text-sm leading-relaxed text-muted">
-              An adaptive companion that remembers what you&apos;re working toward and helps you actually get there.
+              The companion that brings accountability, clarity, and support until your goals become reality.
             </p>
           </div>
           <div className="text-sm text-muted">
