@@ -26,7 +26,8 @@ import { readMomentum } from "@/lib/momentum";
 import { loadHistory } from "@/lib/focus-session";
 import { computeStreak } from "@/lib/intelligence";
 import { pftCooldownFactor } from "@/lib/pft";
-import type { Mind, CheckIn } from "@/types";
+import type { CheckIn } from "@/components/providers/health-store";
+import type { Mind } from "@/types";
 
 export type PresenceKind = "commitment" | "opportunity" | "drift" | "pre_failure" | "observation" | "celebration";
 

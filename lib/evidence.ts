@@ -18,7 +18,7 @@ import { winningStrategies, failedStrategies } from "@/lib/decisions";
 import { loadPrinciples } from "@/lib/principles";
 import { activeGoals, daysSinceProgress } from "@/lib/goals";
 import { computeStreak } from "@/lib/intelligence";
-import type { CheckIn } from "@/types";
+import type { CheckIn } from "@/components/providers/health-store";
 
 export type EvidenceLevel = 1 | 2 | 3 | 4 | 5;
 
