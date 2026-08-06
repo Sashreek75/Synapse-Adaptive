@@ -114,7 +114,7 @@ interface Store {
   tourDone: boolean;
   completeTour: () => void;
   resetTour: () => void;
-  reset: () => void;
+  reset: () => Promise<void>;
 }
 
 const HealthContext = createContext<Store | null>(null);
@@ -360,7 +360,51 @@ export function HealthProvider({ children }: { children: React.ReactNode }) {
     tourDone,
     completeTour: () => { setTourDone(true); persist({ tourDone: true }); },
     resetTour: () => { setTourDone(false); persist({ tourDone: false }); },
-    reset: () => { setProfile(DEFAULT_PROFILE); setCheckIns([]); setProviderQuestions([]); setChatState([]); setTourDone(false); setContextNotes([]); setLastFocusAreas([]); setUnderstandingLog([]); setRecommendationLog([]); setExperiments([]); setSpaces([]); setMind(DEFAULT_MIND); try { localStorage.removeItem(KEY); } catch {} },
+    reset: async () => {
+      // Cancel any pending debounced cloud write so an in-flight save can't resurrect data mid-delete.
+      try { if (syncTimer.current) clearTimeout(syncTimer.current); } catch {}
+
+      // 1. Reset in-memory state to a brand-new account.
+      setProfile(DEFAULT_PROFILE); setCheckIns([]); setProviderQuestions([]); setChatState([]); setTourDone(false); setContextNotes([]); setLastFocusAreas([]); setUnderstandingLog([]); setRecommendationLog([]); setExperiments([]); setSpaces([]); setMind(DEFAULT_MIND);
+
+      // 2. WIPE THE CLOUD ROW FIRST (awaited). This is the crucial part: the account syncs to a
+      //    Supabase row, and on reload the reconcile step is last-write-wins. If we only cleared
+      //    localStorage, reload would find no local copy, treat the cloud as newest, and restore
+      //    everything. So we overwrite the cloud with an empty snapshot and wait for it to land.
+      const emptySnap = {
+        profile: DEFAULT_PROFILE, checkIns: [], providerQuestions: [], chat: [], tourDone: false,
+        contextNotes: [], lastFocusAreas: [], understandingLog: [], recommendationLog: [],
+        experiments: [], spaces: [], mind: DEFAULT_MIND, updatedAt: new Date().toISOString(),
+      };
+      try {
+        const sb = getSupabase();
+        if (sb) {
+          const { data } = await sb.auth.getSession();
+          const uid = data.session?.user?.id;
+          if (uid) await saveCloud(sb, uid, emptySnap as unknown as Record<string, unknown>);
+        }
+      } catch {}
+
+      // 3. Sweep the WHOLE local namespace — every decoupled behavioral layer (goals, commitments,
+      //    decisions, principles, mind-shifts, workspaces, presence, focus history, report caches, …)
+      //    owns its own `synapse.*` key. Leave non-namespaced keys alone (theme, Supabase auth tokens).
+      try {
+        for (const store of [localStorage, sessionStorage]) {
+          const doomed: string[] = [];
+          for (let i = 0; i < store.length; i++) { const k = store.key(i); if (k && k.startsWith("synapse.")) doomed.push(k); }
+          doomed.forEach((k) => store.removeItem(k));
+        }
+      } catch {}
+
+      // 4. Seed a fresh empty local snapshot so a reload agrees with the wiped cloud.
+      try { localStorage.setItem(KEY, JSON.stringify(emptySnap)); } catch {}
+
+      // 5. Nudge every surface that reads a decoupled store to re-read (now empty).
+      try {
+        ["synapse:goals", "synapse:commitments", "synapse:decisions", "synapse:principles", "synapse:mindshifts", "synapse:convictions", "synapse:workspaces", "synapse:focus-end"]
+          .forEach((e) => window.dispatchEvent(new CustomEvent(e)));
+      } catch {}
+    },
   };
 
   return <HealthContext.Provider value={value}>{children}</HealthContext.Provider>;

@@ -93,7 +93,7 @@ export default function SettingsPage() {
           ) : (
             <div className="flex items-center gap-2">
               <span className="text-sm text-muted">Are you sure?</span>
-              <Button onClick={() => { reset(); setConfirmDelete(false); }} className="bg-orange-600">Yes, delete</Button>
+              <Button onClick={async () => { setConfirmDelete(false); try { await reset(); } catch {} try { window.location.assign("/dashboard"); } catch {} }} className="bg-orange-600">Yes, delete</Button>
               <Button variant="ghost" onClick={() => setConfirmDelete(false)}>Cancel</Button>
             </div>
           )}

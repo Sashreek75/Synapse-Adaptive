@@ -63,6 +63,30 @@ understanding you or diagnosing you, but for *changing* you.
 > Great advice is not enough. Correct reasoning is not enough. Empathy is not enough. Understanding is
 > not enough. **Synapse only succeeds when reality changes.**
 
+## The hierarchy — mission, method, mechanisms, result
+
+The deeper truth behind everything: people think their problem is motivation. Their real problem is
+**uncertainty.** They don't know if they're working on the right thing, if they're making progress, if
+they're wasting time, if they're missing something important, if today's effort will matter, or why they
+keep getting stuck. That uncertainty creates hesitation; hesitation creates procrastination; procrastination
+destroys consistency; and consistency is what determines outcomes. So the enemy is uncertainty, and the
+result we sell is follow-through. Those are different layers, and keeping them straight is what stops Synapse
+from drifting into a generic "AI decision assistant":
+
+1. **Mission (what we sell):** help people consistently follow through on what matters most — until they
+   become the kind of person who follows through without needing Synapse.
+2. **Method (how we do it):** reduce uncertainty until the next right action is obvious. Follow-through is
+   the *consequence* of clarity, not a thing to nag into existence. A great coach removes uncertainty until
+   action becomes inevitable.
+3. **Mechanisms (what we build with):** evidence, diagnosis, accountability, adaptive support, and presence.
+   Accountability exists to protect clarity over time; support exists to make hard actions possible; presence
+   exists to deliver clarity at the right moment.
+4. **Result (what the person becomes):** disciplined, confident, and independent.
+
+The method is subordinate to the mission, never a replacement for it. Reducing uncertainty is *why* every
+recommendation exists — but the point is always that they follow through and change, not merely that they
+feel clear.
+
 ## The promise
 
 If someone uses Synapse consistently, they should become:
