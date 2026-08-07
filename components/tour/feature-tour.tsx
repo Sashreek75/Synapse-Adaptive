@@ -7,7 +7,7 @@
  */
 
 import { useState } from "react";
-import { ArrowRight, Target, Flag, MessageCircle, Wrench, CalendarCheck, ShieldCheck } from "lucide-react";
+import { ArrowRight, Compass, Target, ShieldCheck, Wrench, Sparkles } from "lucide-react";
 import { useHealth } from "@/components/providers/health-store";
 import { SynapseOrb } from "@/components/synapse/orb";
 import { Button } from "@/components/ui/primitives";
@@ -15,34 +15,29 @@ import { cn } from "@/lib/utils";
 
 const steps = [
   {
+    icon: Compass,
+    title: "Start with what you're chasing",
+    body: "Tell Synapse what you want — even the embarrassingly big goal. Just naming it is enough; it works out where to aim, so your energy goes to what actually matters.",
+  },
+  {
     icon: Target,
-    title: "Start with your goals",
-    body: "Synapse is a goal operating system. Name the things you're working toward — even the embarrassingly big ones. Just the goal is enough; it learns the rest as you go.",
-  },
-  {
-    icon: Flag,
-    title: "Each goal becomes a mission",
-    body: "Synapse breaks a goal into the fronts you have to win, hunts the real bottleneck (often not the obvious one), and always leaves you one clear next move — then reassesses as reality changes.",
-  },
-  {
-    icon: MessageCircle,
-    title: "Talk to it anywhere",
-    body: "The orb travels with you on every page. Ask anything, and it can take you where you need to go, keep you accountable, or notice when an important goal is quietly slipping.",
-  },
-  {
-    icon: Wrench,
-    title: "It builds what you need",
-    body: "When a tool would help more than a paragraph — a mock interview, a tracker, a study plan — Synapse offers to build it. Your spaces attach to your goals, remember your progress, and improve over time.",
-  },
-  {
-    icon: CalendarCheck,
-    title: "Check in, review weekly",
-    body: "A quick daily check-in keeps things sharp. Each week, your review lands focused on your missions and follow-through — what moved, what's stuck, and what to do next.",
+    title: "One clear next step — always",
+    body: "Open a goal and Synapse gives you the single most important thing to do next, and why. No dashboards to manage, no wall of tasks — just the obvious next move.",
   },
   {
     icon: ShieldCheck,
-    title: "It won't let goals slip",
-    body: "Synapse's job isn't to answer questions — it's to help you actually reach the goals you chose, and to stay with you until something has really changed.",
+    title: "It won't let it slip",
+    body: "It remembers what you committed to, notices when you go quiet, and reaches out when it genuinely matters — keeping you accountable, never nagging.",
+  },
+  {
+    icon: Wrench,
+    title: "It helps with the hard part",
+    body: "When a plan, a tool, or a push would help more than advice, Synapse builds it with you — right in the conversation — and stays until the thing is actually done.",
+  },
+  {
+    icon: Sparkles,
+    title: "It gets sharper the longer we work together",
+    body: "Every conversation teaches it what really moves you, so its guidance fits you more each week — and, done right, you need it less over time.",
   },
 ];
 

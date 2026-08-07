@@ -48,14 +48,20 @@ const NL = String.fromCharCode(10);
 // So Synapse can answer "what does this mean?" about whatever the user is looking at.
 const PAGE_DESC: Record<string, string> = {
   "/dashboard": "the home conversation",
+  "/onboarding": "first-time setup — they're choosing which areas of life to focus on and how they want Synapse to coach them",
+  "/goals": "their list of goals",
   "/daily": "today's check-in / daily snapshot",
-  "/stats": "their numbers and trends",
-  "/report": "their weekly report",
-  "/playbook": "the page showing what Synapse understands about them",
+  "/stats": "their progress — the honest read on whether they're getting better",
+  "/report": "their weekly review",
+  "/playbook": "the page showing who Synapse thinks they're becoming",
+  "/workspaces": "the spaces Synapse has built for them",
+  "/settings": "their settings",
+  "/billing": "their plan and billing",
   "/focus": "a focus session",
 };
 function describePage(p: string): string {
   if (!p || p === "/") return "the home conversation";
+  if (p.startsWith("/goals/")) return "a specific goal they're working on";
   const hit = Object.keys(PAGE_DESC).find((k) => p === k || p.startsWith(k + "/"));
   return hit ? PAGE_DESC[hit] : "another part of the app";
 }
@@ -178,6 +184,9 @@ export function CompanionPresence() {
         "Right now it is " + now + ".",
         "You are Synapse, riding along in a small companion window the user opened over whatever page they're on — one continuous conversation that travels with them everywhere. Answer right here in 1-3 short sentences: warm, specific, and immediately useful. Lead with the single most valuable thing and stop; never write a long paragraph or a wall of text — if it is getting long, cut it. Never mention pages, routes, or navigation — you are simply with them.",
         "The user is currently looking at " + describePage(here) + ". If they ask what something here means — a check-in question, one of their numbers, what the weekly report is saying — answer it directly and specifically, using what you know about them. They are already on this page, so never offer to take them where they already are.",
+        here.startsWith("/onboarding")
+          ? "IMPORTANT CONTEXT: they are in first-time setup right now, on the step where they pick focus areas — and they can select MORE THAN ONE. The exact options on screen are: Work & career; Studying & learning; Focus & productivity; Fitness & training; Building better habits; Stress & wellbeing; Health & wellbeing; Personal growth. If they ask which to choose, first tell them they can pick several, then point to the specific option(s) from THIS list that match what they told you (e.g. wanting to be more focused, productive, and disciplined → pick 'Focus & productivity', and usually 'Building better habits' too). Do NOT tell them to lock in a task for tomorrow or start a focus session — they are still setting up; keep it to choosing the right area(s) on this screen."
+          : "",
         goal ? "They are working to become: " + goal + "." : "",
         goalsContextBlock(),
         challengeContextBlock(),

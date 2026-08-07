@@ -11,7 +11,6 @@ import {
   MessageCircleQuestion,
   ShieldCheck,
   Sparkles,
-  Timer,
 } from "lucide-react";
 import { Button } from "@/components/ui/primitives";
 import { ThemeToggle } from "@/components/shell/theme-toggle";
@@ -92,14 +91,14 @@ function Hero() {
           </div>
 
           <h1 className="animate-fade-up mt-6 text-balance text-5xl font-bold leading-[1.05] tracking-tight text-ink sm:text-6xl xl:text-7xl">
-            The support for your
-            <span className="block sa-gradient-text">embarrassingly big goals.</span>
+            Know what to do next.
+            <span className="block sa-gradient-text">Then actually do it.</span>
           </h1>
 
           <p className="animate-fade-up mx-auto mt-6 max-w-xl text-lg leading-relaxed text-muted lg:mx-0">
-            Synapse turns the goals you&apos;re almost afraid to say out loud into missions it
-            helps you actually win — breaking each one down, hunting the real bottleneck, building
-            the tools you need, and refusing to let it quietly slip.
+            Synapse is your partner in follow-through. It cuts the overwhelm down to the one thing
+            that matters most today, shows you why, and stays on your side until it&apos;s done —
+            the clarity, direction, accountability, and support a great coach would give you.
           </p>
 
           <div className="animate-fade-up mt-9 flex flex-col items-center justify-center gap-3 sm:flex-row lg:justify-start">
@@ -112,8 +111,8 @@ function Hero() {
           </div>
 
           <div className="animate-fade-up mt-8 flex flex-wrap items-center justify-center gap-x-6 gap-y-2 text-sm text-muted lg:justify-start">
-            <span className="inline-flex items-center gap-1.5"><Timer className="h-4 w-4 text-navy-400" /> Turns goals into missions</span>
-            <span className="inline-flex items-center gap-1.5"><ShieldCheck className="h-4 w-4 text-navy-400" /> Builds the tools you need</span>
+            <span className="inline-flex items-center gap-1.5"><Compass className="h-4 w-4 text-navy-400" /> Always one clear next step</span>
+            <span className="inline-flex items-center gap-1.5"><ShieldCheck className="h-4 w-4 text-navy-400" /> Keeps you accountable</span>
             <span className="inline-flex items-center gap-1.5"><Lock className="h-4 w-4 text-navy-400" /> Private by design</span>
           </div>
 
@@ -177,12 +176,13 @@ function Problem() {
   ];
   return (
     <Section>
-      <Eyebrow>The gap</Eyebrow>
-      <H2>You set out to become someone. Then ordinary life happens — and you&apos;re on your own.</H2>
+      <Eyebrow>The real problem</Eyebrow>
+      <H2>You don&apos;t stall because you&apos;re lazy. You stall because you&apos;re not sure.</H2>
       <p className="mt-4 max-w-2xl text-lg text-muted">
-        The problem was never a lack of information — you already know roughly what to do.
-        What&apos;s missing is someone who remembers what you&apos;re working toward, notices
-        when you slip, and keeps you honest. The questions that actually keep you up:
+        You already know roughly what to do. What stops you is uncertainty — is this the right
+        thing? am I making progress? what am I missing? — and uncertainty turns into hesitation,
+        hesitation into another lost week. What&apos;s missing isn&apos;t information. It&apos;s
+        someone who removes the doubt and keeps you moving. The questions that actually stall you:
       </p>
       <div className="mt-10 grid gap-4 sm:grid-cols-2">
         {qs.map((q) => (
@@ -201,19 +201,18 @@ function Solution() {
       <div className="absolute inset-0 sa-grid opacity-60" />
       <div className="relative mx-auto max-w-6xl px-5 py-20 sm:py-28">
         <Reveal>
-          <Eyebrow className="text-orange-300">The shift</Eyebrow>
-          <H2 className="text-white">From a chatbot that forgets to a companion that remembers.</H2>
+          <Eyebrow className="text-orange-300">What Synapse gives you</Eyebrow>
+          <H2 className="text-white">Everything a great coach gives you — four things, every day.</H2>
           <p className="mt-4 max-w-2xl text-lg text-navy-100/80">
-            A generic AI answers your question and forgets you the moment you close it.
-            Synapse stays. It comes to know you not to impress you with insight, but to help
-            you keep moving toward what you actually want — and to notice, honestly, when
-            you&apos;re drifting away from it.
+            A generic AI answers a question and forgets you the moment you close it. Synapse stays,
+            and it does the four things that actually move you from intention to done.
           </p>
-          <div className="mt-12 grid gap-5 md:grid-cols-3">
+          <div className="mt-12 grid gap-5 md:grid-cols-2 lg:grid-cols-4">
             {[
-              { icon: Brain, t: "Remembers what you're working toward", d: "Your goals, your commitments, what's worked and what hasn't — so nothing important quietly slips." },
-              { icon: Compass, t: "Keeps you moving", d: "Notices when momentum builds and when it fades, then offers one honest, doable next thing — accountability, not nagging." },
-              { icon: ShieldCheck, t: "Honest enough to challenge you", d: "Shows its reasoning, admits what it doesn't know, and pushes back when you're drifting from what you said you wanted." },
+              { icon: Compass, t: "Direction", d: "It cuts through the noise to the single highest-leverage thing to work on — so your energy goes where it actually counts, not everywhere at once." },
+              { icon: Sparkles, t: "Clarity", d: "It reduces the uncertainty until the next step is obvious: one clear action, and the reason behind it. You always know exactly what to do next." },
+              { icon: ShieldCheck, t: "Accountability", d: "It remembers what you committed to, notices when you drift, and follows up — and stays honest with you. Accountability, never nagging." },
+              { icon: HeartPulse, t: "Support", d: "When a plan, a tool, or a push would help, it's there — breaking the hard thing down and building what you need to actually get through it." },
             ].map(({ icon: Icon, t, d }) => (
               <div key={t} className="rounded-2xl border border-white/10 bg-white/5 p-7 backdrop-blur transition-colors hover:bg-white/[0.08]">
                 <span className="grid h-11 w-11 place-items-center rounded-xl bg-orange-500/15">
@@ -232,14 +231,14 @@ function Solution() {
 
 function HowItWorks() {
   const steps = [
-    { icon: MessageCircleQuestion, t: "Just talk to it", d: "Tell Synapse what you're working toward and what's in the way. No forms, no fixed surveys — an honest conversation with someone who remembers." },
-    { icon: Brain, t: "It stays with you", d: "Every conversation deepens what it understands about you — a private picture of what actually moves you, and what pulls you off course." },
-    { icon: CalendarCheck, t: "You keep moving", d: "One clear next step, the reason behind it, and a companion who'll notice next time whether you followed through." },
+    { icon: MessageCircleQuestion, t: "Tell it what you're chasing", d: "Name a goal — even the embarrassingly big one. No forms, no surveys. Just say what you want; it learns the rest as you talk." },
+    { icon: Compass, t: "It finds the one thing", d: "Synapse cuts your goal down to the single highest-leverage next step, and tells you why that's the move right now — not a to-do list, one clear action." },
+    { icon: CalendarCheck, t: "It keeps you moving", d: "It follows up, notices when you drift, and builds what you need to get unstuck — staying with you until it's actually done." },
   ];
   return (
     <Section id="how">
       <Eyebrow>How it works</Eyebrow>
-      <H2>Talk. Commit. Keep moving.</H2>
+      <H2>Say the goal. See the one thing. Follow through.</H2>
       <div className="relative mt-12 grid gap-6 md:grid-cols-3">
         <div className="absolute left-[16%] right-[16%] top-11 hidden border-t border-dashed border-line md:block" />
         {steps.map(({ icon: Icon, t, d }, i) => (
@@ -430,11 +429,12 @@ function CTA() {
         <div className="relative">
           <div className="mx-auto mb-7 w-fit"><SynapseOrb size={72} /></div>
           <h2 className="mx-auto max-w-2xl text-balance text-3xl font-semibold tracking-tight sm:text-4xl">
-            Meet the support for your embarrassingly big goals.
+            Meet the partner who makes your next step obvious.
           </h2>
           <p className="mx-auto mt-4 max-w-xl text-navy-100/80">
-            Name the goal you keep putting off. Synapse turns it into a mission it helps you
-            win — the plan, the tools, the accountability — and won&apos;t let it quietly disappear.
+            Name the goal you keep putting off. Synapse gives you the direction to know where to
+            aim, the clarity to know what&apos;s next, the accountability to keep at it, and the
+            support to get through the hard part — and won&apos;t let it quietly disappear.
           </p>
           <Link href="/login" className="mt-9 inline-block">
             <Button size="lg" className="sa-shine">Meet Synapse <ArrowRight className="h-4 w-4" /></Button>
@@ -456,7 +456,7 @@ function Footer() {
               Synapse Adaptive
             </div>
             <p className="mt-3 max-w-sm text-sm leading-relaxed text-muted">
-              The companion that brings accountability, clarity, and support until your goals become reality.
+              Your partner in follow-through — clarity, direction, accountability, and support until your goals become who you are.
             </p>
           </div>
           <div className="text-sm text-muted">
@@ -482,20 +482,20 @@ function Footer() {
 
 function AppleHealth() {
   const rows = [
-    ["When you open it", "A wall of numbers and charts", "A companion who remembers what you're working toward"],
-    ["When something slips", "You notice — eventually, maybe", "It notices, and gently calls it before you drift"],
-    ["Does it know you?", "No — every user sees the same app", "Yes — an evolving relationship, built around your goals"],
-    ["What you leave with", "More data", "Real momentum — one honest next step at a time"],
+    ["When you open it", "A long list of everything you could do", "The one thing that matters most today"],
+    ["When something slips", "Nothing happens — it just waits for you", "It notices, and reaches out before you drift"],
+    ["Does it know you?", "No — every user gets the same app", "Yes — it learns what actually moves you"],
+    ["What you leave with", "More tasks", "One clear next step, and the reason behind it"],
   ];
   return (
     <Section>
       <Eyebrow>The difference</Eyebrow>
-      <H2>A tracker tells you what happened. Synapse helps you do something about it.</H2>
-      <p className="mt-3 max-w-2xl text-lg text-muted">Trackers are repositories. Synapse Adaptive is a companion that remembers what you want and keeps you moving toward it.</p>
+      <H2>A to-do app holds your tasks. Synapse helps you actually do them.</H2>
+      <p className="mt-3 max-w-2xl text-lg text-muted">Lists and trackers are storage. Synapse is a partner: it gives you direction, makes the next step clear, and keeps you accountable to it.</p>
       <div className="mt-12 overflow-hidden rounded-2xl border bg-surface shadow-soft">
         <div className="grid grid-cols-3 border-b bg-surface-2 text-sm font-semibold text-ink">
           <div className="p-4" />
-          <div className="p-4 text-muted">A typical tracker</div>
+          <div className="p-4 text-muted">A typical to-do app</div>
           <div className="p-4 text-orange-600 dark:text-orange-400">Synapse Adaptive</div>
         </div>
         {rows.map(([k, a, b], i) => (
@@ -566,7 +566,7 @@ function StructuredData() {
         "@type": "Organization",
         name: "Synapse Adaptive",
         url: base,
-        description: "An AI accountability partner and goal operating system that helps people follow through and achieve their goals.",
+        description: "An AI partner in follow-through that gives people the clarity, direction, accountability, and support to consistently reach the goals that matter most.",
       },
       {
         "@type": "WebSite",
@@ -579,7 +579,7 @@ function StructuredData() {
         applicationCategory: "ProductivityApplication",
         operatingSystem: "Web, iOS, Android",
         description:
-          "Synapse is an AI accountability partner and goal operating system. It remembers what you're working toward, helps you lock in and follow through, breaks big goals into campaigns, adapts when life changes, and never lets your important goals quietly disappear.",
+          "Synapse is an AI partner in follow-through. It cuts the overwhelm down to the one thing that matters most, makes the next step obvious, keeps you accountable, and gives you the support to get through the hard part — so your intentions become outcomes.",
         url: base,
         offers: { "@type": "Offer", price: "0", priceCurrency: "USD" },
       },

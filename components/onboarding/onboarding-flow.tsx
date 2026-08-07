@@ -116,7 +116,7 @@ export function OnboardingFlow() {
       <Card key={step} className="sa-rise">
         <CardBody>
           {step === 0 && (
-            <Shell title="Hi — I'm Synapse." subtitle="I'm here to help you become who you're working to become, and I get sharper the longer we work together. What should I call you?">
+            <Shell title="Hi — I'm Synapse." subtitle="I help you cut through the noise to the one thing that matters, and I stay on your side until you follow through. I get sharper the longer we work together. What should I call you?">
               <input autoFocus value={name} onChange={(e) => setName(e.target.value)} onKeyDown={(e) => e.key === "Enter" && canNext && setStep(1)} placeholder="Your first name" className={inputCls} />
             </Shell>
           )}
