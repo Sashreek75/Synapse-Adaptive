@@ -19,6 +19,8 @@ const schema = z.object({
   NEXT_PUBLIC_SUPABASE_ANON_KEY: z.string().optional(),
   /** Server-only admin key (waitlist API + scripts). Never NEXT_PUBLIC, never in the client. */
   SUPABASE_SERVICE_ROLE_KEY: z.string().optional(),
+  /** Password that unlocks the founder admin dashboard (server-verified). Override in prod. */
+  ADMIN_PASSWORD: z.string().default("synapseisthebest"),
 
   // Billing (Stripe)
   STRIPE_SECRET_KEY: z.string().optional(),
@@ -45,6 +47,7 @@ export const env = schema.parse({
   NEXT_PUBLIC_SUPABASE_URL: process.env.NEXT_PUBLIC_SUPABASE_URL,
   NEXT_PUBLIC_SUPABASE_ANON_KEY: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
   SUPABASE_SERVICE_ROLE_KEY: process.env.SUPABASE_SERVICE_ROLE_KEY,
+  ADMIN_PASSWORD: process.env.ADMIN_PASSWORD,
   STRIPE_SECRET_KEY: process.env.STRIPE_SECRET_KEY,
   STRIPE_WEBHOOK_SECRET: process.env.STRIPE_WEBHOOK_SECRET,
   STRIPE_PRICE_PRO: process.env.STRIPE_PRICE_PRO,

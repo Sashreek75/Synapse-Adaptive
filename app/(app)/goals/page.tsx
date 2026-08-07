@@ -73,6 +73,12 @@ export default function GoalsPage() {
           ))}
         </div>
       )}
+
+      {/* Never a dead-end: a clear way forward into Synapse. */}
+      <div className="flex flex-col items-stretch gap-3 border-t pt-5 sm:flex-row sm:items-center sm:justify-between">
+        <p className="text-sm text-muted">{goals.length ? "That's enough to start — you can add more anytime." : "You can always add goals later."}</p>
+        <Button onClick={() => router.push("/dashboard")} className="shrink-0">Continue to Synapse <ArrowRight className="h-4 w-4" /></Button>
+      </div>
     </div>
   );
 }
