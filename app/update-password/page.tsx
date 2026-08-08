@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import { Brain, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/primitives";
 import { AnimatedBackground } from "@/components/ui/animated-background";
@@ -34,6 +35,7 @@ export default function UpdatePasswordPage() {
           className="mt-6 w-full rounded-xl border bg-surface px-4 py-3 text-ink placeholder:text-muted focus:outline-none focus-visible:ring-2 focus-visible:ring-navy-400" />
         {msg && <p className={cn("mt-3 rounded-xl px-3 py-2 text-sm", msg.kind === "error" ? "bg-orange-50 text-orange-700" : "bg-emerald-50 text-emerald-700")}>{msg.text}</p>}
         <Button className="mt-4 w-full" onClick={submit} disabled={busy || password.length < 6}>{busy ? <Loader2 className="h-4 w-4 animate-spin" /> : "Update password"}</Button>
+        <Link href="/login" className="mt-4 inline-block text-sm text-muted hover:text-ink">Back to sign in</Link>
       </div>
     </div>
   );

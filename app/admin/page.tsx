@@ -96,6 +96,8 @@ export default function AdminPage() {
           {!error && !locked && attempts === 0 && <p className="mt-3 text-xs text-muted">{MAX_TRIES} attempts allowed.</p>}
           {!locked && attempts > 0 && !error && <p className="mt-3 text-xs text-muted">{remaining} {remaining === 1 ? "try" : "tries"} left.</p>}
         </div>
+
+        <a href="/dashboard" className="mt-6 text-xs text-muted hover:text-ink">← Back to Synapse</a>
       </div>
     );
   }
