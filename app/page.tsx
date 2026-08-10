@@ -91,8 +91,8 @@ function Hero() {
           </div>
 
           <h1 className="animate-fade-up mt-6 text-balance text-5xl font-bold leading-[1.05] tracking-tight text-ink sm:text-6xl xl:text-7xl">
-            Know what to do next.
-            <span className="block sa-gradient-text">Then actually do it.</span>
+            The support for your
+            <span className="block sa-gradient-text">embarrassingly big goals.</span>
           </h1>
 
           <p className="animate-fade-up mx-auto mt-6 max-w-xl text-lg leading-relaxed text-muted lg:mx-0">

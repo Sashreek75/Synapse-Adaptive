@@ -290,7 +290,16 @@ export function presenceContextBlock(now = new Date()): string {
 /* ── Optional delivery channel: real browser notifications, opt-in, best-effort ──────────
  * Presence works entirely in-app via the orb. When the user has explicitly granted permission,
  * the very strongest ("now") signals may also arrive as a browser notification — never for
- * ambient ones, never without permission, never auto-prompted. */
+ * ambient ones, never without permission, never auto-prompted.
+ *
+ * FUTURE REQUIREMENT (documented, deliberately NOT built here): the biggest structural limit on
+ * accountability today is that Synapse can only reach out while the app/tab is open — so it goes
+ * silent on exactly the person who drifts away. When a web-push service worker or a native mobile
+ * app exists, an EARNED signal (see evaluatePresence: a due promise, predictable failure, real
+ * drift) should be deliverable even when the app is closed. This changes only the DELIVERY channel;
+ * the restraint law is absolute and unchanged — a notification exists only when staying silent would
+ * meaningfully lower this person's odds of following through. Do not build a notification system
+ * merely so notifications exist. */
 
 export async function requestPresencePermission(): Promise<boolean> {
   try {

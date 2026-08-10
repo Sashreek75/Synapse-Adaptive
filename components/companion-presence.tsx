@@ -219,6 +219,9 @@ export function CompanionPresence() {
   }, [open, msgs.length]);
 
   if (focusActive) return null; // the Focus Companion is the orb right now
+  // On Home the immersive conversation IS the coach, so the floating orb would be a second, confusing
+  // entry point to the same AI. Step aside here; the orb remains the one presence on every other room.
+  if (pathname === "/dashboard" || pathname === "/") return null;
 
   return (
     <div className="fixed bottom-4 right-4 z-[70] flex flex-col items-end gap-2 pb-[env(safe-area-inset-bottom)] pr-[env(safe-area-inset-right)] print:hidden">

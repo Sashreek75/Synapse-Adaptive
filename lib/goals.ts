@@ -248,6 +248,27 @@ function mergeFronts(existing: Front[], fresh: Front[]): Front[] {
  * so the model can reorganize around what's actually happening — the bottleneck can change.
  * Falls back deterministically; never throws. Client-side.
  */
+/**
+ * The person-level context the user ALREADY gave (in onboarding / conversation), read from the
+ * persisted health-store snapshot so the first recommendation can reason from their real situation
+ * — their aspiration, what they say is hardest right now — instead of generic goal decomposition.
+ * Read-only; degrades to "" if unavailable. Never invents anything the user didn't state.
+ */
+function personContext(): string {
+  if (typeof window === "undefined") return "";
+  try {
+    const snap = JSON.parse(localStorage.getItem("synapse.recovery.v3") || "null"); // health-store KEY
+    if (!snap) return "";
+    const p = snap.profile ?? {};
+    const traj: string | undefined = snap.mind?.trajectory?.statement || p.definitionOfBetter;
+    const parts: string[] = [];
+    if (traj) parts.push(`They're working toward: ${traj}.`);
+    if (p.primaryChallenge && p.primaryChallenge !== traj) parts.push(`What they say is hardest right now: ${p.primaryChallenge}.`);
+    if (p.aiSummary) parts.push(String(p.aiSummary));
+    return parts.join(" ").slice(0, 600);
+  } catch { return ""; }
+}
+
 export async function decomposeGoal(goalId: string): Promise<Goal | null> {
   const g = getGoal(goalId); if (!g) return null;
   type RawFront = { title: string; bottleneck?: string; nextMove?: string; target?: string; current?: string };
@@ -262,6 +283,7 @@ export async function decomposeGoal(goalId: string): Promise<Goal | null> {
       headers: { "content-type": "application/json" },
       body: JSON.stringify({
         title: g.title, why: g.why, timeline: g.timeline,
+        context: personContext(), // what they already told us — reason the first move from THEIR situation
         fronts: g.fronts.map((f) => ({ title: f.title, status: f.status })),
         outcomes: g.outcomes.slice(-6).map((o) => ({ move: o.move, result: o.result, worked: o.worked })),
       }),

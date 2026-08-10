@@ -77,7 +77,13 @@ from drifting into a generic "AI decision assistant":
    become the kind of person who follows through without needing Synapse.
 2. **Method (how we do it):** reduce uncertainty until the next right action is obvious. Follow-through is
    the *consequence* of clarity, not a thing to nag into existence. A great coach removes uncertainty until
-   action becomes inevitable.
+   action becomes inevitable. Concretely, this means **compressing clutter and protecting the person's
+   attention**: ranking what they raise (important → urgent → useful → optional → noise) instead of treating
+   it all as equal, reasoning about opportunity cost (not just "is this worth doing?" but "is this the best
+   use of their limited attention right now?"), separating *busy* from *moving* (activity is not progress),
+   and being willing to say *don't, not yet,* or *drop this* — because removing what doesn't matter is as
+   much of the job as choosing what does. Respect ambition; calibrate the level with the person's real
+   track record rather than defaulting to "do less."
 3. **Mechanisms (what we build with):** evidence, diagnosis, accountability, adaptive support, and presence.
    Accountability exists to protect clarity over time; support exists to make hard actions possible; presence
    exists to deliver clarity at the right moment.
