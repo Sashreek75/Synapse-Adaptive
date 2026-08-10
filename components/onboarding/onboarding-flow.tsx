@@ -59,7 +59,7 @@ export function OnboardingFlow() {
   const toggle = (v: string) => setAreas((g) => (g.includes(v) ? g.filter((x) => x !== v) : [...g, v]));
   const canNext =
     (step === 0 && name.trim().length > 0) ||
-    (step === 1 && areas.length > 0) ||
+    (step === 1 && aspiration.trim().length > 0) || // the long-term goal, in their words, is what matters here
     (step === 2 && style.length > 0);
 
   const assembled = () => ({
@@ -123,19 +123,23 @@ export function OnboardingFlow() {
 
           {step === 1 && (
             <Shell
-              title={`Nice to meet you, ${name.trim() || "friend"}. What are you working toward?`}
-              subtitle="Pick the areas you want to make progress in — this just tells me where to start. I'll learn the specifics as we talk."
+              title={`What are you working toward, ${name.trim() || "friend"}?`}
+              subtitle="In your own words — the long game. Who are you trying to become, or what do you ultimately want? I'll keep this exactly as you say it, as your north star, and help you get there."
             >
+              <textarea autoFocus value={aspiration} onChange={(e) => setAspiration(e.target.value)} rows={4}
+                placeholder="e.g. Build the discipline and mamba-mentality focus to go all-in on what I care about — and never doubt I'll win."
+                className={cn(inputCls, "resize-none")} />
               <div>
-                <textarea value={aspiration} onChange={(e) => setAspiration(e.target.value)} rows={2}
-                  placeholder="The long game — who are you working to become? (I'll keep this as your north star; you'll add the concrete goals that get you there next.) Optional."
-                  className={cn(inputCls, "resize-none")} />
-              </div>
-              <div className="space-y-2">
-                {AREAS.map((a) => { const Icon = a.icon; return (
-                  <Choice key={a.label} selected={areas.includes(a.label)} onClick={() => toggle(a.label)}>
-                    <span className="flex items-center gap-3"><Icon className="h-4 w-4 text-orange-500" /> {a.label}</span>
-                  </Choice>); })}
+                <p className="mb-2 text-[11px] font-semibold uppercase tracking-wider text-muted">Which areas is this mostly about? <span className="font-normal normal-case text-muted/70">— optional, just helps me start</span></p>
+                <div className="flex flex-wrap gap-2">
+                  {AREAS.map((a) => (
+                    <button key={a.label} type="button" onClick={() => toggle(a.label)}
+                      className={cn("rounded-full border px-3 py-1.5 text-xs font-medium transition",
+                        areas.includes(a.label) ? "border-orange-500 bg-orange-50 text-ink dark:bg-orange-500/10 dark:text-ink" : "bg-surface text-muted hover:text-ink")}>
+                      {a.label}
+                    </button>
+                  ))}
+                </div>
               </div>
             </Shell>
           )}
