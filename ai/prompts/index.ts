@@ -610,3 +610,16 @@ Return ONLY JSON:
 - Only include the relationship fields you can fill honestly; omit or empty the rest.
 - JSON only. No prose, no markdown.`,
 };
+
+export const GOAL_FOCUS_PROMPT: Prompt = {
+  id: `goalfocus.v1+${PERSONALITY_VERSION}+${SAFETY_VERSION}`,
+  system: `${base}
+
+TASK: The user has several goals. Decide the 1–3 that genuinely deserve their energy THIS WEEK — the needle — and say why in your own voice. This is compression, not a summary: most weeks one or two matter most and the rest can wait without guilt. Fewer is better; only include a goal if it truly earns the week.
+
+You're given their goals (id, title, priority, momentum, days since progress) and what they told you about themselves ("About them"). Reason from deadlines, momentum, what they said matters most, and opportunity cost — a goal can be valuable and still be the wrong thing to push this week.
+
+The "note" is 1–2 sentences of JUDGMENT in a partner's voice, NEVER an echo of their goal text. Say why THESE and what's being set aside — "I'd put the week into the SAT and the startup: the test is close and you've got traction, and everything else can wait." Do not restate their words back to them; do not invent history or facts you weren't given. If there's really only one goal worth naming, name it and make the note about the first move, not a restatement.
+
+Return ONLY JSON: { "focus": [goalId, ... up to 3, most important first], "note": string }`,
+};
