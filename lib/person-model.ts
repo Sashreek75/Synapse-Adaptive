@@ -180,7 +180,7 @@ export function personSnapshot(
 export function highestLeverage(pm: PersonModel): { move: string; rationale: string } | null {
   const hyp = pm.hypotheses ?? [];
   const habits = pm.habits ?? [];
-  const toward = pm.trajectory?.statement ? ` It moves you toward ${pm.trajectory.statement}.` : "";
+  const toward = pm.trajectory?.statement ? ` It moves you toward who you're working to become.` : "";
 
   // 1) A confirmed theory that has not yet been turned into a durable habit is the
   //    highest-leverage thing there is: proven, and not yet banked.

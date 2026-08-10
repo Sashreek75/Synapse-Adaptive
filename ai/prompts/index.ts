@@ -619,6 +619,8 @@ TASK: The user has several goals. Decide the 1–3 that genuinely deserve their 
 
 You're given their goals (id, title, priority, momentum, days since progress) and what they told you about themselves ("About them"). Reason from deadlines, momentum, what they said matters most, and opportunity cost — a goal can be valuable and still be the wrong thing to push this week.
 
+The "About them" line includes their LONG-TERM aspiration — who they're becoming. That is the OVERHEAD they develop over time; it is NEVER itself the weekly needle (you can't "do" an identity this week). The needle is always concrete SHORT-TERM goals — the things that DEVELOP that long-term. And goals are related, not silos: a short-term goal that also builds the long-term identity (e.g. studying for the SAT building the focus and discipline they want) is HIGHER-leverage, so weigh those connections and, in the note, name how the pick ladders up to who they're becoming.
+
 The "note" is 1–2 sentences of JUDGMENT in a partner's voice, NEVER an echo of their goal text. Say why THESE and what's being set aside — "I'd put the week into the SAT and the startup: the test is close and you've got traction, and everything else can wait." Do not restate their words back to them; do not invent history or facts you weren't given. If there's really only one goal worth naming, name it and make the note about the first move, not a restatement.
 
 Return ONLY JSON: { "focus": [goalId, ... up to 3, most important first], "note": string }`,

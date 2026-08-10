@@ -66,7 +66,7 @@ export default function PlaybookPage() {
       {(mind.trajectory?.statement || (profile.goals && profile.goals.length > 0)) && (
         <Card className="overflow-hidden"><div className="mesh"><CardBody className="sm:p-6">
           <SectionLabel className="mb-2 flex items-center gap-1.5"><Compass className="h-3.5 w-3.5 text-orange-500" /> The direction you&apos;re growing in</SectionLabel>
-          {mind.trajectory?.statement && <p className="mb-3 text-ink">{`You're working to become: ${mind.trajectory.statement}.`}</p>}
+          {mind.trajectory?.statement && <p className="mb-3 italic text-ink">&ldquo;{mind.trajectory.statement}&rdquo;</p>}
           {profile.goals && profile.goals.length > 0 && (
             <ul className="space-y-1.5">
               {profile.goals.map((g, i) => (

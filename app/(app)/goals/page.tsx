@@ -6,7 +6,7 @@ import { ArrowRight, Plus, Target, Compass } from "lucide-react";
 import { Button } from "@/components/ui/primitives";
 import { SynapseOrb } from "@/components/synapse/orb";
 import { useHealth } from "@/components/providers/health-store";
-import { activeGoals, addGoal, seedGoalFromTrajectory, daysSinceProgress, type Goal } from "@/lib/goals";
+import { activeGoals, addGoal, daysSinceProgress, type Goal } from "@/lib/goals";
 
 /**
  * THIS WEEK'S NEEDLE — the 1–3 goals that actually deserve the user's energy this week, chosen by
@@ -46,12 +46,13 @@ export default function GoalsPage() {
   const lastSig = useRef<string>("");
 
   useEffect(() => {
-    seedGoalFromTrajectory(mind?.trajectory?.statement);
     const sync = () => setGoals(activeGoals());
     sync();
     window.addEventListener("synapse:goals", sync);
     return () => window.removeEventListener("synapse:goals", sync);
-  }, [mind]);
+  }, []);
+
+  const northStar = mind?.trajectory?.statement?.trim() || "";
 
   const personCtx = useMemo(() => {
     const traj = mind?.trajectory?.statement || profile?.definitionOfBetter;
@@ -115,6 +116,16 @@ export default function GoalsPage() {
           <p className="text-sm text-muted">Jot down what you want to achieve. I&apos;ll figure out how — and what to do first.</p>
         </div>
       </header>
+
+      {/* The long-term aspiration is the OVERHEAD — who you're becoming — not a goal to check off.
+          It frames the concrete short-term goals below, which are how you actually develop it. */}
+      {northStar && (
+        <div className="rounded-xl border border-dashed bg-surface/40 px-4 py-3">
+          <p className="text-[11px] font-semibold uppercase tracking-wider text-muted">Who you&apos;re becoming</p>
+          <p className="mt-0.5 text-sm leading-snug text-ink">{northStar}</p>
+          <p className="mt-1 text-xs text-muted">This is the long game — you develop it through the goals below, not by checking it off.</p>
+        </div>
+      )}
 
       <div className="rounded-2xl border bg-surface p-4 shadow-soft">
         <div className="flex gap-2">

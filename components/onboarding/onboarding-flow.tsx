@@ -128,7 +128,7 @@ export function OnboardingFlow() {
             >
               <div>
                 <textarea value={aspiration} onChange={(e) => setAspiration(e.target.value)} rows={2}
-                  placeholder="In your words: who do you want to become, or what are you working toward? (optional)"
+                  placeholder="The long game — who are you working to become? (I'll keep this as your north star; you'll add the concrete goals that get you there next.) Optional."
                   className={cn(inputCls, "resize-none")} />
               </div>
               <div className="space-y-2">

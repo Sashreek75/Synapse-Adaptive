@@ -316,10 +316,11 @@ export async function decomposeGoal(goalId: string): Promise<Goal | null> {
   });
 }
 
-export function seedGoalFromTrajectory(statement?: string | null): void {
-  if (!statement || !statement.trim()) return;
-  if (loadGoals().length > 0) return;
-  addGoal({ title: statement.trim(), priority: "primary", why: "The person you're working to become." });
+export function seedGoalFromTrajectory(_statement?: string | null): void {
+  // Intentionally a no-op. The long-term aspiration is the OVERHEAD (it lives in mind.trajectory), not a
+  // goal to check off. Seeding it as a goal made the abstract identity ("become more focused") compete
+  // with real short-term goals and win the weekly needle — which is backwards. You develop the long-term
+  // THROUGH concrete short-term goals; the trajectory frames them, it isn't one of them.
 }
 
 /**

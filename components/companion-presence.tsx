@@ -18,6 +18,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter, usePathname } from "next/navigation";
 import { ArrowRight, Home, Timer, Wrench, X } from "lucide-react";
 import { SynapseOrb } from "@/components/synapse/orb";
+import { RichText } from "@/components/agent/rich-text";
 import { useHealth } from "@/components/providers/health-store";
 import { useSubscription } from "@/components/providers/subscription-provider";
 import { preGate, CRISIS_RESPONSE } from "@/ai/safety";
@@ -243,7 +244,13 @@ export function CompanionPresence() {
               const desc = bo.description;
               return (
                 <div key={m.id} className={cn("flex flex-col gap-1", m.from === "you" ? "items-end" : "items-start")}>
-                  <p className={cn("max-w-[85%] rounded-2xl px-3 py-1.5 text-sm leading-relaxed", m.from === "you" ? "bg-navy-900 text-white" : "bg-surface-2 text-ink")}>{fo.cleaned}</p>
+                  {m.from === "you" ? (
+                    <p className="max-w-[85%] whitespace-pre-wrap rounded-2xl bg-navy-900 px-3 py-1.5 text-sm leading-relaxed text-white">{fo.cleaned}</p>
+                  ) : (
+                    <div className="max-w-[92%] rounded-2xl bg-surface-2 px-3.5 py-2.5">
+                      <RichText text={fo.cleaned} className="text-sm leading-relaxed" />
+                    </div>
+                  )}
                   {desc && (
                     <button onClick={() => buildFromOffer(desc)}
                       className="inline-flex items-center gap-1.5 self-start rounded-full border border-orange-300/60 bg-orange-500/10 px-2.5 py-1 text-xs font-medium text-ink transition hover:bg-orange-500/15">

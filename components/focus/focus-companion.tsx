@@ -224,7 +224,7 @@ export function FocusCompanion() {
       case "restart": say("No problem. What's the very next small step? Name it and just start there."); setOpen(true); break;
       case "break": startBlock(null, 5, "break"); break;
       case "another": startBlock(s.goal, Math.max(1, Math.round(s.durationSec / 60)) || 25, "focus"); break;
-      case "done": { const toward = mind?.trajectory?.statement ? ` Another step toward ${mind.trajectory.statement}.` : ""; say(`Nicely done.${toward}`); setTimeout(() => endSession(), 1200); break; }
+      case "done": { const toward = mind?.trajectory?.statement ? ` Another step toward who you're becoming.` : ""; say(`Nicely done.${toward}`); setTimeout(() => endSession(), 1200); break; }
       default: break;
     }
   }, [say, startBlock, endSession, mind]);
