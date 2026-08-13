@@ -612,16 +612,26 @@ Return ONLY JSON:
 };
 
 export const GOAL_FOCUS_PROMPT: Prompt = {
-  id: `goalfocus.v1+${PERSONALITY_VERSION}+${SAFETY_VERSION}`,
+  id: `goalfocus.v2+${PERSONALITY_VERSION}+${SAFETY_VERSION}`,
   system: `${base}
 
-TASK: The user has several goals. Decide the 1–3 that genuinely deserve their energy THIS WEEK — the needle — and say why in your own voice. This is compression, not a summary: most weeks one or two matter most and the rest can wait without guilt. Fewer is better; only include a goal if it truly earns the week.
+TASK: Decide where this person's attention should go THIS WEEK — an ALLOCATION across their goals, not a ranking and NEVER a score. Most weeks one or two goals deserve the marginal push and the rest should be kept alive with less — but keeping a goal alive is not the same as dropping it, and a goal that isn't the needle has NOT stopped mattering.
 
-You're given their goals (id, title, priority, momentum, days since progress) and what they told you about themselves ("About them"). Reason from deadlines, momentum, what they said matters most, and opportunity cost — a goal can be valuable and still be the wrong thing to push this week.
+You're given their goals (id, title, priority, momentum, days since progress, and — when known — a deadline in days) and what they told you about themselves ("About them"), which includes their long-term aspiration.
 
-The "About them" line includes their LONG-TERM aspiration — who they're becoming. That is the OVERHEAD they develop over time; it is NEVER itself the weekly needle (you can't "do" an identity this week). The needle is always concrete SHORT-TERM goals — the things that DEVELOP that long-term. And goals are related, not silos: a short-term goal that also builds the long-term identity (e.g. studying for the SAT building the focus and discipline they want) is HIGHER-leverage, so weigh those connections and, in the note, name how the pick ladders up to who they're becoming.
+Reason exactly as your "DECIDE WHERE ATTENTION GOES" loop says, in order and never as a formula: what actually COMPETES (don't manufacture a trade-off between goals that don't starve each other) → hard CONSTRAINTS and deadlines first → IMPORTANCE and leverage (a bottleneck can lift a secondary goal) → OPPORTUNITY COST → what they'll realistically EXECUTE (low follow-through changes the step, not the pick) → CONFIDENCE (how close are the top calls?). The long-term aspiration is OVERHEAD — never itself the needle; the needle is the concrete short-term goals that develop it, and one that also builds that identity is higher-leverage.
 
-The "note" is 1–2 sentences of JUDGMENT in a partner's voice, NEVER an echo of their goal text. Say why THESE and what's being set aside — "I'd put the week into the SAT and the startup: the test is close and you've got traction, and everything else can wait." Do not restate their words back to them; do not invent history or facts you weren't given. If there's really only one goal worth naming, name it and make the note about the first move, not a restatement.
+Assign every competing goal a ROLE: "protect" (the needle — the 1–2 that get the week's real attention), "maintain" (preserve its progress with a small action — don't optimise it), "park" (deliberately defer active advancement because acting now costs more than waiting — it still matters, NEVER unimportant), or "watch" (barely touch it, monitor for the one condition that would promote it). Do NOT put everything in "protect", and do NOT imply the maintained/parked goals stopped mattering. Allocation is not execution: protecting one goal does not mean the others get nothing — they get less, not zero.
 
-Return ONLY JSON: { "focus": [goalId, ... up to 3, most important first], "note": string }`,
+The "note" is 1–2 sentences of JUDGMENT in a partner's voice — never an echo of their goal text. Name what you'd protect and, briefly, what it beats and why: "I'd put the week into the SAT — the test is close and you're behind, so the startup can hold with one small move. It's not less important; it just loses this week." Do not restate their words; do not invent facts you weren't given.
+
+Set "confidence" honestly, and "reversal" — the ONE change that would make you reallocate ("if the startup gets a launch date, I'd shift"). If two goals are genuinely close, say so in the note and set confidence "low" — never fake a confident winner.
+
+Return ONLY JSON: {
+  "focus": [goalId, ... the "protect" set, most important first],
+  "allocation": { "protect": [goalId...], "maintain": [goalId...], "park": [goalId...], "watch": [goalId...] },
+  "note": string,
+  "confidence": "low"|"moderate"|"high",
+  "reversal": string
+}`,
 };

@@ -8,11 +8,11 @@
  */
 import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
-import { ArrowLeft, Trash2, Check, RefreshCw, MessageCircle, HelpCircle, CheckCircle2 } from "lucide-react";
+import { ArrowLeft, Trash2, Check, RefreshCw, MessageCircle, HelpCircle, CheckCircle2, CalendarClock } from "lucide-react";
 import { Button } from "@/components/ui/primitives";
 import { SynapseOrb } from "@/components/synapse/orb";
 import { cn } from "@/lib/utils";
-import { getGoal, updateGoal, deleteGoal, decomposeGoal, logOutcome, currentFront, type Goal } from "@/lib/goals";
+import { getGoal, updateGoal, deleteGoal, decomposeGoal, logOutcome, currentFront, dueLabel, type Goal } from "@/lib/goals";
 
 function nextAction(g: Goal): string | null {
   if (g.nextMove?.title) return g.nextMove.title;
@@ -81,6 +81,17 @@ export default function GoalDetailPage() {
             className="w-full bg-transparent text-2xl font-semibold tracking-tight text-ink focus:outline-none" />
           {goal.why && <p className="truncate text-sm text-muted">{goal.why}</p>}
         </div>
+      </div>
+
+      {/* OPTIONAL structured deadline — the only real urgency signal, never required. When set, it
+          makes this goal's urgency a fact (not a vibe) in every prioritization call. */}
+      <div className="flex flex-wrap items-center gap-2 px-1 text-xs text-muted">
+        <CalendarClock className="h-3.5 w-3.5 shrink-0" />
+        <label htmlFor="due">Deadline</label>
+        <input id="due" type="date" value={goal.dueDate ?? ""}
+          onChange={(e) => { const u = updateGoal(id, { dueDate: e.target.value || undefined }); if (u) setGoal(u); }}
+          className="rounded-md border bg-surface px-2 py-1 text-ink focus:outline-none focus-visible:ring-2 focus-visible:ring-navy-400" />
+        <span className="text-muted/70">{goal.dueDate ? dueLabel(goal) : "optional — add one only if there's a real date"}</span>
       </div>
 
       {/* THE ONE THING */}

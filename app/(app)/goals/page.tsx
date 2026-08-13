@@ -6,7 +6,8 @@ import { ArrowRight, Plus, Target, Compass } from "lucide-react";
 import { Button } from "@/components/ui/primitives";
 import { SynapseOrb } from "@/components/synapse/orb";
 import { useHealth } from "@/components/providers/health-store";
-import { activeGoals, addGoal, daysSinceProgress, type Goal } from "@/lib/goals";
+import { activeGoals, addGoal, getGoal, daysSinceProgress, daysUntilDue, type Goal } from "@/lib/goals";
+import { recordAllocation, priorAllocation, recordExecution, summarizeExecution, type AllocConfidence } from "@/lib/allocations";
 
 /**
  * THIS WEEK'S NEEDLE — the 1–3 goals that actually deserve the user's energy this week, chosen by
@@ -15,19 +16,32 @@ import { activeGoals, addGoal, daysSinceProgress, type Goal } from "@/lib/goals"
  * it's computed once per week (cached) so it's stable and instant. No new fields, scores, or ranking
  * controls for the user to manage — Synapse owns the judgment.
  */
-type Focus = { ids: string[]; note: string };
+type Alloc = { protect: string[]; maintain: string[]; park: string[]; watch: string[] };
+type Focus = { ids: string[]; note: string; confidence?: AllocConfidence; reversal?: string; allocation?: Alloc };
 
 const PRI: Record<string, number> = { primary: 3, high: 2, medium: 1, someday: 0 };
 const MOM: Record<string, number> = { building: 2, steady: 1.5, new: 1, slipping: 0.5, stalled: 0 };
 function score(g: Goal): number {
   const d = daysSinceProgress(g);
   const recency = d == null ? 0.5 : d <= 2 ? 1 : d <= 7 ? 0.3 : -0.5;
-  return (PRI[g.priority] ?? 0) * 10 + (MOM[g.momentum] ?? 0) * 2 + recency;
+  // A real, near deadline is a hard constraint — let it promote a goal (urgency only when a dueDate exists).
+  const due = daysUntilDue(g);
+  const urgency = due == null ? 0 : due <= 3 ? 6 : due <= 10 ? 3 : due <= 21 ? 1 : 0;
+  return (PRI[g.priority] ?? 0) * 10 + (MOM[g.momentum] ?? 0) * 2 + recency + urgency;
 }
-/** Quiet fallback when the model can't be reached: pick the top 1–2, and say nothing we can't back up. */
+/** Quiet, HONEST fallback when the model can't be reached. This is NOT the reasoning path — it is a
+ * last-resort ordering over the few structured signals we actually have (priority label, momentum,
+ * recency, and a real deadline), never surfaced as a score and never spoken as reasoned judgment
+ * (invariant 5). It stays low-confidence, keeps every non-protected goal alive (maintain, not drop),
+ * and when the top candidates are genuinely close it refuses to fake a single winner — it protects
+ * both rather than inventing a precise ranking from weak inputs. */
 function deterministicFocus(goals: Goal[]): Focus {
-  const ranked = [...goals].sort((a, b) => score(b) - score(a));
-  return { ids: ranked.slice(0, goals.length >= 4 ? 2 : 1).map((g) => g.id), note: "" };
+  const ranked = [...goals].map((g) => ({ g, s: score(g) })).sort((a, b) => b.s - a.s);
+  let n = goals.length >= 4 ? 2 : 1;
+  if (n === 1 && ranked.length >= 2 && ranked[0].s - ranked[1].s < 2) n = 2; // near-tie: don't fake a winner
+  const protect = ranked.slice(0, n).map((x) => x.g.id);
+  const maintain = ranked.slice(n).map((x) => x.g.id);
+  return { ids: protect, note: "", confidence: "low", allocation: { protect, maintain, park: [], watch: [] } };
 }
 function weekKey(): string {
   const d = new Date(); d.setDate(d.getDate() + ((7 - d.getDay()) % 7));
@@ -51,6 +65,24 @@ export default function GoalsPage() {
     window.addEventListener("synapse:goals", sync);
     return () => window.removeEventListener("synapse:goals", sync);
   }, []);
+
+  // Close the loop's EXECUTION half automatically: for last week's call, did the protected goals move
+  // since it was made? This is a fact (not a judgment) — decision quality stays a separate reflection.
+  useEffect(() => {
+    try {
+      const prior = priorAllocation(weekKey());
+      if (!prior || prior.outcome?.execution || !prior.protect.length) return;
+      const priorAt = new Date(prior.at).getTime();
+      let moved = 0, unknown = 0;
+      for (const id of prior.protect) {
+        const g = getGoal(id);
+        if (!g) { unknown++; continue; }
+        const lp = g.lastProgressAt ? new Date(g.lastProgressAt).getTime() : 0;
+        if (lp > priorAt) moved++;
+      }
+      recordExecution(prior.id, summarizeExecution(moved, prior.protect.length, unknown));
+    } catch {}
+  }, [goals]);
 
   const northStar = mind?.trajectory?.statement?.trim() || "";
 
@@ -81,16 +113,40 @@ export default function GoalsPage() {
         const res = await fetch("/api/goal-focus", {
           method: "POST", headers: { "content-type": "application/json" },
           body: JSON.stringify({
-            goals: goals.map((g) => ({ id: g.id, title: g.title, priority: g.priority, momentum: g.momentum, daysSince: daysSinceProgress(g) })),
+            goals: goals.map((g) => ({ id: g.id, title: g.title, priority: g.priority, momentum: g.momentum, daysSince: daysSinceProgress(g), dueInDays: daysUntilDue(g) })),
             context: personCtx,
           }),
         });
         const d = await res.json();
-        if (d && Array.isArray(d.focus) && d.focus.length) val = { ids: d.focus as string[], note: typeof d.note === "string" ? d.note : "" };
+        if (d && Array.isArray(d.focus) && d.focus.length) {
+          val = {
+            ids: d.focus as string[],
+            note: typeof d.note === "string" ? d.note : "",
+            confidence: d.confidence,
+            reversal: typeof d.reversal === "string" ? d.reversal : undefined,
+            allocation: d.allocation && typeof d.allocation === "object" ? d.allocation as Alloc : undefined,
+          };
+        }
       } catch {}
       if (cancelled) return;
       const resolved = val ?? deterministicFocus(goals);
       setFocus(resolved);
+      // Record the prioritization call so Synapse can stay consistent, shift out loud, and later judge
+      // whether the CALL was right (separately from whether they executed it). Idempotent per week.
+      try {
+        const a = resolved.allocation ?? { protect: resolved.ids, maintain: [], park: [], watch: [] };
+        recordAllocation({
+          weekKey: weekKey(),
+          protect: a.protect ?? resolved.ids,
+          maintain: a.maintain ?? [],
+          park: a.park ?? [],
+          watch: a.watch ?? [],
+          reasoning: resolved.note,
+          confidence: resolved.confidence ?? "low",
+          reversal: resolved.reversal,
+          goals: goals.map((g) => ({ id: g.id, title: g.title, momentum: g.momentum, dueInDays: daysUntilDue(g) })),
+        });
+      } catch {}
       try { localStorage.setItem("synapse.goals.focus.v1", JSON.stringify({ sig, focus: resolved })); } catch {}
     })().finally(() => { if (!cancelled) setFocusLoading(false); });
     return () => { cancelled = true; };

@@ -33,6 +33,7 @@ import { detectBuildIntent, extractBuildOffer } from "@/lib/build-intent";
 import { createWorkspaceFromRequest, workspaceContextBlock } from "@/lib/workspaces";
 import { challengeContextBlock } from "@/lib/coaching";
 import { extractRecTag, recordRecommendation, decisionsContextBlock } from "@/lib/decisions";
+import { allocationContextBlock, calibrationContextBlock } from "@/lib/allocations";
 import { extractPrincipleTag, extractMindShiftTag, addPrinciple, addMindShift, principlesContextBlock } from "@/lib/principles";
 import { goalsContextBlock, findOrCreateGoal, decomposeGoal } from "@/lib/goals";
 import { detectGoalIntent } from "@/lib/goal-intent";
@@ -190,6 +191,8 @@ export function CompanionPresence() {
           : "",
         goal ? "They are working to become: " + goal + "." : "",
         goalsContextBlock(),
+        allocationContextBlock(),
+        calibrationContextBlock(),
         challengeContextBlock(),
         decisionsContextBlock(),
         principlesContextBlock(),

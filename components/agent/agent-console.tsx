@@ -7,6 +7,7 @@ import { createWorkspaceFromRequest } from "@/lib/workspaces";
 import { goalsContextBlock, findOrCreateGoal, decomposeGoal } from "@/lib/goals";
 import { challengeContextBlock } from "@/lib/coaching";
 import { extractRecTag, recordRecommendation, decisionsContextBlock } from "@/lib/decisions";
+import { allocationContextBlock, calibrationContextBlock } from "@/lib/allocations";
 import { extractPrincipleTag, extractMindShiftTag, addPrinciple, addMindShift, principlesContextBlock } from "@/lib/principles";
 import { workspaceContextBlock } from "@/lib/workspaces";
 import { evidenceContextBlock } from "@/lib/evidence";
@@ -108,6 +109,8 @@ export function AgentConsole({ embedded = false, immersive = false }: { embedded
     const who = [
       `Name: ${profile.displayName || "User"}`,
       goalsContextBlock(),
+      allocationContextBlock(),
+      calibrationContextBlock(),
       challengeContextBlock(),
       decisionsContextBlock(),
       principlesContextBlock(),

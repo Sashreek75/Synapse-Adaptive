@@ -38,7 +38,8 @@ export interface Goal {
   mission?: string;            // identity-level framing: "Become someone who…"
   why?: string;
   priority: GoalPriority;
-  timeline?: string;
+  timeline?: string;           // FREE TEXT, human ("by end of summer") — never parsed into urgency
+  dueDate?: string;            // OPTIONAL structured deadline (ISO yyyy-mm-dd) — the only real urgency signal
   momentum: GoalMomentum;
   strategy?: string;
   obstacles: string[];
@@ -108,7 +109,7 @@ function slug(s: string): string {
 }
 function uid(prefix: string): string { return `${prefix}${Date.now().toString(36)}${Math.random().toString(36).slice(2, 5)}`; }
 
-export function addGoal(input: { title: string; why?: string; priority?: GoalPriority; timeline?: string }): Goal {
+export function addGoal(input: { title: string; why?: string; priority?: GoalPriority; timeline?: string; dueDate?: string }): Goal {
   const now = new Date().toISOString();
   const list = loadGoals();
   const goal: Goal = {
@@ -118,6 +119,7 @@ export function addGoal(input: { title: string; why?: string; priority?: GoalPri
     why: input.why?.trim() || undefined,
     priority: input.priority || (list.some((g) => g.priority === "primary" && g.status === "active") ? "high" : "primary"),
     timeline: input.timeline?.trim() || undefined,
+    dueDate: input.dueDate?.trim() || undefined,
     momentum: "new",
     strategy: undefined,
     obstacles: [], whatWorks: [], whatHasnt: [],
@@ -222,6 +224,25 @@ export function daysSinceProgress(g: Goal): number | null {
   const ts = g.lastProgressAt || g.createdAt;
   if (!ts) return null;
   return Math.floor((Date.now() - new Date(ts).getTime()) / 86_400_000);
+}
+
+/** Whole days until the goal's structured deadline (negative = overdue). null when no dueDate is set —
+ * urgency is ONLY real when a deadline actually exists; free-text `timeline` is never treated as urgency. */
+export function daysUntilDue(g: Goal): number | null {
+  if (!g.dueDate) return null;
+  const t = new Date(g.dueDate).getTime();
+  if (Number.isNaN(t)) return null;
+  return Math.ceil((t - Date.now()) / 86_400_000);
+}
+
+/** Short human urgency label from the structured deadline, or "" when none. */
+export function dueLabel(g: Goal): string {
+  const d = daysUntilDue(g);
+  if (d == null) return "";
+  if (d < 0) return `${-d}d overdue`;
+  if (d === 0) return "due today";
+  if (d === 1) return "due tomorrow";
+  return `due in ${d}d`;
 }
 
 export function campaignFallback(title: string): string[] {
@@ -344,6 +365,8 @@ export function goalsContextBlock(): string {
     if (g.fronts.length) extra.push(`fronts ${g.fronts.filter((f) => f.status === "won").length}/${g.fronts.length} won`);
     const last = g.outcomes[g.outcomes.length - 1];
     if (last) extra.push(`last outcome: "${last.move}" -> ${last.worked ?? "logged"} (${last.result})`);
+    const due = dueLabel(g);
+    if (due) extra.push(due.toUpperCase());
     const d = daysSinceProgress(g);
     if (d != null) extra.push(`last moved ${d === 0 ? "today" : `${d}d ago`}`);
     return `- ${head} ${g.title}${extra.length ? ` (${extra.join(" | ")})` : ""}`;
@@ -351,13 +374,13 @@ export function goalsContextBlock(): string {
 
   const stale = goals.filter((g) => (g.priority === "primary" || g.priority === "high") && (daysSinceProgress(g) ?? 0) >= 8);
   const driftLine = stale.length
-    ? `POSSIBLE DRIFT — these important missions haven't moved in over a week: ${stale.map((g) => g.title).join("; ")}. If effort has gone elsewhere, name it directly and ask whether the priority changed.`
+    ? `POSSIBLE DRIFT — these important goals haven't moved in over a week: ${stale.map((g) => g.title).join("; ")}. If attention has gone elsewhere on purpose that's fine — but if it's slipping unnoticed, name it and ask whether the allocation should change.`
     : "";
   const competeLine = goals.length > 1
-    ? `They are running ${goals.length} missions at once with a finite week. When they compete, don't let all of them limp — force a choice: name the trade-off and ask which one deserves this week.`
+    ? `They are carrying ${goals.length} goals at once with a finite week. Decide where their MARGINAL attention goes — allocation, not elimination: which one or two to PROTECT this week, which to MAINTAIN with a small action (still matters — maintenance is not neglect), which to PARK on purpose (deferred because acting now costs more than waiting — never "unimportant" — with what brings it back). Allocation is NOT execution: a protected goal still leaves the others a small maintenance action, not nothing. Only treat goals as competing if pushing one actually starves another; don't manufacture a trade-off. And stay dynamic: if a deadline, a stall, or a new dependency means last week's call is no longer right, say so and reallocate.`
     : "";
   return [
-    "THE MISSIONS YOU ARE HELPING THEM WIN — you are a goal OBSESSOR, not a note-taker. For each: reason about the real BOTTLENECK ('if this isn't moving, why?') and attack THAT, not the obvious task. CLOSE THE OUTCOME LOOP: after they do something, ask whether it actually worked and let the answer reorganize the plan. CHALLENGE THE WRONG OPTIMIZATION: if their energy keeps going where the needle isn't moving, say so plainly ('we've spent weeks on X but Y hasn't moved — I think we're solving the wrong problem'). Protect the top priorities from drift, and when missions compete, force a real choice.",
+    "THE GOALS YOU ARE HELPING THEM WIN — you are a goal OBSESSOR, not a note-taker. For each: reason about the real BOTTLENECK ('if this isn't moving, why?') and attack THAT, not the obvious task. CLOSE THE OUTCOME LOOP: after they do something, ask whether it actually worked and let the answer reorganize the plan. CHALLENGE THE WRONG OPTIMIZATION: if their energy keeps going where the needle isn't moving, say so plainly ('we've spent weeks on X but Y hasn't moved — I think we're solving the wrong problem'). A goal shown with a deadline (DUE IN…) has real urgency; a goal without one does not — never invent urgency from a vibe.",
     ...lines,
     driftLine,
     competeLine,
