@@ -35,6 +35,7 @@ import { challengeContextBlock } from "@/lib/coaching";
 import { extractRecTag, recordRecommendation, decisionsContextBlock } from "@/lib/decisions";
 import { allocationContextBlock, calibrationContextBlock } from "@/lib/allocations";
 import { extractPrincipleTag, extractMindShiftTag, addPrinciple, addMindShift, principlesContextBlock } from "@/lib/principles";
+import { extractObserveTags } from "@/lib/observations";
 import { goalsContextBlock, findOrCreateGoal, decomposeGoal } from "@/lib/goals";
 import { detectGoalIntent } from "@/lib/goal-intent";
 import { detectFocusIntent, extractFocusOffer, type FocusIntent } from "@/lib/focus-intent";
@@ -71,7 +72,7 @@ function describePage(p: string): string {
 export function CompanionPresence() {
   const router = useRouter();
   const pathname = usePathname();
-  const { mind, checkIns } = useHealth();
+  const { mind, checkIns, addObservation } = useHealth();
   const { plan: tier } = useSubscription();
   const [focusActive, setFocusActive] = useState(false);
   const [open, setOpen] = useState(false);
@@ -213,7 +214,10 @@ export function CompanionPresence() {
       if (pr.text) { try { addPrinciple(pr.text); } catch {} }
       const ms = extractMindShiftTag(pr.cleaned);
       if (ms.to) { try { addMindShift({ from: ms.from ?? "", to: ms.to }); } catch {} }
-      setMsgs((m) => [...m, { id: `a_${Date.now()}`, from: "synapse", text: ms.cleaned || "I'm here — say a little more?" }]);
+      // Stage 2: capture conversational behavioral observations (silent — never changes the reply text).
+      const obs = extractObserveTags(ms.cleaned);
+      for (const o of obs.observations) { try { addObservation(o.patternKey, o.note); } catch {} }
+      setMsgs((m) => [...m, { id: `a_${Date.now()}`, from: "synapse", text: obs.cleaned || "I'm here — say a little more?" }]);
     } catch { setMsgs((m) => [...m, { id: `a_${Date.now()}`, from: "synapse", text: "I couldn't reach my reasoning just now — give it a second." }]); }
     finally { setBusy(false); scroll(); }
   }, [busy, mind, tier, router, pathname, msgs]);

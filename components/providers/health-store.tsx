@@ -3,6 +3,7 @@
 import { createContext, useContext, useEffect, useMemo, useRef, useState } from "react";
 import type { ChatMessage, MetricKey, MetricSeries, ProviderQuestion, RecentChange, Mind, Evidence, SignalId } from "@/types";
 import { signalMeta, mergeSeries, seriesFromEvidence } from "@/lib/signals";
+import { buildObservationEvidence } from "@/lib/observations";
 import { computeTrend } from "@/lib/stats";
 import { getSupabase } from "@/lib/supabase/client";
 import { loadCloud, saveCloud } from "@/lib/supabase/sync";
@@ -96,6 +97,9 @@ interface Store {
   contextNotes: ContextNote[];
   lastFocusAreas: string[];
   addContextNote: (prompt: string, answer: string) => void;
+  /** Stage 2: capture ONE conversational behavioral observation into the synced mind.evidence log.
+   * Capture only — forms no hypothesis and influences no decision. */
+  addObservation: (patternKey: string, note: string) => void;
   setLastFocus: (areas: string[]) => void;
   understandingLog: UnderstandingSnapshot[];
   recordUnderstanding: (snap: { focus: string[]; leadMetric?: SignalId; read: string }) => void;
@@ -327,6 +331,13 @@ export function HealthProvider({ children }: { children: React.ReactNode }) {
       const nm: Mind = { ...mind, evidence: [...(mind.evidence ?? []), ev].slice(-500) };
       setMind(nm);
       persist({ contextNotes: n, mind: nm });
+    },
+    addObservation: (patternKey, note) => {
+      // Stage 2: one behavioral observation → one atomic Evidence in the SYNCED mind. Capture only.
+      const ev = buildObservationEvidence(patternKey, note);
+      const nm: Mind = { ...mind, evidence: [...(mind.evidence ?? []), ev].slice(-500) };
+      setMind(nm);
+      persist({ mind: nm });
     },
     setLastFocus: (areas) => { setLastFocusAreas(areas); persist({ lastFocusAreas: areas }); },
     understandingLog,

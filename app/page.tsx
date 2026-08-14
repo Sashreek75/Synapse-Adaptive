@@ -26,16 +26,18 @@ export default function LandingPage() {
       <StructuredData />
       <SiteHeader />
       <Hero />
-      <Problem />
+      {/* MOBILE gets a short, breathable funnel: hero → the one punchy idea → 3 steps → pricing → CTA.
+          Everything heavier is desktop-only so a phone isn't handed a research paper to scroll. */}
+      <div className="hidden md:block"><Problem /></div>
       <Solution />
-      <AppleHealth />
+      <div className="hidden md:block"><AppleHealth /></div>
       <HowItWorks />
-      <AgentSpotlight />
-      <Features />
+      <div className="hidden md:block"><AgentSpotlight /></div>
+      <div className="hidden md:block"><Features /></div>
       <Pricing />
-      <Testimonials />
-      <Roadmap />
-      <FAQ />
+      <div className="hidden md:block"><Testimonials /></div>
+      <div className="hidden md:block"><Roadmap /></div>
+      <div className="hidden md:block"><FAQ /></div>
       <CTA />
       <Footer />
     </div>

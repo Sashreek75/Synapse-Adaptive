@@ -25,6 +25,7 @@ import { FirstWeek } from "@/components/dashboard/first-week";
 import { CommitmentPrompt } from "@/components/dashboard/commitment-prompt";
 import { GoalsStrip } from "@/components/goals/goals-strip";
 import { AgentConsole } from "@/components/agent/agent-console";
+import { MobileHome } from "@/components/mobile/mobile-home";
 import { sessionOpener } from "@/lib/intelligence";
 import { copy } from "@/lib/copy";
 
@@ -77,7 +78,14 @@ export default function HomePage() {
   const oneInsight = opener.highlights.find((h) => h.tone !== "neutral") ?? opener.highlights[0];
 
   return (
-    <div className="flex min-h-[calc(100dvh-9rem)] flex-col">
+    <>
+      {/* MOBILE — orb-first: talk to Synapse, cards one tap away. Desktop keeps its layout below. */}
+      <div className="sm:hidden">
+        <MobileHome />
+      </div>
+
+      {/* DESKTOP — the existing home, unchanged. */}
+      <div className="hidden min-h-[calc(100dvh-9rem)] flex-col sm:flex">
       {/* Greeting + the one thing worth knowing */}
       <section className="sa-rise flex flex-col items-center gap-3 pb-5 pt-1 text-center sm:gap-4 sm:pb-6 sm:pt-4">
         <SynapseOrb size={64} className="sm:hidden" />
@@ -117,6 +125,7 @@ export default function HomePage() {
       <section id="conversation" className="sa-rise-3 mt-6 flex-1 scroll-mt-24">
         <AgentConsole immersive />
       </section>
-    </div>
+      </div>
+    </>
   );
 }

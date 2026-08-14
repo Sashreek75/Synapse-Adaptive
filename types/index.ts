@@ -288,6 +288,10 @@ export interface EvidenceFacets {
   energy?: "draining" | "neutral" | "energizing";
   importance?: "low" | "medium" | "high";
   emotion?: string;
+  /** For source:"conversation" behavioral OBSERVATIONS (Stage 2): a stable key naming the observed
+   * behavior (never a supposed cause). The observation stays an observation — recurrence/hypothesis
+   * formation is a LATER stage and does not happen here. */
+  patternKey?: string;
 }
 
 /** The atomic unit the engine learns from. */

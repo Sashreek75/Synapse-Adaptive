@@ -23,6 +23,7 @@ import { SynapseOrb } from "@/components/synapse/orb";
 import { useHealth } from "@/components/providers/health-store";
 import { useSubscription } from "@/components/providers/subscription-provider";
 import { getPath } from "@/lib/paths";
+import { activeGoals } from "@/lib/goals";
 import { dailyReflection, type DailyReflection } from "@/lib/intelligence";
 import { addCommitment, loadCommitments } from "@/lib/commitments";
 import { readMomentum, commitmentHint } from "@/lib/momentum";
@@ -202,6 +203,15 @@ export function DailyCheckIn() {
         pathLabel: profile.pathLabel,
         focusNoun: getPath(profile.path).focusNoun,
         goals: profile.goals,
+        // WHO THEY ACTUALLY ARE — so questions fit their real life, not a generic work-block template.
+        aboutThem: [
+          mind.trajectory?.statement ? `They're working to become: ${mind.trajectory.statement}.` : "",
+          profile.primaryChallenge ? `What they say is hardest right now: ${profile.primaryChallenge}.` : "",
+          profile.definitionOfBetter && profile.definitionOfBetter !== profile.primaryChallenge ? `What better looks like to them: ${profile.definitionOfBetter}.` : "",
+          profile.aiSummary ? String(profile.aiSummary) : "",
+        ].filter(Boolean).join(" ").slice(0, 600),
+        // Their REAL, named goals (not just focus-area labels) so the check-in can reference them specifically.
+        realGoals: activeGoals().slice(0, 6).map((g) => g.title),
         trends: recentChanges.map((c) => ({ metric: c.metric, label: c.label, improving: c.improving, delta: c.deltaNorm })),
         notes: contextNotes.slice(-4).map((n) => ({ prompt: n.prompt, answer: n.answer })),
         playbook: mind.playbook.slice(-8).map((p) => p.statement),

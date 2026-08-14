@@ -9,6 +9,7 @@ import { challengeContextBlock } from "@/lib/coaching";
 import { extractRecTag, recordRecommendation, decisionsContextBlock } from "@/lib/decisions";
 import { allocationContextBlock, calibrationContextBlock } from "@/lib/allocations";
 import { extractPrincipleTag, extractMindShiftTag, addPrinciple, addMindShift, principlesContextBlock } from "@/lib/principles";
+import { extractObserveTags } from "@/lib/observations";
 import { workspaceContextBlock } from "@/lib/workspaces";
 import { evidenceContextBlock } from "@/lib/evidence";
 import { pftContextBlock } from "@/lib/pft";
@@ -53,7 +54,7 @@ const sectionMeta = {
 } as const;
 
 export function AgentConsole({ embedded = false, immersive = false }: { embedded?: boolean; immersive?: boolean } = {}) {
-  const { profile, series, hasData, weeksTracked, consistency, weeklyScore, recentChanges, providerQuestions, checkIns, contextNotes, recommendationLog, mind, experiments, chat, setChat, dailyDoneToday } = useHealth();
+  const { profile, series, hasData, weeksTracked, consistency, weeklyScore, recentChanges, providerQuestions, checkIns, contextNotes, recommendationLog, mind, experiments, chat, setChat, dailyDoneToday, addObservation } = useHealth();
   const { plan, startUpgrade } = useSubscription();
   const { email } = useAuth();
   const [waitlistOpen, setWaitlistOpen] = useState(false);
@@ -331,7 +332,10 @@ export function AgentConsole({ embedded = false, immersive = false }: { embedded
       if (pr.text) { try { addPrinciple(pr.text); } catch {} }
       const ms = extractMindShiftTag(pr.cleaned);
       if (ms.to) { try { addMindShift({ from: ms.from ?? "", to: ms.to }); } catch {} }
-      setChat([...next, { id: `a_${Date.now()}`, role: "assistant", content: ms.cleaned, sections: data.sections, evidenceUsed: data.evidenceUsed }]);
+      // Stage 2: capture any conversational behavioral observations (silent — never changes the reply text).
+      const obs = extractObserveTags(ms.cleaned);
+      for (const o of obs.observations) { try { addObservation(o.patternKey, o.note); } catch {} }
+      setChat([...next, { id: `a_${Date.now()}`, role: "assistant", content: obs.cleaned, sections: data.sections, evidenceUsed: data.evidenceUsed }]);
     } catch {
       setChat([...next, { id: `a_${Date.now()}`, role: "assistant", content: "I couldn't reach my reasoning engine just now — give it a moment and try again." }]);
     } finally { setBusy(false); scrollDown(); }
