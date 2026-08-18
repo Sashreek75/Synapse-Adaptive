@@ -44,14 +44,16 @@ export const metadata: Metadata = {
   },
 };
 
-export const viewport = { themeColor: "#0b1f3a", width: "device-width", initialScale: 1, viewportFit: "cover" as const };
+export const viewport = { themeColor: "#06141f", width: "device-width", initialScale: 1, viewportFit: "cover" as const };
 
 const themeScript = `
 (function(){try{
   var t = localStorage.getItem('theme');
-  if(!t){ t = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'; }
+  /* Dark navy is Synapse's signature identity — it ships by default. A saved choice or an
+     explicit light system-preference still wins, so the toggle keeps working. */
+  if(!t){ t = window.matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark'; }
   if(t==='dark'){ document.documentElement.classList.add('dark'); }
-}catch(e){}})();
+}catch(e){ document.documentElement.classList.add('dark'); }})();
 `;
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

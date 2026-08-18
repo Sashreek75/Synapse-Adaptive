@@ -95,6 +95,49 @@ export function extractObserveTags(text: string): { observations: CapturedObserv
  * (kind:"statement", source:"conversation"), so it lands in the synced mind.evidence log with one
  * canonical home. Always low capture-confidence: a single observation is never treated as established.
  */
+/** Human, non-judgmental readouts of each behavioral pattern key — describes the BEHAVIOR, never a
+ * trait. Used only to title an evidence card on the You page; the stored note stays the real content. */
+export const PATTERN_LABEL: Record<string, string> = {
+  reopened_decision: "Reopening settled decisions",
+  repeated_question: "Asking the same thing several ways",
+  reassurance_seeking: "Looking for reassurance after deciding",
+  over_comparison: "Comparing options past the point of new information",
+  changed_mind_after_setback: "Changing direction after a setback",
+  avoidance_at_step: "Pulling back at a particular step",
+  stuck_same_step: "Stalling at the same step",
+  priority_execution_mismatch: "Attention not matching a stated priority",
+  abandons_after_setback: "Setting a goal down after one setback",
+  ambition_then_reduce: "Scaling an ambitious plan back down",
+  doubt_loop: "Circling a decision with doubt",
+  certainty_seeking: "Looking for certainty that isn't available yet",
+  circling_question: "Returning to the same open question",
+  strong_reaction_constraint: "A strong reaction to a particular constraint",
+  position_change_on_evidence: "Updating a view when evidence arrived",
+  preference_signal: "A preference worth remembering",
+  follow_through_signal: "A moment of real follow-through",
+  changed_mind: "Changing their mind",
+};
+
+export interface ObservationGroup { patternKey: string; label: string; notes: string[]; count: number; firstAt: string; lastAt: string }
+
+/** Group captured conversational observations by pattern for the You page — evidence, not diagnosis.
+ * Pure read over mind.evidence; forms no hypothesis and confers no authority on anything downstream. */
+export function observationSummary(evidence: { source?: string; text?: string; recordedAt?: string; facets?: { patternKey?: string } }[] | undefined): ObservationGroup[] {
+  const rows = (evidence ?? []).filter((e) => e && e.source === "conversation" && e.facets?.patternKey && e.text);
+  const map = new Map<string, ObservationGroup>();
+  for (const e of rows) {
+    const key = e.facets!.patternKey!;
+    const at = e.recordedAt || "";
+    const g = map.get(key) || { patternKey: key, label: PATTERN_LABEL[key] || key.replace(/_/g, " "), notes: [], count: 0, firstAt: at, lastAt: at };
+    g.notes.push(e.text!);
+    g.count++;
+    if (at && (!g.firstAt || at < g.firstAt)) g.firstAt = at;
+    if (at && at > g.lastAt) g.lastAt = at;
+    map.set(key, g);
+  }
+  return [...map.values()].sort((a, b) => b.count - a.count || b.lastAt.localeCompare(a.lastAt));
+}
+
 export function buildObservationEvidence(patternKey: string, note: string, now = new Date().toISOString()): Evidence {
   return {
     id: `obs_${Date.now().toString(36)}${Math.random().toString(36).slice(2, 5)}`,

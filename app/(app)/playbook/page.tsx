@@ -15,7 +15,8 @@
 import { useEffect, useMemo } from "react";
 import Link from "next/link";
 import { witness } from "@/lib/activity";
-import { Sparkles, Compass, Trophy, GitBranch } from "lucide-react";
+import { Sparkles, Compass, Trophy, GitBranch, Eye } from "lucide-react";
+import { observationSummary } from "@/lib/observations";
 import { Card, CardBody, Button, SectionLabel, Skeleton } from "@/components/ui/primitives";
 import { SynapseOrb } from "@/components/synapse/orb";
 import { useHealth } from "@/components/providers/health-store";
@@ -36,6 +37,12 @@ function livingVoice(weekly: WeeklyFocusReasoning | undefined, hypotheses: Track
   return null;
 }
 
+function fmtDate(iso: string): string {
+  if (!iso) return "recently";
+  const d = new Date(iso);
+  return Number.isNaN(d.getTime()) ? "recently" : d.toLocaleDateString(undefined, { month: "short", day: "numeric" });
+}
+
 export default function PlaybookPage() {
   const { hydrated, mind, profile } = useHealth();
 
@@ -44,12 +51,13 @@ export default function PlaybookPage() {
     const wk = Object.keys(mind.weekly).sort().pop();
     return wk ? mind.weekly[wk] : undefined;
   }, [mind.weekly]);
+  const observations = useMemo(() => observationSummary(mind.evidence), [mind.evidence]);
 
   if (!hydrated) return <Skeleton className="h-96 w-full rounded-2xl" />;
 
   const voice = livingVoice(weekly, mind.hypotheses, mind.habits);
   const becoming = mind.habits.filter((h) => h.status === "established" || h.status === "building");
-  const nothingYet = !voice && becoming.length === 0 && !mind.playbook.length && !mind.trajectory?.statement && !(profile.goals && profile.goals.length);
+  const nothingYet = !voice && becoming.length === 0 && !mind.playbook.length && !mind.trajectory?.statement && !(profile.goals && profile.goals.length) && observations.length === 0;
 
   return (
     <div className="mx-auto max-w-2xl space-y-6">
@@ -78,6 +86,28 @@ export default function PlaybookPage() {
           )}
           {profile.definitionOfBetter && <p className="mt-3 text-sm text-muted">{`What better looks like: ${profile.definitionOfBetter}`}</p>}
         </CardBody></div></Card>
+      )}
+
+      {/* WHAT SYNAPSE HAS NOTICED — behavioral observations shown as EVIDENCE, never as labels or
+          diagnoses. Each card is a concrete, checkable thing that happened; the framing stays humble
+          and correctable. These have no authority over goals, planning, or decisions (Stage-2 capture). */}
+      {observations.length > 0 && (
+        <section>
+          <SectionLabel className="mb-1.5 flex items-center gap-1.5"><Eye className="h-3.5 w-3.5 text-orange-500" /> What I&apos;ve noticed</SectionLabel>
+          <p className="mb-3 text-sm leading-relaxed text-muted">Patterns in how you work — evidence I&apos;m gathering, not conclusions about who you are. I could be wrong; tell me when I am.</p>
+          <div className="space-y-2">
+            {observations.slice(0, 6).map((o) => (
+              <Card key={o.patternKey}><CardBody className="p-4">
+                <div className="flex items-start justify-between gap-3">
+                  <p className="text-sm font-medium text-ink">{o.label}</p>
+                  <span className="shrink-0 text-[11px] text-muted">{o.count === 1 ? "seen once" : `seen ${o.count}×`}</span>
+                </div>
+                <p className="mt-1.5 text-[13px] leading-relaxed text-muted">{o.notes[o.notes.length - 1]}</p>
+                <p className="mt-2 text-[11px] text-muted/70">First noticed {fmtDate(o.firstAt)}</p>
+              </CardBody></Card>
+            ))}
+          </div>
+        </section>
       )}
 
       {nothingYet ? (

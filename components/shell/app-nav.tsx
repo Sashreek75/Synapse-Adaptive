@@ -171,13 +171,18 @@ function RoomLink({ room, active }: { room: Room; active: boolean }) {
   const { href, label, icon: Icon, blurb } = room;
   return (
     <Link href={href}
-      className={cn("group flex items-start gap-3 rounded-2xl px-3 py-2.5 transition-colors", active ? "bg-navy-900 text-white" : "text-ink hover:bg-surface-2")}>
-      <span className={cn("mt-0.5 grid h-8 w-8 shrink-0 place-items-center rounded-xl", active ? "bg-white/10" : "bg-surface-2 group-hover:bg-surface")}>
-        <Icon className={cn("h-4 w-4", active ? "text-orange-400" : "text-navy-500")} />
+      className={cn(
+        "group relative flex items-start gap-3 rounded-xl px-3 py-2.5 transition-colors",
+        // Subtle active state: a slightly lighter surface + a thin orange accent — never a solid box.
+        active ? "bg-surface-2 text-ink" : "text-muted hover:bg-surface-2 hover:text-ink",
+      )}>
+      {active && <span className="absolute inset-y-2 left-0 w-[2px] rounded-full bg-orange-500" aria-hidden />}
+      <span className={cn("mt-0.5 grid h-8 w-8 shrink-0 place-items-center rounded-lg transition-colors", active ? "bg-orange-500/10" : "bg-surface-2 group-hover:bg-surface")}>
+        <Icon className={cn("h-4 w-4", active ? "text-orange-400" : "text-muted")} />
       </span>
       <span className="min-w-0">
-        <span className="block text-sm font-medium">{label}</span>
-        <span className={cn("block text-[12px] leading-snug", active ? "text-white/60" : "text-muted")}>{blurb}</span>
+        <span className={cn("block text-sm font-medium", active ? "text-ink" : "text-ink")}>{label}</span>
+        <span className="block text-[12px] leading-snug text-muted">{blurb}</span>
       </span>
     </Link>
   );

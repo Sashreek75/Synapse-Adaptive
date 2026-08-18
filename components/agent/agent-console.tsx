@@ -467,7 +467,7 @@ export function AgentConsole({ embedded = false, immersive = false }: { embedded
               placeholder="What do you want to make progress on?"
               className="min-w-0 flex-1 bg-transparent px-3 py-2.5 text-base text-ink placeholder:text-muted focus:outline-none" />
             <button onClick={() => send(input)} disabled={busy || !input.trim()} aria-label="Send"
-              className="sa-shine grid h-11 w-11 shrink-0 place-items-center rounded-xl bg-gradient-to-br from-orange-500 to-orange-600 text-white transition hover:from-orange-600 hover:to-orange-700 disabled:opacity-50">
+              className="sa-shine grid h-11 w-11 shrink-0 place-items-center rounded-xl bg-orange-500 text-white transition hover:bg-orange-600 disabled:opacity-50">
               <Send className="h-5 w-5" />
             </button>
           </div>
@@ -515,7 +515,7 @@ export function AgentConsole({ embedded = false, immersive = false }: { embedded
             </div>
           ) : (
             <div key={m.id} className="flex gap-3">
-              <span className="grid h-8 w-8 shrink-0 place-items-center rounded-xl bg-gradient-to-br from-orange-500 to-navy-700 text-white"><Sparkles className="h-4 w-4" /></span>
+              <span className="mt-0.5 shrink-0"><SynapseOrb size={26} state={busy ? "thinking" : "idle"} /></span>
               <div className="max-w-[82%] space-y-2.5">
                 {m.content && (() => { const bo = extractBuildOffer(m.content); const fo = extractFocusOffer(bo.cleaned); const desc = bo.description; return (<>{fo.cleaned && <div className="rounded-2xl rounded-tl-md border bg-surface-2 px-4 py-3 leading-relaxed text-ink">{fo.cleaned}</div>}{desc && <OfferButton desc={desc} />}{fo.offered && <FocusOfferButton goal={fo.goal} minutes={fo.minutes} />}</>); })()}
                 {m.sections?.map((s, i) => {
@@ -534,7 +534,7 @@ export function AgentConsole({ embedded = false, immersive = false }: { embedded
         )}
         {busy && (
           <div className="flex gap-3">
-            <span className="grid h-8 w-8 shrink-0 place-items-center rounded-xl bg-gradient-to-br from-orange-500 to-navy-700 text-white"><Sparkles className="h-4 w-4" /></span>
+            <span className="mt-0.5 shrink-0"><SynapseOrb size={26} state={busy ? "thinking" : "idle"} /></span>
             <div className="rounded-2xl rounded-tl-md border bg-surface-2 px-4 py-3"><span className="sa-typing"><span /><span /><span /></span></div>
           </div>
         )}
@@ -570,7 +570,7 @@ export function AgentConsole({ embedded = false, immersive = false }: { embedded
             placeholder="What are you working on? Talk to me."
             className="flex-1 bg-transparent px-3 py-2 text-ink placeholder:text-muted focus:outline-none" />
           <button onClick={() => send(input)} disabled={busy || !input.trim()} aria-label="Send"
-            className="sa-shine grid h-11 w-11 shrink-0 place-items-center rounded-xl bg-gradient-to-br from-orange-500 to-orange-600 text-white transition hover:from-orange-600 hover:to-orange-700 disabled:opacity-50">
+            className="sa-shine grid h-11 w-11 shrink-0 place-items-center rounded-xl bg-orange-500 text-white transition hover:bg-orange-600 disabled:opacity-50">
             <Send className="h-5 w-5" />
           </button>
         </div>

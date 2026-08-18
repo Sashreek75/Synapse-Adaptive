@@ -2,22 +2,24 @@
 @tailwind components;
 @tailwind utilities;
 
-/* Brand: Navy #0B1F3A · Orange #F97316 · White · slate neutrals.
-   Orange is reserved for CTAs, active states, key insights, and Synapse moments. */
+/* Brand: deep navy · orange · warm near-white. Dark is the primary identity — a calm, intelligent
+   control room. Orange is a SIGNAL, not decoration: CTAs, active state, progress, Synapse moments.
+   Hierarchy comes from layered navy surfaces + typography + space, not from a rainbow of colors. */
 :root {
   --font-sans: "Inter", system-ui, -apple-system, sans-serif;
   --ink: #0f172a;
-  --muted: #64748b;
+  --muted: #5b6b7d;
   --surface: #ffffff;
-  --surface-2: #f8fafc;
-  --line: #e2e8f0;
+  --surface-2: #f6f8fa;
+  --line: #e5e9ee;
 }
+/* The default, signature theme. Extremely dark navy, with a few subtle layers of elevation. */
 .dark {
-  --ink: #f1f5f9;
-  --muted: #94a3b8;
-  --surface: #0e1f38;
-  --surface-2: #081426;
-  --line: #1c3554;
+  --ink: #e9eef4;        /* warm near-white — never pure white */
+  --muted: #90a4b8;      /* muted blue-gray for secondary text */
+  --surface: #0c2033;    /* cards — one subtle step above the app background */
+  --surface-2: #06141f;  /* app background — the deepest navy */
+  --line: #17324a;       /* low-contrast navy hairline for borders */
 }
 * { border-color: var(--line); }
 html { scroll-behavior: smooth; -webkit-text-size-adjust: 100%; }
@@ -63,13 +65,13 @@ button:active, [role="button"]:active { transform: scale(0.985); }
 }
 .dark .mesh {
   background:
-    radial-gradient(55% 55% at 10% 6%, rgba(249,115,22,0.14), transparent 60%),
-    radial-gradient(50% 50% at 92% 0%, rgba(124,157,191,0.16), transparent 55%),
-    radial-gradient(80% 80% at 60% 120%, rgba(90,127,166,0.12), transparent 60%);
+    radial-gradient(55% 55% at 10% 6%, rgba(249,115,22,0.06), transparent 62%),
+    radial-gradient(50% 50% at 92% 0%, rgba(124,157,191,0.09), transparent 58%),
+    radial-gradient(80% 80% at 60% 120%, rgba(90,127,166,0.07), transparent 62%);
 }
 
 .glass { background: rgba(255,255,255,0.72); backdrop-filter: blur(14px) saturate(140%); -webkit-backdrop-filter: blur(14px) saturate(140%); }
-.dark .glass { background: rgba(11,31,58,0.68); }
+.dark .glass { background: rgba(6,20,31,0.72); border-color: var(--line); }
 
 .sa-blob { background: radial-gradient(circle at 30% 30%, var(--blob-a), transparent 70%); will-change: transform; }
 .sa-blob-1 { --blob-a: rgba(249,115,22,0.35); animation: sa-drift1 26s ease-in-out infinite; }
@@ -86,18 +88,18 @@ button:active, [role="button"]:active { transform: scale(0.985); }
 .sa-card-hover { transition: transform .25s cubic-bezier(.16,1,.3,1), box-shadow .25s ease, border-color .25s ease; }
 .sa-card-hover:hover { transform: translateY(-3px); box-shadow: 0 24px 48px -20px rgba(11,31,58,.32); border-color: rgba(90,127,166,.4); }
 .sa-glow { position: relative; }
-.sa-glow::after { content:""; position:absolute; inset:-2px; border-radius:inherit; background:linear-gradient(120deg,rgba(249,115,22,.5),rgba(11,31,58,.55)); filter:blur(16px); opacity:0; transition:opacity .3s; z-index:-1; }
-.sa-glow:hover::after { opacity:.6; }
+.sa-glow::after { content:""; position:absolute; inset:-1px; border-radius:inherit; background:radial-gradient(60% 60% at 50% 0%, rgba(249,115,22,.28), transparent 70%); filter:blur(14px); opacity:0; transition:opacity .3s; z-index:-1; }
+.sa-glow:hover::after { opacity:.3; }
 
+/* Restrained: a calm orange gradient for the single hero accent word. No perpetual animation. */
 .sa-gradient-text {
-  background: linear-gradient(90deg, #f97316, #fdba74, #7c9dbf, #f97316);
-  background-size: 250% auto; -webkit-background-clip: text; background-clip: text; color: transparent;
-  animation: sa-textshine 7s linear infinite;
+  background: linear-gradient(92deg, #f97316, #fbbf7a);
+  -webkit-background-clip: text; background-clip: text; color: transparent;
 }
-@keyframes sa-textshine { to { background-position: 250% center; } }
 
-.shadow-soft { box-shadow: 0 1px 2px rgba(11,31,58,0.05), 0 12px 32px -18px rgba(11,31,58,0.24); }
-.shadow-lift { box-shadow: 0 2px 6px rgba(11,31,58,0.07), 0 28px 56px -24px rgba(11,31,58,0.34); }
+/* Elevation on dark reads best as depth + a hairline, not a heavy glow. Restrained, near-black. */
+.shadow-soft { box-shadow: 0 1px 2px rgba(0,0,0,0.18), 0 8px 24px -20px rgba(0,0,0,0.42); }
+.shadow-lift { box-shadow: 0 2px 8px rgba(0,0,0,0.24), 0 24px 48px -28px rgba(0,0,0,0.52); }
 .sa-accent { position: relative; }
 .sa-accent::before { content:""; position:absolute; left:0; top:14px; bottom:14px; width:3px; border-radius:999px; background:linear-gradient(180deg,#f97316,#5a7fa6); }
 
@@ -168,38 +170,40 @@ button:active, [role="button"]:active { transform: scale(0.985); }
    gradients — deep navy at rest, with a warm orange ember: futuristic yet calming.
    No images, no canvas. Sizes via --orb (px). States: idle / thinking. */
 .orb { position: relative; width: var(--orb, 96px); height: var(--orb, 96px); border-radius: 9999px; isolation: isolate; }
+/* A dark, dimensional sphere: deep navy body, a single warm ember low-right, a soft cool highlight.
+   Atmospheric and restrained — a luminous object in a dark room, not a glowing toy. */
 .orb-core {
   position: absolute; inset: 0; border-radius: inherit;
   background:
-    radial-gradient(40% 38% at 34% 30%, rgba(255,255,255,.92), rgba(255,255,255,0) 60%),
-    radial-gradient(75% 75% at 68% 72%, #f97316 0%, #e8823c 26%, #5a7fa6 58%, #16406e 82%),
-    radial-gradient(120% 120% at 50% 50%, #0b1f3a 0%, #061224 100%);
-  box-shadow: inset 0 0 24px rgba(255,255,255,.16), inset 0 -10px 26px rgba(4,14,30,.6);
-  animation: orb-breathe 6.5s ease-in-out infinite;
+    radial-gradient(36% 34% at 33% 29%, rgba(210,224,238,.30), rgba(210,224,238,0) 60%),
+    radial-gradient(85% 85% at 72% 78%, rgba(249,115,22,.50) 0%, rgba(176,86,38,.24) 28%, rgba(26,58,88,.55) 58%, #0a2032 82%),
+    radial-gradient(120% 120% at 50% 44%, #10283c 0%, #06131f 100%);
+  box-shadow: inset 0 1px 1px rgba(200,220,240,.14), inset 0 -12px 30px rgba(2,9,16,.72);
+  animation: orb-breathe 7.5s ease-in-out infinite;
   will-change: transform;
 }
 .orb-sheen {
-  position: absolute; inset: 0; border-radius: inherit; mix-blend-mode: screen; opacity: .75;
-  background: conic-gradient(from 0deg, rgba(249,115,22,0), rgba(124,157,191,.5), rgba(249,115,22,.45), rgba(90,127,166,.4), rgba(249,115,22,0));
-  -webkit-mask: radial-gradient(closest-side, transparent 56%, #000 70%, transparent 100%);
-  mask: radial-gradient(closest-side, transparent 56%, #000 70%, transparent 100%);
-  animation: orb-spin 14s linear infinite;
+  position: absolute; inset: 0; border-radius: inherit; mix-blend-mode: screen; opacity: .3;
+  background: conic-gradient(from 210deg, transparent, rgba(124,157,191,.34), transparent 42%, rgba(249,115,22,.18), transparent 72%);
+  -webkit-mask: radial-gradient(closest-side, transparent 58%, #000 74%, transparent 100%);
+  mask: radial-gradient(closest-side, transparent 58%, #000 74%, transparent 100%);
+  animation: orb-spin 26s linear infinite;
 }
 .orb-bloom {
-  position: absolute; inset: -28%; border-radius: inherit; z-index: -1;
-  background: radial-gradient(closest-side, rgba(90,127,166,.45), rgba(249,115,22,.16) 55%, transparent 75%);
-  filter: blur(8px); animation: orb-bloom 6.5s ease-in-out infinite;
+  position: absolute; inset: -22%; border-radius: inherit; z-index: -1;
+  background: radial-gradient(closest-side, rgba(90,127,166,.28), rgba(249,115,22,.07) 56%, transparent 74%);
+  filter: blur(11px); animation: orb-bloom 7.5s ease-in-out infinite;
 }
 .orb-ring {
-  position: absolute; inset: -10%; border-radius: inherit; opacity: 0;
-  border: 1.5px solid rgba(249,115,22,.5);
+  position: absolute; inset: -9%; border-radius: inherit; opacity: 0;
+  border: 1px solid rgba(249,115,22,.42);
 }
-.orb[data-state="thinking"] .orb-core { animation-duration: 2.6s; }
-.orb[data-state="thinking"] .orb-sheen { animation-duration: 4.5s; }
-.orb[data-state="thinking"] .orb-bloom { animation-duration: 2.6s; }
-.orb[data-state="thinking"] .orb-ring { animation: orb-ping 2.2s ease-out infinite; }
-@keyframes orb-breathe { 0%,100% { transform: scale(.97); } 50% { transform: scale(1.03); } }
-@keyframes orb-bloom { 0%,100% { opacity:.55; transform: scale(.98); } 50% { opacity:.9; transform: scale(1.05); } }
+.orb[data-state="thinking"] .orb-core { animation-duration: 3.4s; }
+.orb[data-state="thinking"] .orb-sheen { animation-duration: 8s; opacity: .42; }
+.orb[data-state="thinking"] .orb-bloom { animation-duration: 3.4s; }
+.orb[data-state="thinking"] .orb-ring { animation: orb-ping 2.8s ease-out infinite; }
+@keyframes orb-breathe { 0%,100% { transform: scale(.985); } 50% { transform: scale(1.015); } }
+@keyframes orb-bloom { 0%,100% { opacity:.4; transform: scale(.99); } 50% { opacity:.62; transform: scale(1.03); } }
 @keyframes orb-spin { to { transform: rotate(360deg); } }
 @keyframes orb-ping { 0% { opacity:.55; transform: scale(.92); } 80%,100% { opacity:0; transform: scale(1.25); } }
 @media (prefers-reduced-motion: reduce){
