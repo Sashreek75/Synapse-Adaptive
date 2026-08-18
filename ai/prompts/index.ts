@@ -607,6 +607,14 @@ FRONTS that must be won, name the single most likely CURRENT bottleneck (the rea
 moving, which is often NOT the obvious task: for fitness it's frequently sleep, for a startup it's
 talking to customers, for the SAT it's timing or anxiety), and give the ONE next critical move.
 
+First, CLASSIFY the goal's shape and return it as "kind": "milestone" (a real finish line — "get 1500 on the
+SAT", "ship v1"; a deadline is meaningful and it can be completed), "continuous" (ever-growing, no endpoint —
+"grow real user impact", "become a stronger writer"; it is NEVER 'done', takes NO deadline, and its fronts are
+ongoing LEVERS rather than a finish line), "habit" (a recurring cadence — "train 3x a week"), or "exploratory"
+(figuring something out that will resolve into other goals). For a CONTINUOUS goal, do not frame fronts as a
+path to completion or invent a deadline — frame them as the levers that compound its growth, and let the next
+move be the current highest-leverage push, not a step toward finishing.
+
 USE WHAT THEY ALREADY TOLD YOU. If an "About them" line is present (their aspiration, what they say is
 hardest right now, their situation), reason the bottleneck and the next move FROM those specifics — not
 from generic domain steps. The result should feel like you understood THEIR exact situation: e.g., for
@@ -628,6 +636,7 @@ Also frame the mission as a living relationship, not a folder:
 
 Return ONLY JSON:
 {
+  "kind": "milestone" | "continuous" | "habit" | "exploratory",
   "fronts": [ { "title": string, "bottleneck"?: string, "nextMove"?: string, "target"?: string, "current"?: string } ],
   "bottleneck": string,
   "nextMove": { "title": string, "when"?: string, "minutes"?: number, "why"?: string },
@@ -655,6 +664,8 @@ TASK: Decide where this person's attention should go THIS WEEK — an ALLOCATION
 You're given their goals (id, title, priority, momentum, days since progress, and — when known — a deadline in days) and what they told you about themselves ("About them"), which includes their long-term aspiration.
 
 Reason exactly as your "DECIDE WHERE ATTENTION GOES" loop says, in order and never as a formula: what actually COMPETES (don't manufacture a trade-off between goals that don't starve each other) → hard CONSTRAINTS and deadlines first → IMPORTANCE and leverage (a bottleneck can lift a secondary goal) → OPPORTUNITY COST → what they'll realistically EXECUTE (low follow-through changes the step, not the pick) → CONFIDENCE (how close are the top calls?). The long-term aspiration is OVERHEAD — never itself the needle; the needle is the concrete short-term goals that develop it, and one that also builds that identity is higher-leverage.
+
+RESPECT GOAL SHAPE (some goals are tagged 'continuous' or 'habit'). A MILESTONE goal's urgency can come from its deadline. A CONTINUOUS goal (grow, become, improve) has NO deadline and is never 'done' — its claim on the week comes from drift (it's gone quiet) or a live opportunity, and 'maintain' is a perfectly good role for it; never say it will be finished and never fault it for lacking a deadline. A HABIT's urgency is the cadence slipping. Do not protect a goal just because it has a deadline, nor park a continuous goal just because it doesn't.
 
 Assign every competing goal a ROLE: "protect" (the needle — the 1–2 that get the week's real attention), "maintain" (preserve its progress with a small action — don't optimise it), "park" (deliberately defer active advancement because acting now costs more than waiting — it still matters, NEVER unimportant), or "watch" (barely touch it, monitor for the one condition that would promote it). Do NOT put everything in "protect", and do NOT imply the maintained/parked goals stopped mattering. Allocation is not execution: protecting one goal does not mean the others get nothing — they get less, not zero.
 

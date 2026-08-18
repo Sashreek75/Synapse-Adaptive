@@ -12,7 +12,7 @@ import { ArrowLeft, Trash2, Check, RefreshCw, MessageCircle, HelpCircle, CheckCi
 import { Button } from "@/components/ui/primitives";
 import { SynapseOrb } from "@/components/synapse/orb";
 import { cn } from "@/lib/utils";
-import { getGoal, updateGoal, deleteGoal, decomposeGoal, logOutcome, currentFront, dueLabel, type Goal } from "@/lib/goals";
+import { getGoal, updateGoal, deleteGoal, decomposeGoal, logOutcome, currentFront, dueLabel, takesDeadline, type Goal, type GoalKind } from "@/lib/goals";
 
 function nextAction(g: Goal): string | null {
   if (g.nextMove?.title) return g.nextMove.title;
@@ -83,15 +83,34 @@ export default function GoalDetailPage() {
         </div>
       </div>
 
-      {/* OPTIONAL structured deadline — the only real urgency signal, never required. When set, it
-          makes this goal's urgency a fact (not a vibe) in every prioritization call. */}
-      <div className="flex flex-wrap items-center gap-2 px-1 text-xs text-muted">
-        <CalendarClock className="h-3.5 w-3.5 shrink-0" />
-        <label htmlFor="due">Deadline</label>
-        <input id="due" type="date" value={goal.dueDate ?? ""}
-          onChange={(e) => { const u = updateGoal(id, { dueDate: e.target.value || undefined }); if (u) setGoal(u); }}
-          className="rounded-md border bg-surface px-2 py-1 text-ink focus:outline-none focus-visible:ring-2 focus-visible:ring-navy-400" />
-        <span className="text-muted/70">{goal.dueDate ? dueLabel(goal) : "optional — add one only if there's a real date"}</span>
+      {/* SHAPE + deadline. Not every goal has a finish line — a continuous goal ("grow real user impact")
+          is never "done" and takes no deadline; its urgency is momentum, not a date. The deadline field
+          only appears for goals that can actually end. Shape is inferred but you can correct it here. */}
+      <div className="space-y-2 px-1">
+        <div className="flex flex-wrap items-center gap-1.5 text-xs">
+          <span className="text-muted">Shape</span>
+          {(["milestone", "continuous", "habit"] as GoalKind[]).map((k) => (
+            <button key={k} type="button" onClick={() => { const u = updateGoal(id, { kind: k }); if (u) setGoal(u); }}
+              className={cn("rounded-full border px-2.5 py-1 font-medium transition", (goal.kind ?? "milestone") === k ? "border-orange-500 bg-orange-500/10 text-ink" : "bg-surface text-muted hover:text-ink")}>
+              {k === "milestone" ? "Has a finish line" : k === "continuous" ? "Ongoing" : "Habit"}
+            </button>
+          ))}
+        </div>
+        {takesDeadline(goal) ? (
+          <div className="flex flex-wrap items-center gap-2 text-xs text-muted">
+            <CalendarClock className="h-3.5 w-3.5 shrink-0" />
+            <label htmlFor="due">Deadline</label>
+            <input id="due" type="date" value={goal.dueDate ?? ""}
+              onChange={(e) => { const u = updateGoal(id, { dueDate: e.target.value || undefined }); if (u) setGoal(u); }}
+              className="rounded-md border bg-surface px-2 py-1 text-ink focus:outline-none focus-visible:ring-2 focus-visible:ring-navy-400" />
+            <span className="text-muted/70">{goal.dueDate ? dueLabel(goal) : "optional — add one only if there's a real date"}</span>
+          </div>
+        ) : (
+          <p className="flex items-center gap-2 text-xs text-muted">
+            <CalendarClock className="h-3.5 w-3.5 shrink-0" />
+            {goal.kind === "habit" ? "A habit — I'll track your cadence, not a deadline." : "Ongoing — no finish line. I'll track your momentum, not a deadline."}
+          </p>
+        )}
       </div>
 
       {/* THE ONE THING */}
@@ -120,7 +139,7 @@ export default function GoalDetailPage() {
 
       <div className="flex items-center justify-between px-1">
         <button onClick={() => talk(`What's really holding me back on "${goal.title}"?`)} className="text-xs text-muted hover:text-ink">Ask what&apos;s holding me back</button>
-        <button onClick={() => { updateGoal(id, { status: "achieved" }); router.push("/goals"); }} className="inline-flex items-center gap-1 text-xs text-muted transition hover:text-emerald-600 dark:hover:text-emerald-400"><CheckCircle2 className="h-3.5 w-3.5" /> I&apos;ve achieved this</button>
+        <button onClick={() => { updateGoal(id, { status: "achieved" }); router.push("/goals"); }} className="inline-flex items-center gap-1 text-xs text-muted transition hover:text-emerald-600 dark:hover:text-emerald-400"><CheckCircle2 className="h-3.5 w-3.5" /> {goal.kind === "continuous" || goal.kind === "habit" ? "Wind this down" : "I've achieved this"}</button>
       </div>
     </div>
   );

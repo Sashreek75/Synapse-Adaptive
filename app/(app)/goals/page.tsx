@@ -113,7 +113,7 @@ export default function GoalsPage() {
         const res = await fetch("/api/goal-focus", {
           method: "POST", headers: { "content-type": "application/json" },
           body: JSON.stringify({
-            goals: goals.map((g) => ({ id: g.id, title: g.title, priority: g.priority, momentum: g.momentum, daysSince: daysSinceProgress(g), dueInDays: daysUntilDue(g) })),
+            goals: goals.map((g) => ({ id: g.id, title: g.title, priority: g.priority, kind: g.kind, momentum: g.momentum, daysSince: daysSinceProgress(g), dueInDays: daysUntilDue(g) })),
             context: personCtx,
           }),
         });

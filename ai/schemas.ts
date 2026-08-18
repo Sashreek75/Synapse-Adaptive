@@ -164,6 +164,7 @@ const frontSpecSchema = z.object({
 });
 export const goalPlanSchema = z.object({
   fronts: z.array(frontSpecSchema).min(2).max(7),
+  kind: z.enum(["milestone", "continuous", "habit", "exploratory"]).optional(),
   bottleneck: z.string().optional(),
   nextMove: z.object({ title: z.string().min(1), when: z.string().optional(), minutes: z.number().optional(), why: z.string().optional() }).optional(),
   mission: z.string().optional(),

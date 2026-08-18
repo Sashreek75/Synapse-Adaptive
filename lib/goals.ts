@@ -17,6 +17,15 @@
 export type GoalPriority = "primary" | "high" | "medium" | "someday";
 export type GoalStatus = "active" | "paused" | "achieved" | "dropped";
 export type GoalMomentum = "new" | "building" | "steady" | "slipping" | "stalled";
+/**
+ * The SHAPE of a goal — not every goal has a finish line, and that changes how urgency works:
+ *  - milestone:   a real endpoint ("get 1500 on the SAT", "ship v1"). A deadline is meaningful; it can be "done".
+ *  - continuous:  ever-growing, no end ("grow real user impact", "become a stronger writer"). NO deadline; urgency
+ *                 comes from drift and opportunity, and "maintain" is often its natural home. Never "done".
+ *  - habit:       a recurring cadence ("train 3x a week"). Urgency = missing the cadence, not a due date.
+ *  - exploratory: figuring something out ("decide what to build"); usually resolves INTO other goals.
+ */
+export type GoalKind = "milestone" | "continuous" | "habit" | "exploratory";
 export type FrontStatus = "open" | "active" | "won" | "paused";
 export type OutcomeVerdict = "yes" | "partly" | "no";
 
@@ -38,8 +47,9 @@ export interface Goal {
   mission?: string;            // identity-level framing: "Become someone who…"
   why?: string;
   priority: GoalPriority;
+  kind?: GoalKind;             // the goal's SHAPE — governs whether a deadline even makes sense
   timeline?: string;           // FREE TEXT, human ("by end of summer") — never parsed into urgency
-  dueDate?: string;            // OPTIONAL structured deadline (ISO yyyy-mm-dd) — the only real urgency signal
+  dueDate?: string;            // OPTIONAL structured deadline (ISO yyyy-mm-dd) — only meaningful for milestone goals
   momentum: GoalMomentum;
   strategy?: string;
   obstacles: string[];
@@ -72,6 +82,31 @@ const PRIORITY_RANK: Record<GoalPriority, number> = { primary: 0, high: 1, mediu
 export const MOMENTUM_LABEL: Record<GoalMomentum, string> = {
   new: "just started", building: "building", steady: "steady", slipping: "slipping", stalled: "stalled",
 };
+export const KIND_LABEL: Record<GoalKind, string> = {
+  milestone: "has a finish line", continuous: "ongoing — no finish line", habit: "a recurring habit", exploratory: "figuring it out",
+};
+
+/** A deadline only makes sense for goals that can actually END. Continuous goals and habits do not take
+ * one — their urgency is cadence/drift, not a date. */
+export function takesDeadline(g: Pick<Goal, "kind">): boolean {
+  return g.kind !== "continuous" && g.kind !== "habit";
+}
+
+/** A best-guess SHAPE from the goal's own words, used as a sensible default at creation. The model can
+ * refine it on decomposition and the user can correct it — this is only a starting point, never a verdict. */
+export function inferGoalKind(title: string, why?: string): GoalKind {
+  const t = `${title || ""} ${why || ""}`.toLowerCase();
+  const has = (...w: string[]) => w.some((x) => t.includes(x));
+  // Habit: an explicit cadence.
+  if (has("every day", "everyday", "daily", "each day", "each week", "weekly", "per week", "x a week", "x/week", "times a week", " habit", "routine", "consistently ", "each morning", "each night")) return "habit";
+  // Continuous: grow/keep/become — things with no endpoint.
+  if (has("grow", "growing", "keep ", "stay ", "maintain", "sustain", "ongoing", "continuous", "become ", "get better at", "improve", "build a", "build my", "build an audience", "audience", "impact", "scale", "more consistent", "keep up", "long-term")) return "continuous";
+  // Exploratory: deciding / figuring out.
+  if (has("figure out", "decide ", "explore", "work out what", "choose ", "discover ", "clarify")) return "exploratory";
+  // Milestone: a clear endpoint, a target, a date, an event.
+  if (has("get into", "get in to", "pass ", "ship ", "launch", "finish", "complete", "reach ", "hit ", "land ", "get a ", "apply", "application", "publish", "exam", "sat", "act ", "gre", "interview", "by ", "before ", "1500", "target", "certif", "degree", "graduate")) return "milestone";
+  return "milestone";
+}
 
 const KEY = "synapse.goals.v1";
 const EVT = "synapse:goals";
@@ -118,6 +153,7 @@ export function addGoal(input: { title: string; why?: string; priority?: GoalPri
     mission: undefined,
     why: input.why?.trim() || undefined,
     priority: input.priority || (list.some((g) => g.priority === "primary" && g.status === "active") ? "high" : "primary"),
+    kind: inferGoalKind(input.title, input.why),
     timeline: input.timeline?.trim() || undefined,
     dueDate: input.dueDate?.trim() || undefined,
     momentum: "new",
@@ -161,7 +197,7 @@ export function activeGoals(): Goal[] {
 }
 
 /* ---- Campaign structure ---- */
-export function setCampaign(goalId: string, plan: Partial<Pick<Goal, "fronts" | "bottleneck" | "nextMove" | "mission" | "greatestRisk" | "belief" | "counterBelief" | "openQuestion" | "evidence">>): Goal | null {
+export function setCampaign(goalId: string, plan: Partial<Pick<Goal, "fronts" | "bottleneck" | "nextMove" | "mission" | "greatestRisk" | "belief" | "counterBelief" | "openQuestion" | "evidence" | "kind">>): Goal | null {
   const patch: Partial<Goal> = {};
   (Object.keys(plan) as (keyof typeof plan)[]).forEach((k) => {
     if (plan[k] !== undefined) (patch as Record<string, unknown>)[k] = plan[k];
@@ -294,7 +330,7 @@ export async function decomposeGoal(goalId: string): Promise<Goal | null> {
   const g = getGoal(goalId); if (!g) return null;
   type RawFront = { title: string; bottleneck?: string; nextMove?: string; target?: string; current?: string };
   type Plan = {
-    fronts?: RawFront[]; bottleneck?: string; nextMove?: NextMove; mission?: string;
+    fronts?: RawFront[]; kind?: GoalKind; bottleneck?: string; nextMove?: NextMove; mission?: string;
     greatestRisk?: string; belief?: string; counterBelief?: string; openQuestion?: string; evidence?: string[];
   };
   let plan: Plan | null = null;
@@ -326,6 +362,7 @@ export async function decomposeGoal(goalId: string): Promise<Goal | null> {
   const fronts = mergeFronts(g.fronts, fresh);
   return setCampaign(goalId, {
     fronts,
+    kind: plan?.kind, // the model's read of the goal's shape refines our creation-time guess
     bottleneck: plan?.bottleneck,
     nextMove: plan?.nextMove,
     mission: plan?.mission,
@@ -356,7 +393,7 @@ export function goalsContextBlock(): string {
   if (!goals.length) return "";
   const nl = String.fromCharCode(10);
   const lines = goals.map((g) => {
-    const head = `[${g.priority}${g.momentum !== "new" ? `, ${MOMENTUM_LABEL[g.momentum]}` : ""}]`;
+    const head = `[${g.priority}${g.kind && g.kind !== "milestone" ? `, ${g.kind}` : ""}${g.momentum !== "new" ? `, ${MOMENTUM_LABEL[g.momentum]}` : ""}]`;
     const extra: string[] = [];
     if (g.why) extra.push(`why: ${g.why}`);
     if (g.bottleneck) extra.push(`BOTTLENECK: ${g.bottleneck}`);
@@ -380,7 +417,8 @@ export function goalsContextBlock(): string {
     ? `They are carrying ${goals.length} goals at once with a finite week. Decide where their MARGINAL attention goes — allocation, not elimination: which one or two to PROTECT this week, which to MAINTAIN with a small action (still matters — maintenance is not neglect), which to PARK on purpose (deferred because acting now costs more than waiting — never "unimportant" — with what brings it back). Allocation is NOT execution: a protected goal still leaves the others a small maintenance action, not nothing. Only treat goals as competing if pushing one actually starves another; don't manufacture a trade-off. And stay dynamic: if a deadline, a stall, or a new dependency means last week's call is no longer right, say so and reallocate.`
     : "";
   return [
-    "THE GOALS YOU ARE HELPING THEM WIN — you are a goal OBSESSOR, not a note-taker. For each: reason about the real BOTTLENECK ('if this isn't moving, why?') and attack THAT, not the obvious task. CLOSE THE OUTCOME LOOP: after they do something, ask whether it actually worked and let the answer reorganize the plan. CHALLENGE THE WRONG OPTIMIZATION: if their energy keeps going where the needle isn't moving, say so plainly ('we've spent weeks on X but Y hasn't moved — I think we're solving the wrong problem'). A goal shown with a deadline (DUE IN…) has real urgency; a goal without one does not — never invent urgency from a vibe.",
+    "THE GOALS YOU ARE HELPING THEM WIN — you are a goal OBSESSOR, not a note-taker. For each: reason about the real BOTTLENECK ('if this isn't moving, why?') and attack THAT, not the obvious task. CLOSE THE OUTCOME LOOP: after they do something, ask whether it actually worked and let the answer reorganize the plan. CHALLENGE THE WRONG OPTIMIZATION: if their energy keeps going where the needle isn't moving, say so plainly ('we've spent weeks on X but Y hasn't moved — I think we're solving the wrong problem').",
+    "GOALS HAVE DIFFERENT SHAPES, and it changes how urgency works. A MILESTONE goal has a finish line — a deadline (DUE IN…) is real urgency, and it can be 'done'. A CONTINUOUS goal (grow, become, improve — tagged 'continuous') has NO finish line and NO deadline: never ask for one, never imply it will be 'done', and its urgency comes from DRIFT (it's been neglected) and OPPORTUNITY, not a date — 'maintain' is often its healthy home. A HABIT goal's urgency is missing its cadence, not a due date. Never invent deadline-urgency for a goal that has no deadline, and never treat a continuous goal's lack of a deadline as 'not urgent'.",
     ...lines,
     driftLine,
     competeLine,

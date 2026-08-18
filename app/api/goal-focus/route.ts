@@ -11,7 +11,7 @@ export const runtime = "nodejs";
  * pick so the page still works. No new storage; the client caches the result per week.
  */
 interface FocusReq {
-  goals?: { id: string; title: string; priority?: string; momentum?: string; daysSince?: number | null; dueInDays?: number | null }[];
+  goals?: { id: string; title: string; priority?: string; kind?: string; momentum?: string; daysSince?: number | null; dueInDays?: number | null }[];
   context?: string;
 }
 
@@ -49,7 +49,7 @@ export async function POST(req: Request) {
 
   const user = [
     "GOALS:",
-    ...goals.map((g) => `- [id:${g.id}] ${g.title} (priority ${g.priority || "?"}, momentum ${g.momentum || "?"}${g.daysSince != null ? `, last moved ${g.daysSince}d ago` : ""}${g.dueInDays != null ? `, DUE IN ${g.dueInDays}d` : ""})`),
+    ...goals.map((g) => `- [id:${g.id}] ${g.title} (priority ${g.priority || "?"}${g.kind && g.kind !== "milestone" ? `, ${g.kind} goal` : ""}, momentum ${g.momentum || "?"}${g.daysSince != null ? `, last moved ${g.daysSince}d ago` : ""}${g.dueInDays != null ? `, DUE IN ${g.dueInDays}d` : ""})`),
     body.context ? `About them: ${body.context}` : "",
     "",
     "Allocate this week across these goals, as JSON now.",
