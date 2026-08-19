@@ -15,7 +15,6 @@ import {
 import { Button } from "@/components/ui/primitives";
 import { ThemeToggle } from "@/components/shell/theme-toggle";
 import { SynapseOrb } from "@/components/synapse/orb";
-import { NeuralBackground } from "@/components/marketing/neural-background";
 import { Reveal } from "@/components/marketing/reveal";
 import { PricingCTA } from "@/components/marketing/pricing-cta";
 import { PLANS, PLAN_ORDER } from "@/lib/billing/plans";
@@ -31,6 +30,7 @@ export default function LandingPage() {
           Everything heavier is desktop-only so a phone isn't handed a research paper to scroll. */}
       <div className="hidden md:block"><Problem /></div>
       <Solution />
+      <SynapseFlow />
       <div className="hidden md:block"><AppleHealth /></div>
       <HowItWorks />
       <div className="hidden md:block"><AgentSpotlight /></div>
@@ -73,11 +73,9 @@ function SiteHeader() {
 
 function Hero() {
   return (
-    <section className="relative overflow-hidden bg-surface-2">
-      {/* Restrained depth: the neural field, dimmed, plus a single faint ember. No bright mesh. */}
-      <NeuralBackground className="absolute inset-0 h-full w-full opacity-40" focus={{ x: 0.72, y: 0.4 }} />
-      <div className="pointer-events-none absolute -top-32 right-[6%] h-[30rem] w-[30rem] rounded-full"
-        style={{ background: "radial-gradient(closest-side, rgba(249,115,22,0.10), transparent 72%)" }} />
+    <section className="hero-bg relative overflow-hidden">
+      {/* Clean, blended navy+white+orange field (see .hero-bg) with a whisper of grid for depth. */}
+      <div className="absolute inset-0 sa-grid opacity-30" />
       <div className="absolute inset-x-0 bottom-0 h-24 bg-gradient-to-b from-transparent to-surface-2" />
 
       <div className="relative mx-auto grid max-w-6xl items-center gap-14 px-5 pb-24 pt-20 sm:pt-24 lg:grid-cols-[1fr_1.05fr] lg:pb-28 lg:pt-28">
@@ -87,11 +85,11 @@ function Hero() {
             <span className="h-1.5 w-1.5 rounded-full bg-orange-500" /> Decision intelligence, for one person — you
           </div>
 
-          <h1 className="mt-6 text-balance text-[2.75rem] font-semibold leading-[1.04] tracking-tight text-ink sm:text-6xl">
+          <h1 className="mt-5 text-balance text-4xl font-semibold leading-[1.08] tracking-tight text-ink sm:mt-6 sm:text-5xl sm:leading-[1.04] lg:text-6xl">
             An AI that learns how you <span className="sa-gradient-text">actually operate.</span>
           </h1>
 
-          <p className="mt-6 max-w-lg text-lg leading-relaxed text-muted">
+          <p className="mt-5 max-w-lg text-base leading-relaxed text-muted sm:mt-6 sm:text-lg">
             Synapse learns from how you decide, work, and follow through — then helps you put your
             limited attention where it actually counts, and stays with you until intention becomes done.
           </p>
@@ -101,11 +99,14 @@ function Hero() {
             <a href="#how" className="text-sm font-medium text-muted transition-colors hover:text-ink">See how it works →</a>
           </div>
 
-          <div className="mt-9 flex flex-wrap gap-x-6 gap-y-2 text-sm text-muted">
+          <div className="mt-8 flex flex-wrap gap-x-6 gap-y-2 text-sm text-muted sm:mt-9">
             <span className="inline-flex items-center gap-1.5"><Compass className="h-4 w-4 text-navy-400" /> One clear next step</span>
             <span className="inline-flex items-center gap-1.5"><ShieldCheck className="h-4 w-4 text-navy-400" /> Learns your patterns</span>
             <span className="inline-flex items-center gap-1.5"><Lock className="h-4 w-4 text-navy-400" /> Private by design</span>
           </div>
+
+          {/* Mobile/tablet get a clean upright product card so the hero isn't text-only. */}
+          <HeroProductVizMobile />
         </div>
 
         <HeroProductViz />
@@ -119,43 +120,77 @@ function Hero() {
  * no robot. Desktop only; the mobile hero leads with the copy. */
 function HeroProductViz() {
   return (
-    <div className="relative mx-auto hidden w-full max-w-md lg:block">
-      {/* The interface panel */}
-      <div className="relative rounded-2xl border bg-surface shadow-lift">
-        {/* window chrome */}
-        <div className="flex items-center gap-2 border-b px-4 py-3">
-          <SynapseOrb size={22} />
-          <span className="text-sm font-semibold text-ink">Synapse</span>
-          <span className="ml-auto text-[11px] text-muted">Thursday · evening</span>
-        </div>
-
-        <div className="space-y-4 p-4">
-          {/* a real exchange */}
-          <div className="flex justify-end">
-            <p className="max-w-[80%] rounded-2xl rounded-br-md border bg-surface-2 px-3.5 py-2 text-[13px] leading-relaxed text-ink">
-              Should I focus on the SAT or my startup this week?
-            </p>
+    <div className="relative mx-auto hidden w-full max-w-md lg:block [perspective:2000px]">
+      {/* A floating, tilted slice of the real Synapse UI — a product shot, not stock art. It eases
+          toward flat on hover, so it feels alive without spinning. */}
+      <div className="relative overflow-hidden rounded-2xl border bg-surface shadow-lift transition-transform duration-700 ease-out [transform:rotateY(-17deg)_rotateX(7deg)_rotate(1deg)] hover:[transform:rotateY(-7deg)_rotateX(3deg)]">
+        <div className="flex">
+          {/* slim app rail */}
+          <div className="flex w-12 shrink-0 flex-col items-center gap-4 border-r bg-surface-2/60 py-4">
+            <SynapseOrb size={22} />
+            <span className="h-1.5 w-1.5 rounded-full bg-orange-500" />
+            <span className="h-1.5 w-1.5 rounded-full bg-line" />
+            <span className="h-1.5 w-1.5 rounded-full bg-line" />
           </div>
-          <div className="text-[13px] leading-relaxed text-ink/90">
-            I&apos;d protect the SAT this week — the test is close and you&apos;re a little behind your
-            target. The startup has real momentum, so it can hold with one small move.
-            <span className="text-muted"> If your launch date moves, I&apos;d shift.</span>
-          </div>
-
-          {/* the contextual state around the decision */}
-          <div className="grid grid-cols-2 gap-2 pt-1">
-            <StateChip label="Protecting" value="SAT" accent />
-            <StateChip label="Maintaining" value="Startup" />
-            <StateChip label="Decision logged" value="moderate confidence" />
-            <StateChip label="Noticed" value="reopened this 2×" />
+          <div className="min-w-0 flex-1">
+            <div className="flex items-center gap-2 border-b px-4 py-3">
+              <span className="text-sm font-semibold text-ink">Talk</span>
+              <span className="ml-auto text-[11px] text-muted">Thursday · evening</span>
+            </div>
+            <div className="space-y-3.5 p-4">
+              <div className="flex justify-end">
+                <p className="max-w-[82%] rounded-2xl rounded-br-md border bg-surface-2 px-3.5 py-2 text-[13px] leading-relaxed text-ink">
+                  Should I focus on the SAT or my startup this week?
+                </p>
+              </div>
+              <p className="text-[13px] leading-relaxed text-ink/90">
+                I&apos;d protect the SAT this week — the test is close and you&apos;re a little behind
+                target. The startup has real momentum, so it can hold with one small move.
+              </p>
+              <div className="grid grid-cols-2 gap-2 pt-0.5">
+                <StateChip label="Protecting" value="SAT · 12 days" accent />
+                <StateChip label="Maintaining" value="Startup" />
+                <StateChip label="Decision" value="logged · moderate" />
+                <StateChip label="Noticed" value="reopened 2×" />
+              </div>
+            </div>
           </div>
         </div>
       </div>
 
       {/* Thin annotations — a quiet product walkthrough, not colorful labels. */}
-      <Annotation className="-left-3 top-16">Understands context</Annotation>
-      <Annotation className="-right-3 top-[42%]">Learns from behavior</Annotation>
-      <Annotation className="-left-2 bottom-10">Tracks its decisions</Annotation>
+      <Annotation className="-left-4 top-14">Understands context</Annotation>
+      <Annotation className="-right-4 top-[46%]">Learns from behavior</Annotation>
+      <Annotation className="-left-3 bottom-12">Tracks its decisions</Annotation>
+    </div>
+  );
+}
+
+/** Upright, untilted product card for phones/tablets (the tilted one is desktop-only), so the mobile
+ * hero still leads with a real product visual rather than text alone. */
+function HeroProductVizMobile() {
+  return (
+    <div className="mt-10 overflow-hidden rounded-2xl border bg-surface shadow-lift lg:hidden">
+      <div className="flex items-center gap-2 border-b px-4 py-3">
+        <SynapseOrb size={22} />
+        <span className="text-sm font-semibold text-ink">Talk</span>
+        <span className="ml-auto text-[11px] text-muted">evening</span>
+      </div>
+      <div className="space-y-3 p-4">
+        <div className="flex justify-end">
+          <p className="max-w-[85%] rounded-2xl rounded-br-md border bg-surface-2 px-3.5 py-2 text-[13px] leading-relaxed text-ink">
+            SAT or my startup this week?
+          </p>
+        </div>
+        <p className="text-[13px] leading-relaxed text-ink/90">
+          I&apos;d protect the SAT — the deadline&apos;s close and you&apos;re behind target. The
+          startup has momentum, so it can hold with one small move.
+        </p>
+        <div className="grid grid-cols-2 gap-2">
+          <StateChip label="Protecting" value="SAT · 12 days" accent />
+          <StateChip label="Maintaining" value="Startup" />
+        </div>
+      </div>
     </div>
   );
 }
@@ -433,7 +468,7 @@ function FAQ() {
 function CTA() {
   return (
     <Section>
-      <div className="relative overflow-hidden rounded-3xl border bg-navy-900 px-8 py-16 text-center text-white sm:py-20">
+      <div className="relative overflow-hidden rounded-3xl border bg-navy-900 px-6 py-14 text-center text-white sm:px-8 sm:py-20">
         <div className="absolute inset-0 mesh opacity-60" />
         <div className="absolute inset-0 sa-grid opacity-50" />
         <div className="relative">
@@ -447,7 +482,7 @@ function CTA() {
             support to get through the hard part — and won&apos;t let it quietly disappear.
           </p>
           <Link href="/login" className="mt-9 inline-block">
-            <Button size="lg" className="sa-shine">Meet Synapse <ArrowRight className="h-4 w-4" /></Button>
+            <Button size="lg">Start with Synapse <ArrowRight className="h-4 w-4" /></Button>
           </Link>
         </div>
       </div>
@@ -613,4 +648,34 @@ function Eyebrow({ children, className = "" }: { children: React.ReactNode; clas
 }
 function H2({ children, className = "" }: { children: React.ReactNode; className?: string }) {
   return <h2 className={`mt-3 max-w-3xl text-balance text-3xl font-semibold tracking-tight text-ink sm:text-4xl ${className}`}>{children}</h2>;
+}
+
+/* THE SYNAPSE IDEA — the narrative spine: how a conversation becomes a better decision. */
+function SynapseFlow() {
+  const steps: { k: string; d: string }[] = [
+    { k: "Conversation", d: "You talk to Synapse the way you'd talk to a sharp friend — about a decision, a goal, or whatever's in the way." },
+    { k: "Observation", d: "It quietly notices how you operate: where you hesitate, what you reopen, when you actually follow through." },
+    { k: "Understanding", d: "Those observations build into a model of how you really work — held as evidence, never as labels." },
+    { k: "Better decisions", d: "So when it says “protect this, let that wait,” it's grounded in you — and it changes its mind when you change." },
+  ];
+  return (
+    <Section className="bg-surface-2">
+      <div className="mx-auto max-w-2xl text-center">
+        <Eyebrow className="mx-auto">The idea</Eyebrow>
+        <H2 className="mx-auto">Most AI answers the question. Synapse understands the person asking it.</H2>
+      </div>
+      <div className="mx-auto mt-12 grid max-w-5xl gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        {steps.map((s, i) => (
+          <div key={s.k} className="relative rounded-2xl border bg-surface p-5">
+            <span className="text-[11px] font-semibold tracking-wider text-orange-400">0{i + 1}</span>
+            <p className="mt-2 text-base font-semibold text-ink">{s.k}</p>
+            <p className="mt-1.5 text-sm leading-relaxed text-muted">{s.d}</p>
+            {i < steps.length - 1 && (
+              <span aria-hidden className="absolute right-[-10px] top-1/2 hidden h-px w-5 -translate-y-1/2 bg-line lg:block" />
+            )}
+          </div>
+        ))}
+      </div>
+    </Section>
+  );
 }

@@ -32,7 +32,10 @@ h1, h2, h3 { letter-spacing: -0.02em; }
 ::selection { background: rgba(249,115,22,0.22); color: var(--ink); }
 button { -webkit-tap-highlight-color: transparent; }
 button:active, [role="button"]:active { transform: scale(0.985); }
-:focus-visible { outline: 2px solid rgba(90,127,166,0.7); outline-offset: 2px; border-radius: 6px; }
+/* ui-ux-pro-max checklist: pointer cursor on every clickable, and a clearly-visible, on-brand focus ring. */
+button:not(:disabled), [role="button"]:not([aria-disabled="true"]), summary, label[for] { cursor: pointer; }
+button:disabled { cursor: not-allowed; }
+:focus-visible { outline: 2px solid rgba(249,115,22,0.8); outline-offset: 2px; border-radius: 6px; }
 
 /* Mobile: inputs must be >=16px or iOS Safari zooms in on focus. Also allow the
    layout to use the *visual* viewport height and respect the home-indicator. */
@@ -73,6 +76,21 @@ button:active, [role="button"]:active { transform: scale(0.985); }
 .glass { background: rgba(255,255,255,0.72); backdrop-filter: blur(14px) saturate(140%); -webkit-backdrop-filter: blur(14px) saturate(140%); }
 .dark .glass { background: rgba(6,20,31,0.72); border-color: var(--line); }
 
+/* Signature hero blend: white → cool navy-tinted → a warm orange hint, à la a premium AI landing.
+   Restrained, not a rainbow. Dark theme gets a deep-navy variant with the same single ember. */
+.hero-bg {
+  background:
+    radial-gradient(60% 60% at 88% -6%, rgba(249,115,22,0.10), transparent 60%),
+    radial-gradient(70% 65% at 6% 4%, rgba(90,127,166,0.14), transparent 62%),
+    linear-gradient(122deg, #fdfdff 0%, #eff1fb 46%, #fdeee2 100%);
+}
+.dark .hero-bg {
+  background:
+    radial-gradient(60% 60% at 86% -8%, rgba(249,115,22,0.12), transparent 58%),
+    radial-gradient(70% 70% at 4% 2%, rgba(90,127,166,0.12), transparent 60%),
+    #06141f;
+}
+
 .sa-blob { background: radial-gradient(circle at 30% 30%, var(--blob-a), transparent 70%); will-change: transform; }
 .sa-blob-1 { --blob-a: rgba(249,115,22,0.35); animation: sa-drift1 26s ease-in-out infinite; }
 .sa-blob-2 { --blob-a: rgba(90,127,166,0.35); animation: sa-drift2 32s ease-in-out infinite; }
@@ -85,8 +103,9 @@ button:active, [role="button"]:active { transform: scale(0.985); }
 .sa-rise-2 { animation: sa-rise .6s cubic-bezier(.16,1,.3,1) .08s both; }
 .sa-rise-3 { animation: sa-rise .6s cubic-bezier(.16,1,.3,1) .16s both; }
 @keyframes sa-rise { from { opacity:0; transform: translateY(14px) } to { opacity:1; transform:none } }
-.sa-card-hover { transition: transform .25s cubic-bezier(.16,1,.3,1), box-shadow .25s ease, border-color .25s ease; }
-.sa-card-hover:hover { transform: translateY(-3px); box-shadow: 0 24px 48px -20px rgba(11,31,58,.32); border-color: rgba(90,127,166,.4); }
+.sa-card-hover { transition: box-shadow .2s ease, border-color .2s ease; }
+/* Calm, premium hover: a gentle border + shadow shift — no bouncy lift, no colored glow. */
+.sa-card-hover:hover { box-shadow: 0 10px 30px -22px rgba(0,0,0,.42); border-color: rgba(90,127,166,.35); }
 .sa-glow { position: relative; }
 .sa-glow::after { content:""; position:absolute; inset:-1px; border-radius:inherit; background:radial-gradient(60% 60% at 50% 0%, rgba(249,115,22,.28), transparent 70%); filter:blur(14px); opacity:0; transition:opacity .3s; z-index:-1; }
 .sa-glow:hover::after { opacity:.3; }
@@ -169,16 +188,18 @@ button:active, [role="button"]:active { transform: scale(0.985); }
    The living center of the product. A calm, breathing sphere built from layered
    gradients — deep navy at rest, with a warm orange ember: futuristic yet calming.
    No images, no canvas. Sizes via --orb (px). States: idle / thinking. */
-.orb { position: relative; width: var(--orb, 96px); height: var(--orb, 96px); border-radius: 9999px; isolation: isolate; }
-/* A dark, dimensional sphere: deep navy body, a single warm ember low-right, a soft cool highlight.
-   Atmospheric and restrained — a luminous object in a dark room, not a glowing toy. */
+.orb { position: relative; width: var(--orb, 96px); height: var(--orb, 96px); border-radius: 9999px; isolation: isolate;
+  /* A soft outer definition so the dark sphere reads on light AND dark backgrounds. */
+  box-shadow: 0 10px 30px -12px rgba(11,31,58,.45); }
+/* A dimensional sphere: navy body, a single warm ember low-right, a soft cool highlight. Legible on
+   light or dark — a luminous object, not a glowing toy. */
 .orb-core {
   position: absolute; inset: 0; border-radius: inherit;
   background:
-    radial-gradient(36% 34% at 33% 29%, rgba(210,224,238,.30), rgba(210,224,238,0) 60%),
-    radial-gradient(85% 85% at 72% 78%, rgba(249,115,22,.50) 0%, rgba(176,86,38,.24) 28%, rgba(26,58,88,.55) 58%, #0a2032 82%),
-    radial-gradient(120% 120% at 50% 44%, #10283c 0%, #06131f 100%);
-  box-shadow: inset 0 1px 1px rgba(200,220,240,.14), inset 0 -12px 30px rgba(2,9,16,.72);
+    radial-gradient(38% 36% at 32% 27%, rgba(226,236,248,.45), rgba(226,236,248,0) 62%),
+    radial-gradient(88% 88% at 72% 80%, rgba(249,115,22,.62) 0%, rgba(214,110,48,.34) 26%, rgba(40,84,124,.62) 56%, #113049 82%),
+    radial-gradient(120% 120% at 50% 42%, #163a56 0%, #08192a 100%);
+  box-shadow: inset 0 1px 2px rgba(220,235,250,.22), inset 0 -12px 30px rgba(2,9,16,.66);
   animation: orb-breathe 7.5s ease-in-out infinite;
   will-change: transform;
 }
