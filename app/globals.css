@@ -78,17 +78,12 @@ button:disabled { cursor: not-allowed; }
 
 /* Signature hero blend: white → cool navy-tinted → a warm orange hint, à la a premium AI landing.
    Restrained, not a rainbow. Dark theme gets a deep-navy variant with the same single ember. */
+/* Signature hero blend: pure white at the top, easing down into the orange → mauve → periwinkle
+   sweep. Exact tri-tone à la the reference, kept soft so dark navy headings stay legible on top. */
 .hero-bg {
   background:
-    radial-gradient(60% 60% at 88% -6%, rgba(249,115,22,0.10), transparent 60%),
-    radial-gradient(70% 65% at 6% 4%, rgba(90,127,166,0.14), transparent 62%),
-    linear-gradient(122deg, #fdfdff 0%, #eff1fb 46%, #fdeee2 100%);
-}
-.dark .hero-bg {
-  background:
-    radial-gradient(60% 60% at 86% -8%, rgba(249,115,22,0.12), transparent 58%),
-    radial-gradient(70% 70% at 4% 2%, rgba(90,127,166,0.12), transparent 60%),
-    #06141f;
+    linear-gradient(to bottom, #ffffff 0%, #ffffff 14%, rgba(255,255,255,0.50) 42%, rgba(255,255,255,0) 74%),
+    linear-gradient(100deg, #e79e6f 0%, #c49aa4 50%, #8085c8 100%);
 }
 
 .sa-blob { background: radial-gradient(circle at 30% 30%, var(--blob-a), transparent 70%); will-change: transform; }

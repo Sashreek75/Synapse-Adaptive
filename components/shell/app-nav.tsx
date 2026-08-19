@@ -16,7 +16,6 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { Home, CreditCard, Settings, FileText, CalendarCheck, Menu, X, LogOut, LogIn, Target, Sparkles, MessageCircle, Timer, BarChart3, LayoutGrid } from "lucide-react";
 import { SynapseOrb } from "@/components/synapse/orb";
-import { ThemeToggle } from "@/components/shell/theme-toggle";
 import { useAuth } from "@/components/providers/auth-provider";
 import { cn } from "@/lib/utils";
 import { copy } from "@/lib/copy";
@@ -124,7 +123,6 @@ export function RoomsMenu() {
             <div className="min-w-0 text-xs text-muted">
               {email ? <>Signed in as<br /><span className="truncate font-medium text-ink">{email}</span></> : "Using Synapse on this device"}
             </div>
-            <ThemeToggle />
           </div>
           <div className="mt-3">
             {email ? (

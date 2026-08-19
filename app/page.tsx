@@ -13,7 +13,6 @@ import {
   Sparkles,
 } from "lucide-react";
 import { Button } from "@/components/ui/primitives";
-import { ThemeToggle } from "@/components/shell/theme-toggle";
 import { SynapseOrb } from "@/components/synapse/orb";
 import { Reveal } from "@/components/marketing/reveal";
 import { PricingCTA } from "@/components/marketing/pricing-cta";
@@ -61,7 +60,6 @@ function SiteHeader() {
           <a href="#faq" className="transition-colors hover:text-ink">FAQ</a>
         </nav>
         <div className="flex items-center gap-3">
-          <ThemeToggle />
           <Link href="/login">
             <Button size="sm">Open the app <ArrowRight className="h-4 w-4" /></Button>
           </Link>

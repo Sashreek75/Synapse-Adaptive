@@ -44,15 +44,14 @@ export const metadata: Metadata = {
   },
 };
 
-export const viewport = { themeColor: "#f7f9fc", width: "device-width", initialScale: 1, viewportFit: "cover" as const };
+export const viewport = { themeColor: "#ffffff", width: "device-width", initialScale: 1, viewportFit: "cover" as const };
 
 const themeScript = `
 (function(){try{
-  var t = localStorage.getItem('theme');
-  /* Signature look: a light navy + white blend with an orange accent. Ships by default; a saved
-     choice or a system dark-mode preference still wins, so the toggle keeps working. */
-  if(!t){ t = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'; }
-  if(t==='dark'){ document.documentElement.classList.add('dark'); }
+  /* Synapse is light-only — there is no dark mode. Force light and clear any stale saved preference
+     so returning users who once toggled dark come back to the intended look. */
+  document.documentElement.classList.remove('dark');
+  localStorage.removeItem('theme');
 }catch(e){}})();
 `;
 
