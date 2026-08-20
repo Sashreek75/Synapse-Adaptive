@@ -1,24 +1,27 @@
 "use client";
 
 /**
- * INTRO TRANSITION — a short, cinematic brand splash that plays on entry, then dissolves into the page.
- * The orb awakens out of a glow on the signature blend, the wordmark reveals, an orange ring expands,
- * and the whole overlay fades away (~2.6s total). Respects prefers-reduced-motion (shows briefly, no
- * heavy motion). `once` gates it to one play per browser session.
+ * INTRO TRANSITION — a big, cinematic entry hook. On a dark dusk backdrop, the robot materializes
+ * large, a flash + shockwave rings fire, and it "transforms" into the glowing Synapse orb as sparks
+ * burst outward and the line "Entering your lock-in." slams in. Then the whole thing dissolves into
+ * the page (~4.6s). Respects prefers-reduced-motion (skips the heavy motion, shows the final frame
+ * briefly). `once` gates it to one play per browser session.
  */
 
 import { useEffect, useState } from "react";
 import { SynapseOrb } from "@/components/synapse/orb";
 import { cn } from "@/lib/utils";
 
+const SPARKS = 10;
+
 export function IntroTransition({ once = false }: { once?: boolean }) {
   const [phase, setPhase] = useState<"hidden" | "in" | "out">("hidden");
 
   useEffect(() => {
-    if (once) { try { if (sessionStorage.getItem("synapse.intro.v1")) return; } catch {} }
+    if (once) { try { if (sessionStorage.getItem("synapse.intro.v2")) return; } catch {} }
     setPhase("in");
-    const t1 = setTimeout(() => setPhase("out"), 2300);
-    const t2 = setTimeout(() => { setPhase("hidden"); if (once) { try { sessionStorage.setItem("synapse.intro.v1", "1"); } catch {} } }, 3100);
+    const t1 = setTimeout(() => setPhase("out"), 4200);
+    const t2 = setTimeout(() => { setPhase("hidden"); if (once) { try { sessionStorage.setItem("synapse.intro.v2", "1"); } catch {} } }, 5100);
     return () => { clearTimeout(t1); clearTimeout(t2); };
   }, [once]);
 
@@ -28,23 +31,47 @@ export function IntroTransition({ once = false }: { once?: boolean }) {
     <div
       aria-hidden
       className={cn(
-        "fixed inset-0 z-[200] grid place-items-center overflow-hidden transition-opacity duration-[800ms] ease-out",
+        "fixed inset-0 z-[200] grid place-items-center overflow-hidden transition-opacity duration-[900ms] ease-out",
         phase === "out" ? "pointer-events-none opacity-0" : "opacity-100",
       )}
-      style={{ background: "linear-gradient(125deg, #f4a463 0%, #c79aa6 48%, #8085c8 100%)" }}
+      style={{ background: "linear-gradient(125deg, #2a1b33 0%, #3d2f56 48%, #1e2749 100%)" }}
     >
-      {/* soft grid + expanding rings + a glow burst behind the orb */}
-      <div className="absolute inset-0 sa-grid opacity-30" />
-      <span className="sa-intro-burst absolute h-72 w-72 rounded-full blur-2xl" style={{ background: "radial-gradient(closest-side, rgba(255,255,255,.9), transparent 70%)" }} />
-      <span className="sa-intro-ring absolute h-48 w-48 rounded-full border-2 border-white/60" />
-      <span className="sa-intro-ring absolute h-48 w-48 rounded-full border border-white/40" style={{ animationDelay: "0.3s" }} />
-      <span className="sa-intro-ring absolute h-48 w-48 rounded-full border border-orange-100/70" style={{ animationDelay: "0.6s" }} />
-      <div className="relative flex flex-col items-center gap-7">
-        <SynapseOrb size={156} className="sa-awaken" />
-        <div className="text-center">
-          <p className="sa-intro-word text-4xl font-semibold tracking-tight text-white drop-shadow-sm">Synapse</p>
-          <p className="sa-intro-sub mt-2 text-sm font-medium tracking-wide text-white/85">learning how you actually operate…</p>
+      {/* atmosphere */}
+      <div className="absolute inset-0 sa-grid opacity-25" />
+      <div className="absolute inset-0" style={{ background: "radial-gradient(60% 55% at 50% 42%, rgba(249,140,60,.18), transparent 70%)" }} />
+
+      {/* the stage — everything shares one center */}
+      <div className="relative grid place-items-center">
+        {/* robot materializes, then dissolves as the orb takes over */}
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img src="/robot.png" alt="" className="cine-robot absolute w-[240px] max-w-[60vw] drop-shadow-2xl" style={{ mixBlendMode: "screen" }} />
+
+        {/* transform flash */}
+        <span className="cine-flash absolute h-64 w-64 rounded-full blur-2xl" style={{ background: "radial-gradient(closest-side, rgba(255,255,255,.95), rgba(249,140,60,.5) 45%, transparent 72%)" }} />
+
+        {/* shockwave rings */}
+        <span className="cine-ring absolute h-52 w-52 rounded-full border-2 border-white/70" style={{ animationDelay: "1.5s" }} />
+        <span className="cine-ring absolute h-52 w-52 rounded-full border border-orange-300/70" style={{ animationDelay: "1.75s" }} />
+        <span className="cine-ring absolute h-52 w-52 rounded-full border border-white/40" style={{ animationDelay: "2s" }} />
+
+        {/* sparks bursting outward */}
+        {Array.from({ length: SPARKS }).map((_, i) => (
+          <span key={i} className="cine-spark-wrap" style={{ transform: `rotate(${(360 / SPARKS) * i}deg)` }}>
+            <span className="cine-spark h-1.5 w-1.5 rounded-full bg-orange-300" style={{ animationDelay: `${1.45 + (i % 3) * 0.05}s` }} />
+          </span>
+        ))}
+
+        {/* the orb it becomes */}
+        <div className="cine-orb relative">
+          <SynapseOrb size={200} state="thinking" />
         </div>
+      </div>
+
+      {/* the hook line, below the stage */}
+      <div className="absolute bottom-[22%] left-0 right-0 px-6 text-center">
+        <p className="cine-eyebrow text-[11px] font-semibold uppercase tracking-[0.35em] text-orange-300">Synapse</p>
+        <p className="cine-word mt-3 text-4xl font-semibold tracking-tight text-white drop-shadow sm:text-6xl">Entering your lock-in.</p>
+        <p className="cine-sub mt-3 text-sm text-white/70">Clearing the noise. Finding the one thing that moves you.</p>
       </div>
     </div>
   );
