@@ -38,6 +38,7 @@ export default function LandingPage() {
       <div className="hidden md:block"><Testimonials /></div>
       <div className="hidden md:block"><Roadmap /></div>
       <div className="hidden md:block"><FAQ /></div>
+      <FeatureMarquee />
       <CTA />
       <Footer />
     </div>
@@ -119,9 +120,11 @@ function Hero() {
 function HeroProductViz() {
   return (
     <div className="relative mx-auto hidden w-full max-w-md lg:block [perspective:2000px]">
-      {/* A floating, tilted slice of the real Synapse UI — a product shot, not stock art. It eases
-          toward flat on hover, so it feels alive without spinning. */}
-      <div className="relative overflow-hidden rounded-2xl border bg-surface shadow-lift transition-transform duration-700 ease-out [transform:rotateY(-17deg)_rotateX(7deg)_rotate(1deg)] hover:[transform:rotateY(-7deg)_rotateX(3deg)]">
+      {/* Soft colored aura, drifting slowly behind the card. */}
+      <div aria-hidden className="sa-aura absolute -inset-8 -z-10 rounded-[2.5rem] opacity-70 blur-3xl"
+        style={{ background: "linear-gradient(100deg, #e79e6f, #c49aa4, #8085c8)" }} />
+      {/* A floating slice of the real Synapse UI — a product shot, not stock art — gently rotating in 3D. */}
+      <div className="sa-hero3d overflow-hidden rounded-2xl border bg-surface shadow-lift">
         <div className="flex">
           {/* slim app rail */}
           <div className="flex w-12 shrink-0 flex-col items-center gap-4 border-r bg-surface-2/60 py-4">
@@ -156,10 +159,15 @@ function HeroProductViz() {
         </div>
       </div>
 
-      {/* Thin annotations — a quiet product walkthrough, not colorful labels. */}
-      <Annotation className="-left-4 top-14">Understands context</Annotation>
-      <Annotation className="-right-4 top-[46%]">Learns from behavior</Annotation>
-      <Annotation className="-left-3 bottom-12">Tracks its decisions</Annotation>
+      {/* Annotations as a clean, animated caption row BELOW the card — never over the text. */}
+      <div className="mt-6 flex flex-wrap items-center justify-center gap-2">
+        {["Understands context", "Learns from behavior", "Tracks its decisions"].map((label, i) => (
+          <span key={label} className="sa-anno inline-flex items-center gap-1.5 rounded-full border bg-surface/85 px-3 py-1 text-[11px] font-medium text-muted shadow-soft backdrop-blur"
+            style={{ ["--d" as string]: `${0.5 + i * 0.18}s` }}>
+            <span className="h-1 w-1 rounded-full bg-orange-500" />{label}
+          </span>
+        ))}
+      </div>
     </div>
   );
 }
@@ -199,14 +207,6 @@ function StateChip({ label, value, accent = false }: { label: string; value: str
       <p className="text-[10px] font-medium uppercase tracking-wider text-muted">{label}</p>
       <p className={cn("mt-0.5 truncate text-xs font-medium", accent ? "text-orange-300" : "text-ink")}>{value}</p>
     </div>
-  );
-}
-
-function Annotation({ children, className = "" }: { children: React.ReactNode; className?: string }) {
-  return (
-    <span className={cn("absolute z-10 inline-flex items-center gap-1.5 rounded-full border bg-surface/80 px-2.5 py-1 text-[11px] text-muted shadow-soft backdrop-blur", className)}>
-      <span className="h-1 w-1 rounded-full bg-orange-500" />{children}
-    </span>
   );
 }
 
@@ -460,6 +460,27 @@ function FAQ() {
         ))}
       </div>
     </Section>
+  );
+}
+
+/* A slow, seamless feature ticker — dark band, white text — that keeps the page feeling alive. */
+function FeatureMarquee() {
+  const items = [
+    "Understands how you operate", "Always one clear next step", "Protects your momentum",
+    "Learns from your decisions", "Adapts its role to the moment", "Notices when you drift",
+    "Closes the intention → action gap", "Remembers what actually worked", "Private by design",
+  ];
+  const row = [...items, ...items];
+  return (
+    <div className="sa-marquee select-none border-y border-white/10 bg-navy-900 py-4">
+      <div className="sa-marquee-track">
+        {row.map((t, i) => (
+          <span key={i} className="mx-6 inline-flex items-center gap-2 whitespace-nowrap text-sm font-medium text-white/85">
+            <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-orange-400" />{t}
+          </span>
+        ))}
+      </div>
+    </div>
   );
 }
 

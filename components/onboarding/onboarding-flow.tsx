@@ -99,7 +99,7 @@ export function OnboardingFlow() {
   return (
     <div className="mx-auto max-w-lg">
       <div className="sa-rise mb-5 flex items-center gap-3">
-        <SynapseOrb size={44} state={finishing ? "thinking" : "idle"} />
+        <SynapseOrb size={44} state={finishing ? "thinking" : "idle"} className="sa-awaken" />
         <div>
           <p className="text-sm font-semibold text-ink">Synapse</p>
           <p className="text-xs text-muted">{finishing ? "Thinking about what you've told me…" : "A few quick things, then we just talk — I'll learn the rest as we go."}</p>
