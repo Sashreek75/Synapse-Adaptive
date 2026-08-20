@@ -42,9 +42,11 @@ export function IntroTransition({ once = false }: { once?: boolean }) {
 
       {/* the stage — everything shares one center */}
       <div className="relative grid place-items-center">
-        {/* robot materializes, then dissolves as the orb takes over */}
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img src="/robot.png" alt="" className="cine-robot absolute w-[240px] max-w-[60vw] drop-shadow-2xl" style={{ mixBlendMode: "screen" }} />
+        {/* robot (background removed) pops in, does a 1s happy dance, then dissolves as the orb takes over */}
+        <div className="cine-robot absolute w-[240px] max-w-[60vw]">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src="/robot-cutout.png" alt="" className="cine-dance w-full drop-shadow-[0_20px_45px_rgba(0,0,0,0.4)]" />
+        </div>
 
         {/* transform flash */}
         <span className="cine-flash absolute h-64 w-64 rounded-full blur-2xl" style={{ background: "radial-gradient(closest-side, rgba(255,255,255,.95), rgba(249,140,60,.5) 45%, transparent 72%)" }} />
