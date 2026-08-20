@@ -34,6 +34,14 @@ export function CssRobot({ className = "" }: { className?: string }) {
         <filter id={id("glow")} x="-60%" y="-60%" width="220%" height="220%">
           <feGaussianBlur stdDeviation="2.2" result="b" /><feMerge><feMergeNode in="b" /><feMergeNode in="SourceGraphic" /></feMerge>
         </filter>
+        <filter id={id("bigglow")} x="-80%" y="-80%" width="260%" height="260%">
+          <feGaussianBlur stdDeviation="9" />
+        </filter>
+        <radialGradient id={id("aura")} cx="0.5" cy="0.42" r="0.6">
+          <stop offset="0%" stopColor="#ff8a2b" stopOpacity="0.55" />
+          <stop offset="45%" stopColor="#2f6fd6" stopOpacity="0.22" />
+          <stop offset="100%" stopColor="#2f6fd6" stopOpacity="0" />
+        </radialGradient>
       </defs>
 
       {/* helpers reused below */}
@@ -45,7 +53,7 @@ export function CssRobot({ className = "" }: { className?: string }) {
           <g transform={`translate(${tx},100)`}>
             <g className={armCls}>
               {/* pauldron */}
-              <path d="M-16,-6 L16,-4 L14,16 L-14,16 Z" fill={OR2} />
+              <path d="M-16,-6 L16,-4 L14,16 L-14,16 Z" fill={OR2} stroke={CYAN} strokeWidth="1" strokeOpacity="0.4" />
               {/* upper arm */}
               <rect x="-11" y="10" width="22" height="40" rx="9" fill={OR} />
               <rect x="-3" y="16" width="6" height="26" rx="3" fill={CYAN} opacity="0.85" filter={GLOW} />
@@ -82,19 +90,26 @@ export function CssRobot({ className = "" }: { className?: string }) {
 
         return (
           <>
+            {/* Backlight aura — a warm navy/orange halo so the mech reads as edge-lit against black. */}
+            <ellipse cx="100" cy="150" rx="128" ry="150" fill={`url(#${id("aura")})`} />
+            {/* Ground energy pool under the feet. */}
+            <ellipse cx="100" cy="292" rx="70" ry="14" fill="#ff8a2b" opacity="0.28" filter={`url(#${id("bigglow")})`} />
+
             {/* LEGS (behind torso) */}
             <Leg tx={87} legCls="rob-leg-l" shinCls="rob-shin-l" />
             <Leg tx={113} legCls="rob-leg-r" shinCls="rob-shin-r" />
 
             {/* TORSO */}
-            <path d="M58,74 L142,74 L151,94 L146,142 L128,160 L72,160 L54,142 L49,94 Z" fill={OR} />
+            <path d="M58,74 L142,74 L151,94 L146,142 L128,160 L72,160 L54,142 L49,94 Z" fill={OR}
+              stroke={CYAN} strokeWidth="1.1" strokeOpacity="0.45" />
             {/* abdomen underlayer */}
             <path d="M72,150 L128,150 L123,182 L77,182 Z" fill={BL} />
             <path d="M84,156 L116,156 L114,176 L86,176 Z" fill={ST} opacity="0.5" />
             {/* chest energy strips */}
             <path d="M66,92 L88,88 L86,96 L64,100 Z" fill={CYAN} opacity="0.8" filter={GLOW} />
             <path d="M134,92 L112,88 L114,96 L136,100 Z" fill={CYAN} opacity="0.8" filter={GLOW} />
-            {/* reactor core */}
+            {/* reactor core + pulsing energy ring */}
+            <circle className="rob-core" cx="100" cy="118" r="19" fill="none" stroke={OR} strokeWidth="1.5" strokeOpacity="0.5" />
             <circle className="rob-core" cx="100" cy="118" r="13" fill={`url(#${id("core")})`} filter={GLOW} />
             <circle cx="100" cy="118" r="4" fill="#fff6e6" />
 
@@ -109,7 +124,8 @@ export function CssRobot({ className = "" }: { className?: string }) {
               <path d="M92,6 L108,6 L112,16 L88,16 Z" fill={OR2} />
               <rect x="97" y="0" width="6" height="7" rx="2" fill="#ff9a3d" filter={GLOW} />
               {/* helmet */}
-              <path d="M74,12 L126,12 L133,30 L130,54 L116,66 L84,66 L70,54 L67,30 Z" fill={OR} />
+              <path d="M74,12 L126,12 L133,30 L130,54 L116,66 L84,66 L70,54 L67,30 Z" fill={OR}
+                stroke={CYAN} strokeWidth="1.1" strokeOpacity="0.4" />
               {/* side vents */}
               <path d="M126,28 L134,30 L133,46 L126,46 Z" fill={ST} />
               <path d="M74,28 L66,30 L67,46 L74,46 Z" fill={ST} />

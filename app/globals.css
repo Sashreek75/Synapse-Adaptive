@@ -315,29 +315,30 @@ button:disabled { cursor: not-allowed; }
 
 /* ===== CSS robot — jointed, so each limb moves on its own ===== */
 .rob-arm-l,.rob-arm-r,.rob-fore-l,.rob-fore-r,.rob-leg-l,.rob-leg-r,.rob-shin-l,.rob-shin-r,.rob-head { transform-box: fill-box; }
-.rob-arm-l  { transform-origin: 50% 4%; animation: rob-arm-l 1.1s ease-in-out infinite; }
-.rob-arm-r  { transform-origin: 50% 4%; animation: rob-arm-r 1.1s ease-in-out infinite; }
-.rob-fore-l { transform-origin: 50% 4%; animation: rob-fore-l 1.1s ease-in-out infinite; }
-.rob-fore-r { transform-origin: 50% 4%; animation: rob-fore-r 1.1s ease-in-out infinite; }
-.rob-leg-l  { transform-origin: 50% 4%; animation: rob-leg-l 0.95s ease-in-out infinite; }
-.rob-leg-r  { transform-origin: 50% 4%; animation: rob-leg-r 0.95s ease-in-out infinite; }
-.rob-shin-l { transform-origin: 50% 4%; animation: rob-shin-l 0.95s ease-in-out infinite; }
-.rob-shin-r { transform-origin: 50% 4%; animation: rob-shin-r 0.95s ease-in-out infinite; }
-.rob-head   { transform-origin: 50% 96%; animation: rob-head 2.6s ease-in-out infinite; }
+/* One shared ~0.9s beat so the whole body grooves in time. Arms pump in opposition (with an elbow
+   whip via a phase offset), the knees spring-bounce IN SYNC, and the hips shift weight the SAME way
+   (a sway, never a scissor-splay) — that was the "weird leg" bug. Head bobs down on the beat. */
+.rob-arm-l  { transform-origin: 50% 4%; animation: rob-arm-l .9s ease-in-out infinite; }
+.rob-arm-r  { transform-origin: 50% 4%; animation: rob-arm-r .9s ease-in-out infinite; }
+.rob-fore-l { transform-origin: 50% 4%; animation: rob-fore-l .9s ease-in-out -.14s infinite; }
+.rob-fore-r { transform-origin: 50% 4%; animation: rob-fore-r .9s ease-in-out -.14s infinite; }
+.rob-leg-l  { transform-origin: 50% 4%; animation: rob-leg .9s ease-in-out infinite; }
+.rob-leg-r  { transform-origin: 50% 4%; animation: rob-leg .9s ease-in-out infinite; }
+.rob-shin-l { transform-origin: 50% 4%; animation: rob-shin .9s ease-in-out infinite; }
+.rob-shin-r { transform-origin: 50% 4%; animation: rob-shin .9s ease-in-out infinite; }
+.rob-head   { transform-origin: 50% 96%; animation: rob-head .9s ease-in-out infinite; }
 .rob-eye, .rob-core { transform-box: fill-box; transform-origin: 50% 50%; }
 .rob-eye    { animation: rob-blink 3.6s ease-in-out infinite; }
-.rob-core   { animation: rob-core 1.8s ease-in-out infinite; }
-@keyframes rob-core { 0%,100% { filter: brightness(1); transform: scale(1); } 50% { filter: brightness(1.35); transform: scale(1.12); } }
-@keyframes rob-arm-l  { 0%,100% { transform: rotate(14deg); } 50% { transform: rotate(-24deg); } }
-@keyframes rob-arm-r  { 0%,100% { transform: rotate(-14deg); } 50% { transform: rotate(24deg); } }
-@keyframes rob-fore-l { 0%,100% { transform: rotate(6deg); } 50% { transform: rotate(-28deg); } }
-@keyframes rob-fore-r { 0%,100% { transform: rotate(-6deg); } 50% { transform: rotate(28deg); } }
-@keyframes rob-leg-l  { 0%,100% { transform: rotate(-11deg); } 50% { transform: rotate(15deg); } }
-@keyframes rob-leg-r  { 0%,100% { transform: rotate(11deg); } 50% { transform: rotate(-15deg); } }
-@keyframes rob-shin-l { 0%,100% { transform: rotate(3deg); } 50% { transform: rotate(28deg); } }
-@keyframes rob-shin-r { 0%,100% { transform: rotate(-3deg); } 50% { transform: rotate(-28deg); } }
-@keyframes rob-head   { 0%,100% { transform: rotate(-3deg) translateY(0); } 50% { transform: rotate(3deg) translateY(-2px); } }
-@keyframes rob-blink  { 0%,90%,100% { transform: scaleY(1); } 95% { transform: scaleY(.12); } }
+.rob-core   { animation: rob-core 1.2s ease-in-out infinite; }
+@keyframes rob-core  { 0%,100% { filter: brightness(1); transform: scale(1); } 50% { filter: brightness(1.55); transform: scale(1.18); } }
+@keyframes rob-arm-l { 0%,100% { transform: rotate(28deg); } 50% { transform: rotate(-46deg); } }
+@keyframes rob-arm-r { 0%,100% { transform: rotate(-46deg); } 50% { transform: rotate(28deg); } }
+@keyframes rob-fore-l{ 0%,100% { transform: rotate(-48deg); } 50% { transform: rotate(-2deg); } }
+@keyframes rob-fore-r{ 0%,100% { transform: rotate(-2deg); } 50% { transform: rotate(-48deg); } }
+@keyframes rob-leg   { 0%,100% { transform: rotate(5deg); } 50% { transform: rotate(-5deg); } }
+@keyframes rob-shin  { 0%,100% { transform: rotate(2deg); } 50% { transform: rotate(18deg); } }
+@keyframes rob-head  { 0%,100% { transform: rotate(-5deg) translateY(-1px); } 50% { transform: rotate(5deg) translateY(3px); } }
+@keyframes rob-blink { 0%,90%,100% { transform: scaleY(1); } 95% { transform: scaleY(.12); } }
 @media (prefers-reduced-motion: reduce){
   .rob-arm-l,.rob-arm-r,.rob-fore-l,.rob-fore-r,.rob-leg-l,.rob-leg-r,.rob-shin-l,.rob-shin-r,.rob-head,.rob-eye { animation: none !important; }
 }
