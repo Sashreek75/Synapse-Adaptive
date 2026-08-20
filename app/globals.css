@@ -279,12 +279,12 @@ button:disabled { cursor: not-allowed; }
 /* ===== Cinematic intro sequence ===== robot materializes → flash → transforms into the orb →
    sparks burst → the hook line slams in. Each layer runs once (forwards) on its own delay. */
 /* Robot wrapper: rise in → hold (while it grooves) → dissolve up as the orb takes over. ~3.6s on stage. */
-.cine-robot { animation: cine-robot 3.6s ease-out forwards; will-change: transform, opacity, filter; }
+.cine-robot { animation: cine-robot 3.45s ease-out forwards; will-change: transform, opacity, filter; }
 @keyframes cine-robot {
   0%   { opacity: 0; transform: translateY(22px) scale(.82); filter: blur(8px); }
   9%   { opacity: 1; transform: translateY(0) scale(1); filter: blur(0); }
-  80%  { opacity: 1; transform: scale(1); filter: blur(0); }
-  100% { opacity: 0; transform: translateY(-12px) scale(1.6); filter: blur(20px); }
+  84%  { opacity: 1; transform: scale(1); filter: blur(0); }
+  100% { opacity: 0; transform: translateY(-6px) scale(.9); filter: blur(11px); }
 }
 /* Inner img: an energetic ~2.5s groove — bob, sway, and scale pulses that build. */
 .cine-dance { animation: cine-dance 2.7s ease-in-out .3s both; transform-origin: 50% 92%; will-change: transform; }
@@ -311,16 +311,20 @@ button:disabled { cursor: not-allowed; }
 @keyframes cine-particle { 0% { opacity: 0; transform: translateY(0) scale(1); } 12% { opacity: .8; } 100% { opacity: 0; transform: translateY(-72vh) scale(.35); } }
 
 /* ===== CSS robot — jointed, so each limb moves on its own ===== */
-.rob-arm-l  { transform-origin: 50% 8%; animation: rob-arm-l 1.1s ease-in-out infinite; }
-.rob-arm-r  { transform-origin: 50% 8%; animation: rob-arm-r 1.1s ease-in-out infinite; }
-.rob-fore-l { transform-origin: 50% 6%; animation: rob-fore-l 1.1s ease-in-out infinite; }
-.rob-fore-r { transform-origin: 50% 6%; animation: rob-fore-r 1.1s ease-in-out infinite; }
-.rob-leg-l  { transform-origin: 50% 6%; animation: rob-leg-l 0.95s ease-in-out infinite; }
-.rob-leg-r  { transform-origin: 50% 6%; animation: rob-leg-r 0.95s ease-in-out infinite; }
-.rob-shin-l { transform-origin: 50% 6%; animation: rob-shin-l 0.95s ease-in-out infinite; }
-.rob-shin-r { transform-origin: 50% 6%; animation: rob-shin-r 0.95s ease-in-out infinite; }
-.rob-head   { transform-origin: 50% 100%; animation: rob-head 2.6s ease-in-out infinite; }
+.rob-arm-l,.rob-arm-r,.rob-fore-l,.rob-fore-r,.rob-leg-l,.rob-leg-r,.rob-shin-l,.rob-shin-r,.rob-head { transform-box: fill-box; }
+.rob-arm-l  { transform-origin: 50% 4%; animation: rob-arm-l 1.1s ease-in-out infinite; }
+.rob-arm-r  { transform-origin: 50% 4%; animation: rob-arm-r 1.1s ease-in-out infinite; }
+.rob-fore-l { transform-origin: 50% 4%; animation: rob-fore-l 1.1s ease-in-out infinite; }
+.rob-fore-r { transform-origin: 50% 4%; animation: rob-fore-r 1.1s ease-in-out infinite; }
+.rob-leg-l  { transform-origin: 50% 4%; animation: rob-leg-l 0.95s ease-in-out infinite; }
+.rob-leg-r  { transform-origin: 50% 4%; animation: rob-leg-r 0.95s ease-in-out infinite; }
+.rob-shin-l { transform-origin: 50% 4%; animation: rob-shin-l 0.95s ease-in-out infinite; }
+.rob-shin-r { transform-origin: 50% 4%; animation: rob-shin-r 0.95s ease-in-out infinite; }
+.rob-head   { transform-origin: 50% 96%; animation: rob-head 2.6s ease-in-out infinite; }
+.rob-eye, .rob-core { transform-box: fill-box; transform-origin: 50% 50%; }
 .rob-eye    { animation: rob-blink 3.6s ease-in-out infinite; }
+.rob-core   { animation: rob-core 1.8s ease-in-out infinite; }
+@keyframes rob-core { 0%,100% { filter: brightness(1); transform: scale(1); } 50% { filter: brightness(1.35); transform: scale(1.12); } }
 @keyframes rob-arm-l  { 0%,100% { transform: rotate(14deg); } 50% { transform: rotate(-24deg); } }
 @keyframes rob-arm-r  { 0%,100% { transform: rotate(-14deg); } 50% { transform: rotate(24deg); } }
 @keyframes rob-fore-l { 0%,100% { transform: rotate(6deg); } 50% { transform: rotate(-28deg); } }
@@ -336,7 +340,20 @@ button:disabled { cursor: not-allowed; }
 }
 
 /* Transform phase */
-.cine-flash { opacity: 0; animation: cine-flash 1.2s ease-out 3.05s forwards; }
+/* Full-screen white flash at the moment of transformation. */
+.cine-screenflash { opacity: 0; background: #ffffff; animation: cine-screenflash 0.9s ease-out 3.05s forwards; }
+@keyframes cine-screenflash { 0% { opacity: 0; } 18% { opacity: .85; } 100% { opacity: 0; } }
+/* Spinning light rays behind the forming orb. */
+.cine-rays { opacity: 0; background: conic-gradient(from 0deg, transparent, rgba(255,190,120,.5), transparent 12%, transparent 30%, rgba(180,210,255,.4), transparent 42%, transparent 60%, rgba(255,190,120,.45), transparent 72%, transparent 90%); animation: cine-rays 2.6s linear 3.2s both; }
+@keyframes cine-rays { 0% { opacity: 0; transform: rotate(0deg) scale(.4); } 20% { opacity: .8; } 100% { opacity: 0; transform: rotate(150deg) scale(1.3); } }
+/* Powder particles: the robot crumbles — bits scatter up and out, then fade. */
+.cine-poof { opacity: 0; animation: cine-poof 1s ease-out 2.95s forwards; }
+@keyframes cine-poof { 0% { opacity: 0; transform: translate(0,0) scale(1); } 12% { opacity: 1; } 100% { opacity: 0; transform: translate(var(--px,0), var(--py,-120px)) scale(.2); } }
+/* Reform particles: motes converge inward to the center as the orb takes shape. */
+.cine-converge { opacity: 0; animation: cine-converge 0.85s cubic-bezier(.5,0,.2,1) 3.35s forwards; }
+@keyframes cine-converge { 0% { opacity: 0; transform: translate(var(--fx,0), var(--fy,0)) scale(1); } 20% { opacity: 1; } 100% { opacity: 0; transform: translate(0,0) scale(.2); } }
+
+.cine-flash { opacity: 0; animation: cine-flash 1.2s ease-out 3.15s forwards; }
 @keyframes cine-flash { 0% { opacity: 0; transform: scale(.3); } 22% { opacity: 1; } 100% { opacity: 0; transform: scale(2.8); } }
 .cine-orb { animation: cine-orb 1.7s cubic-bezier(.34,1.56,.64,1) 3.2s both; will-change: transform, opacity; }
 @keyframes cine-orb { 0% { opacity: 0; transform: scale(0); } 55% { opacity: 1; transform: scale(1.16); } 76% { transform: scale(.95); } 100% { transform: scale(1); } }
@@ -355,7 +372,7 @@ button:disabled { cursor: not-allowed; }
 @media (prefers-reduced-motion: reduce){
   .cine-robot, .cine-dance, .cine-scan, .cine-flashword, .cine-particle { animation: none !important; }
   .cine-robot, .cine-scan, .cine-flashword, .cine-particle { opacity: 0 !important; }
-  .cine-flash, .cine-ring, .cine-spark { animation: none !important; opacity: 0 !important; }
+  .cine-flash, .cine-ring, .cine-spark, .cine-screenflash, .cine-rays, .cine-poof, .cine-converge { animation: none !important; opacity: 0 !important; }
   .cine-orb, .cine-word, .cine-eyebrow, .cine-sub { animation: none !important; opacity: 1 !important; transform: none !important; }
 }
 

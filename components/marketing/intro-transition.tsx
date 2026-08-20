@@ -70,17 +70,48 @@ export function IntroTransition({ once = false }: { once?: boolean }) {
           </div>
         </div>
 
+        {/* powder disintegration — the robot crumbles into motes that scatter up/out */}
+        <div className="absolute" style={{ width: 176, height: 300 }}>
+          {Array.from({ length: 44 }).map((_, i) => {
+            const px = (((i * 53) % 100) - 50) * 1.7;
+            const py = -(50 + ((i * 29) % 150));
+            const sz = 3 + (i % 3);
+            return (
+              <span key={`poof${i}`} className="cine-poof absolute rounded-full"
+                style={{ left: `${(i * 37) % 100}%`, top: `${(i * 61) % 100}%`, width: sz, height: sz, background: i % 3 ? "#f4861d" : "#9cc6ea", ["--px" as string]: `${px}px`, ["--py" as string]: `${py}px` }} />
+            );
+          })}
+        </div>
+
+        {/* reform — motes converge inward as the orb takes shape */}
+        <div className="absolute grid place-items-center" style={{ width: 8, height: 8 }}>
+          {Array.from({ length: 22 }).map((_, i) => {
+            const ang = (Math.PI * 2 * i) / 22;
+            const r = 120 + ((i * 17) % 70);
+            return (
+              <span key={`cv${i}`} className="cine-converge absolute rounded-full"
+                style={{ width: 4, height: 4, background: i % 2 ? "#ffb265" : "#bfe0ff", boxShadow: "0 0 6px rgba(255,180,110,.8)", ["--fx" as string]: `${Math.cos(ang) * r}px`, ["--fy" as string]: `${Math.sin(ang) * r}px` }} />
+            );
+          })}
+        </div>
+
+        {/* spinning light rays behind the forming orb */}
+        <span className="cine-rays absolute h-[440px] w-[440px] rounded-full blur-[2px]" />
+
         <span className="cine-flash absolute h-72 w-72 rounded-full blur-2xl" style={{ background: "radial-gradient(closest-side, rgba(255,255,255,.95), rgba(249,140,60,.5) 45%, transparent 72%)" }} />
-        <span className="cine-ring absolute h-56 w-56 rounded-full border-2 border-white/70" style={{ animationDelay: "3.15s" }} />
-        <span className="cine-ring absolute h-56 w-56 rounded-full border border-orange-300/70" style={{ animationDelay: "3.4s" }} />
-        <span className="cine-ring absolute h-56 w-56 rounded-full border border-white/40" style={{ animationDelay: "3.65s" }} />
+        <span className="cine-ring absolute h-56 w-56 rounded-full border-2 border-white/70" style={{ animationDelay: "3.3s" }} />
+        <span className="cine-ring absolute h-56 w-56 rounded-full border border-orange-300/70" style={{ animationDelay: "3.55s" }} />
+        <span className="cine-ring absolute h-56 w-56 rounded-full border border-white/40" style={{ animationDelay: "3.8s" }} />
         {Array.from({ length: SPARKS }).map((_, i) => (
           <span key={`s${i}`} className="cine-spark-wrap" style={{ transform: `rotate(${(360 / SPARKS) * i}deg)` }}>
-            <span className="cine-spark h-1.5 w-1.5 rounded-full bg-orange-300" style={{ animationDelay: `${3.1 + (i % 4) * 0.04}s` }} />
+            <span className="cine-spark h-1.5 w-1.5 rounded-full bg-orange-300" style={{ animationDelay: `${3.25 + (i % 4) * 0.04}s` }} />
           </span>
         ))}
         <div className="cine-orb relative"><SynapseOrb size={200} state="thinking" /></div>
       </div>
+
+      {/* the transformation white flash, over everything for an instant */}
+      <div className="cine-screenflash absolute inset-0 z-[210]" />
 
       {/* the hook line */}
       <div className="absolute bottom-[18%] left-0 right-0 px-6 text-center">
