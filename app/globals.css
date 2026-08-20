@@ -10,8 +10,8 @@
   --ink: #0e1a2b;          /* deep navy ink */
   --muted: #556579;        /* muted blue-gray, AA on white and on the app bg */
   --surface: #ffffff;      /* cards stay pure white so they lift off the page */
-  --surface-2: #eaeef4;    /* app background — a soft cool off-white, not blinding, so cards have depth */
-  --line: #dbe1e9;         /* slightly more present borders for structure */
+  --surface-2: #e4e9f1;    /* app background — a soft cool tint, clearly not white, so cards have depth */
+  --line: #d6dde7;         /* borders with a bit more presence for structure */
 }
 /* The default, signature theme. Extremely dark navy, with a few subtle layers of elevation. */
 .dark {
@@ -259,6 +259,22 @@ button:disabled { cursor: not-allowed; }
 .sa-intro-sub { opacity: 0; animation: sa-intro-word .8s cubic-bezier(.16,1,.3,1) .7s forwards; }
 .sa-intro-ring { animation: sa-intro-ring 1.7s cubic-bezier(.16,1,.3,1) forwards; }
 @keyframes sa-intro-ring { 0% { opacity: .55; transform: scale(.35); } 100% { opacity: 0; transform: scale(2.6); } }
+/* A one-shot glow burst behind the intro orb. */
+.sa-intro-burst { animation: sa-intro-burst 2s ease-out forwards; }
+@keyframes sa-intro-burst { 0% { opacity: 0; transform: scale(.5); } 30% { opacity: .9; } 100% { opacity: .25; transform: scale(1.6); } }
+
+/* Faint background robot — a slow, drifting underlying presence. Very low opacity + multiply blend so
+   the image's white field disappears and only a ghost of the figure shows. */
+.sa-robot { animation: sa-robot 26s ease-in-out infinite; will-change: transform; }
+@keyframes sa-robot {
+  0%   { transform: translateY(-50%) translateX(0) rotate(0deg); }
+  50%  { transform: translateY(-53%) translateX(-1.5%) rotate(-1.2deg); }
+  100% { transform: translateY(-50%) translateX(0) rotate(0deg); }
+}
+@media (prefers-reduced-motion: reduce){
+  .sa-robot { animation: none !important; }
+  .sa-intro-burst { animation: none !important; opacity: .3 !important; }
+}
 
 @media (prefers-reduced-motion: reduce){
   .sa-marquee-track { animation: none !important; }

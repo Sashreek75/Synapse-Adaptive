@@ -17,13 +17,15 @@ import { SynapseOrb } from "@/components/synapse/orb";
 import { Reveal } from "@/components/marketing/reveal";
 import { PricingCTA } from "@/components/marketing/pricing-cta";
 import { IntroTransition } from "@/components/marketing/intro-transition";
+import { RobotPresence } from "@/components/marketing/robot-presence";
 import { PLANS, PLAN_ORDER } from "@/lib/billing/plans";
 import { cn } from "@/lib/utils";
 
 export default function LandingPage() {
   return (
-    <div className="min-h-screen">
+    <div className="relative min-h-screen">
       <IntroTransition />
+      <RobotPresence />
       <StructuredData />
       <SiteHeader />
       <Hero />
@@ -309,7 +311,7 @@ function HowItWorks() {
 
 function AgentSpotlight() {
   return (
-    <Section id="agent" className="bg-surface">
+    <Section id="agent">
       <div className="grid items-center gap-12 lg:grid-cols-2">
         <div>
           <Eyebrow>The heart of the product</Eyebrow>
@@ -404,7 +406,7 @@ function Testimonials() {
     { t: "Your data is yours", d: "Stored privately, never sold. Export or delete everything at any time." },
   ];
   return (
-    <Section className="bg-surface">
+    <Section>
       <Eyebrow>Why you can trust it</Eyebrow>
       <H2>Built to earn your trust, not just your attention.</H2>
       <p className="mt-3 max-w-2xl text-muted">We&apos;re early, so instead of putting words in users&apos; mouths, here&apos;s what the product actually commits to.</p>
@@ -451,7 +453,7 @@ function FAQ() {
     { q: "Who can see my data, and does it follow me across devices?", a: "Only you. Your data syncs privately to your account so it follows you between phone and computer, is never sold, and you can export or delete it anytime." },
   ];
   return (
-    <Section id="faq" className="bg-surface">
+    <Section id="faq">
       <Eyebrow>FAQ</Eyebrow>
       <H2>Good questions.</H2>
       <div className="mt-10 divide-y overflow-hidden rounded-2xl border bg-surface shadow-soft">
