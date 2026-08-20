@@ -361,6 +361,9 @@ button:disabled { cursor: not-allowed; }
 @keyframes cine-flash { 0% { opacity: 0; transform: scale(.3); } 22% { opacity: 1; } 100% { opacity: 0; transform: scale(2.8); } }
 .cine-orb { animation: cine-orb 1.7s cubic-bezier(.34,1.56,.64,1) 3.2s both; will-change: transform, opacity; }
 @keyframes cine-orb { 0% { opacity: 0; transform: scale(0); } 55% { opacity: 1; transform: scale(1.16); } 76% { transform: scale(.95); } 100% { transform: scale(1); } }
+/* The lock-in glyph settles into the orb core once it has formed. */
+.cine-lock { opacity: 0; animation: cine-lock 1.1s cubic-bezier(.16,1,.3,1) 3.75s both; }
+@keyframes cine-lock { 0% { opacity: 0; transform: scale(.4); filter: blur(4px); } 60% { opacity: .95; } 100% { opacity: .9; transform: scale(1); filter: blur(0); } }
 .cine-ring { opacity: 0; animation: cine-ring 1.5s ease-out forwards; will-change: transform, opacity; }
 @keyframes cine-ring { 0% { opacity: .85; transform: scale(.2); } 100% { opacity: 0; transform: scale(3.4); } }
 .cine-spark-wrap { position: absolute; left: 50%; top: 50%; }
@@ -377,7 +380,7 @@ button:disabled { cursor: not-allowed; }
   .cine-robot, .cine-dance, .cine-scan, .cine-flashword, .cine-particle { animation: none !important; }
   .cine-robot, .cine-scan, .cine-flashword, .cine-particle { opacity: 0 !important; }
   .cine-flash, .cine-ring, .cine-spark, .cine-screenflash, .cine-rays, .cine-poof, .cine-converge { animation: none !important; opacity: 0 !important; }
-  .cine-orb, .cine-word, .cine-eyebrow, .cine-sub { animation: none !important; opacity: 1 !important; transform: none !important; }
+  .cine-orb, .cine-word, .cine-eyebrow, .cine-sub, .cine-lock { animation: none !important; opacity: 1 !important; transform: none !important; }
 }
 
 @media (prefers-reduced-motion: reduce){

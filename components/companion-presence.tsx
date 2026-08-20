@@ -44,6 +44,7 @@ import { evaluatePresence, markPresenceShown, dismissPresence, recordPresenceOut
 import { evidenceContextBlock } from "@/lib/evidence";
 import { pftContextBlock } from "@/lib/pft";
 import { cn } from "@/lib/utils";
+import { ChatTextarea } from "@/components/ui/chat-textarea";
 
 interface Msg { id: string; from: "you" | "synapse"; text: string }
 const NL = String.fromCharCode(10);
@@ -284,10 +285,10 @@ export function CompanionPresence() {
               <button onClick={() => setPendingFocus(null)} className="rounded-full px-2.5 py-1 text-xs font-medium text-muted transition hover:text-ink">Not now</button>
             </div>
           )}
-          <div className="flex items-center gap-2 border-t px-3 py-2.5">
-            <input value={input} onChange={(e) => setInput(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") void send(input); }}
+          <div className="flex items-end gap-2 border-t px-3 py-2.5">
+            <ChatTextarea value={input} onValueChange={setInput} onSubmit={() => void send(input)} maxHeight={120}
               placeholder="Ask Synapse anything…"
-              className="min-w-0 flex-1 rounded-full border bg-surface px-3 py-1.5 text-sm text-ink placeholder:text-muted focus:outline-none" />
+              className="min-w-0 flex-1 rounded-2xl border bg-surface px-3 py-1.5 text-sm leading-relaxed text-ink placeholder:text-muted focus:outline-none" />
             <button onClick={() => void send(input)} disabled={busy || !input.trim()} aria-label="Send" className="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-orange-500 text-white transition hover:bg-orange-600 disabled:opacity-50"><ArrowRight className="h-4 w-4" /></button>
           </div>
         </div>

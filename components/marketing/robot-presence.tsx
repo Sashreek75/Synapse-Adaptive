@@ -1,13 +1,13 @@
 "use client";
 
 /**
- * ROBOT PRESENCE — the CSS robot (no image) rendered very large and very faint behind the landing
- * content. It stays invisible over the hero and fades in only once you scroll past the first section,
- * reading as an underlying presence — its limbs drift subtly. pointer-events-none + aria-hidden.
+ * ROBOT PRESENCE — the armored mech, rendered very large and very faint behind the landing content.
+ * It stays invisible over the hero and fades in only once you scroll past the first section, reading
+ * as a looming presence in the dark rather than a foreground graphic. A soft radial mask melts its
+ * edges into the background. pointer-events-none + aria-hidden.
  */
 
 import { useEffect, useState } from "react";
-import { CssRobot } from "@/components/marketing/css-robot";
 
 export function RobotPresence() {
   const [reveal, setReveal] = useState(0);
@@ -24,11 +24,17 @@ export function RobotPresence() {
     return () => window.removeEventListener("scroll", onScroll);
   }, []);
 
+  const mask = "radial-gradient(58% 60% at 50% 46%, #000 50%, transparent 100%)";
+
   return (
     <div aria-hidden className="pointer-events-none fixed inset-0 -z-10 overflow-hidden" style={{ opacity: reveal, transition: "opacity .6s ease" }}>
-      <div className="absolute right-[-4%] top-1/2" style={{ transform: "translateY(-50%) scale(2.7)", opacity: 0.1 }}>
-        <CssRobot />
-      </div>
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img
+        src="/mech-bg.png"
+        alt=""
+        className="absolute right-[-8%] top-1/2 h-[130vh] max-w-none -translate-y-1/2 select-none"
+        style={{ opacity: 0.16, filter: "saturate(.9) contrast(1.05)", WebkitMaskImage: mask, maskImage: mask }}
+      />
     </div>
   );
 }

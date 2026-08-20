@@ -9,8 +9,9 @@
  */
 
 import { useEffect, useState } from "react";
+import { Lock } from "lucide-react";
 import { SynapseOrb } from "@/components/synapse/orb";
-import { CssRobot } from "@/components/marketing/css-robot";
+import { OrbDust } from "@/components/marketing/orb-dust";
 import { cn } from "@/lib/utils";
 
 const SPARKS = 12;
@@ -60,44 +61,12 @@ export function IntroTransition({ once = false }: { once?: boolean }) {
         </div>
       ))}
 
-      {/* the stage — robot powers up, then transforms into the orb */}
+      {/* the stage — orange & navy powder swirls into a circle, then condenses into the orb */}
       <div className="relative grid place-items-center">
-        <div className="cine-robot absolute grid place-items-center">
-          <div className="cine-dance relative scale-90 sm:scale-100" style={{ transformOrigin: "50% 92%" }}>
-            <CssRobot />
-            {/* scan line sweeping across the robot */}
-            <div className="cine-scan pointer-events-none absolute left-[-10%] right-[-10%] top-1/2 h-1 blur-[1px]" style={{ background: "linear-gradient(90deg, transparent, rgba(140,190,255,.95), transparent)" }} />
-          </div>
-        </div>
+        {/* the swirling dust vortex (canvas) that forms and collapses into the orb */}
+        <div className="absolute grid place-items-center"><OrbDust size={380} /></div>
 
-        {/* powder disintegration — the robot crumbles into motes that scatter up/out */}
-        <div className="absolute" style={{ width: 176, height: 300 }}>
-          {Array.from({ length: 44 }).map((_, i) => {
-            const px = (((i * 53) % 100) - 50) * 1.7;
-            const py = -(50 + ((i * 29) % 150));
-            const sz = 3 + (i % 3);
-            return (
-              <span key={`poof${i}`} className="cine-poof absolute rounded-full"
-                style={{ left: `${(i * 37) % 100}%`, top: `${(i * 61) % 100}%`, width: sz, height: sz, background: i % 3 ? "#f4861d" : "#9cc6ea", ["--px" as string]: `${px}px`, ["--py" as string]: `${py}px` }} />
-            );
-          })}
-        </div>
-
-        {/* reform — motes converge inward as the orb takes shape */}
-        <div className="absolute grid place-items-center" style={{ width: 8, height: 8 }}>
-          {Array.from({ length: 22 }).map((_, i) => {
-            const ang = (Math.PI * 2 * i) / 22;
-            const r = 120 + ((i * 17) % 70);
-            return (
-              <span key={`cv${i}`} className="cine-converge absolute rounded-full"
-                style={{ width: 4, height: 4, background: i % 2 ? "#ffb265" : "#bfe0ff", boxShadow: "0 0 6px rgba(255,180,110,.8)", ["--fx" as string]: `${Math.cos(ang) * r}px`, ["--fy" as string]: `${Math.sin(ang) * r}px` }} />
-            );
-          })}
-        </div>
-
-        {/* spinning light rays behind the forming orb */}
-        <span className="cine-rays absolute h-[440px] w-[440px] rounded-full blur-[2px]" />
-
+        {/* climax burst as the orb locks in */}
         <span className="cine-flash absolute h-72 w-72 rounded-full blur-2xl" style={{ background: "radial-gradient(closest-side, rgba(255,255,255,.95), rgba(249,140,60,.5) 45%, transparent 72%)" }} />
         <span className="cine-ring absolute h-56 w-56 rounded-full border-2 border-white/70" style={{ animationDelay: "3.3s" }} />
         <span className="cine-ring absolute h-56 w-56 rounded-full border border-orange-300/70" style={{ animationDelay: "3.55s" }} />
@@ -107,7 +76,12 @@ export function IntroTransition({ once = false }: { once?: boolean }) {
             <span className="cine-spark h-1.5 w-1.5 rounded-full bg-orange-300" style={{ animationDelay: `${3.25 + (i % 4) * 0.04}s` }} />
           </span>
         ))}
-        <div className="cine-orb relative"><SynapseOrb size={200} state="thinking" /></div>
+
+        {/* the orb, revealed as the dust condenses — with the lock-in glyph settling into its core */}
+        <div className="cine-orb relative grid place-items-center">
+          <SynapseOrb size={200} state="thinking" />
+          <Lock className="cine-lock absolute h-14 w-14 text-white" strokeWidth={1.5} style={{ filter: "drop-shadow(0 0 10px rgba(255,180,110,.8))" }} />
+        </div>
       </div>
 
       {/* the transformation white flash, over everything for an instant */}

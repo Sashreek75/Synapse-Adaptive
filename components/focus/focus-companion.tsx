@@ -25,6 +25,7 @@ import { useSubscription } from "@/components/providers/subscription-provider";
 import { preGate, CRISIS_RESPONSE } from "@/ai/safety";
 import { witness } from "@/lib/activity";
 import { cn } from "@/lib/utils";
+import { ChatTextarea } from "@/components/ui/chat-textarea";
 import {
   type FocusSession, type Nudge, type Telemetry, type NudgeKind,
   loadSession, saveSession, clearSession, newSession, registerNudge,
@@ -289,10 +290,10 @@ export function FocusCompanion() {
         )}
       </div>
 
-      <div className="flex items-center gap-2 border-t px-3 py-2.5">
-        <input value={note} onChange={(e) => setNote(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") void send(); }}
+      <div className="flex items-end gap-2 border-t px-3 py-2.5">
+        <ChatTextarea value={note} onValueChange={setNote} onSubmit={() => void send()} maxHeight={120}
           placeholder="Talk to Synapse…"
-          className="min-w-0 flex-1 rounded-full border bg-surface px-3 py-1.5 text-sm text-ink placeholder:text-muted focus:outline-none" />
+          className="min-w-0 flex-1 rounded-2xl border bg-surface px-3 py-1.5 text-sm leading-relaxed text-ink placeholder:text-muted focus:outline-none" />
         <button onClick={() => void send()} disabled={thinking || !note.trim()} aria-label="Send" className="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-orange-500 text-white transition hover:bg-orange-600 disabled:opacity-50"><ArrowRight className="h-4 w-4" /></button>
       </div>
 

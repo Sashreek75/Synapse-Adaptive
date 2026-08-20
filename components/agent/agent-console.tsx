@@ -36,6 +36,7 @@ import { useAuth } from "@/components/providers/auth-provider";
 import { WaitlistDialog } from "@/components/billing/waitlist-dialog";
 import { SynapseOrb } from "@/components/synapse/orb";
 import { RichText } from "@/components/agent/rich-text";
+import { ChatTextarea } from "@/components/ui/chat-textarea";
 import { cn } from "@/lib/utils";
 import { env, flags } from "@/env";
 import type { ChatMessage } from "@/types";
@@ -462,10 +463,10 @@ export function AgentConsole({ embedded = false, immersive = false }: { embedded
               </button>
             </div>
           )}
-          <div className="flex gap-2 rounded-2xl border bg-surface p-2 shadow-lift">
-            <input value={input} onChange={(e) => setInput(e.target.value)} onKeyDown={(e) => e.key === "Enter" && send(input)}
+          <div className="flex items-end gap-2 rounded-2xl border bg-surface p-2 shadow-lift">
+            <ChatTextarea value={input} onValueChange={setInput} onSubmit={() => send(input)}
               placeholder="What do you want to make progress on?"
-              className="min-w-0 flex-1 bg-transparent px-3 py-2.5 text-base text-ink placeholder:text-muted focus:outline-none" />
+              className="min-w-0 flex-1 bg-transparent px-3 py-2.5 text-base leading-relaxed text-ink placeholder:text-muted focus:outline-none" />
             <button onClick={() => send(input)} disabled={busy || !input.trim()} aria-label="Send"
               className="sa-shine grid h-11 w-11 shrink-0 place-items-center rounded-xl bg-orange-500 text-white transition hover:bg-orange-600 disabled:opacity-50">
               <Send className="h-5 w-5" />
@@ -565,10 +566,10 @@ export function AgentConsole({ embedded = false, immersive = false }: { embedded
             ))}
           </div>
         )}
-        <div className="flex gap-2 rounded-2xl border bg-surface p-2 shadow-soft">
-          <input value={input} onChange={(e) => setInput(e.target.value)} onKeyDown={(e) => e.key === "Enter" && send(input)}
+        <div className="flex items-end gap-2 rounded-2xl border bg-surface p-2 shadow-soft">
+          <ChatTextarea value={input} onValueChange={setInput} onSubmit={() => send(input)}
             placeholder="What are you working on? Talk to me."
-            className="flex-1 bg-transparent px-3 py-2 text-ink placeholder:text-muted focus:outline-none" />
+            className="min-w-0 flex-1 bg-transparent px-3 py-2 leading-relaxed text-ink placeholder:text-muted focus:outline-none" />
           <button onClick={() => send(input)} disabled={busy || !input.trim()} aria-label="Send"
             className="sa-shine grid h-11 w-11 shrink-0 place-items-center rounded-xl bg-orange-500 text-white transition hover:bg-orange-600 disabled:opacity-50">
             <Send className="h-5 w-5" />
