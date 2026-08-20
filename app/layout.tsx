@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Inter } from "next/font/google";
 import "./globals.css";
 import { AuthProvider } from "@/components/providers/auth-provider";
+import { InteractiveNeuralVortex } from "@/components/ui/interactive-neural-vortex-background";
 
 const inter = Inter({ subsets: ["latin"], variable: "--font-sans", display: "swap" });
 
@@ -44,22 +45,30 @@ export const metadata: Metadata = {
   },
 };
 
-export const viewport = { themeColor: "#ffffff", width: "device-width", initialScale: 1, viewportFit: "cover" as const };
+export const viewport = { themeColor: "#04070d", width: "device-width", initialScale: 1, viewportFit: "cover" as const };
 
 const themeScript = `
 (function(){try{
-  /* Synapse is light-only — there is no dark mode. Force light and clear any stale saved preference
-     so returning users who once toggled dark come back to the intended look. */
-  document.documentElement.classList.remove('dark');
+  /* Synapse runs on a single black, navy-and-orange identity. Force the dark theme on and clear any
+     stale saved preference so the look is consistent for everyone. */
+  document.documentElement.classList.add('dark');
   localStorage.removeItem('theme');
 }catch(e){}})();
 `;
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en" suppressHydrationWarning>
+    <html lang="en" className="dark" suppressHydrationWarning>
       <head><script dangerouslySetInnerHTML={{ __html: themeScript }} /></head>
       <body className={inter.variable}>
+        {/* Site-wide living background: a navy+orange neural vortex over black, with a soft scrim
+            on top so foreground text and cards stay readable. */}
+        <InteractiveNeuralVortex className="opacity-80" />
+        <div
+          aria-hidden
+          className="pointer-events-none fixed inset-0 -z-10"
+          style={{ background: "radial-gradient(125% 85% at 50% -5%, rgba(4,7,13,.30), rgba(4,7,13,.74) 72%)" }}
+        />
         <AuthProvider>{children}</AuthProvider>
       </body>
     </html>

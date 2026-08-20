@@ -5,7 +5,6 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { Brain, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/primitives";
-import { AnimatedBackground } from "@/components/ui/animated-background";
 import { useAuth } from "@/components/providers/auth-provider";
 import { cn } from "@/lib/utils";
 
@@ -26,7 +25,6 @@ export default function UpdatePasswordPage() {
 
   return (
     <div className="relative grid min-h-screen place-items-center px-5">
-      <AnimatedBackground variant="hero" />
       <div className="w-full max-w-md rounded-3xl border bg-surface/80 p-8 text-center shadow-lift glass sa-rise">
         <span className="mx-auto grid h-12 w-12 place-items-center rounded-2xl bg-navy-900 text-white"><Brain className="h-6 w-6" /></span>
         <h1 className="mt-5 text-2xl font-semibold tracking-tight text-ink">Set a new password</h1>

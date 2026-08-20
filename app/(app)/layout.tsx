@@ -5,7 +5,6 @@ import { NotificationsBell } from "@/components/shell/notifications-bell";
 import { HealthProvider } from "@/components/providers/health-store";
 import { SubscriptionProvider } from "@/components/providers/subscription-provider";
 import { AuthGuard } from "@/components/providers/auth-gate";
-import { AnimatedBackground } from "@/components/ui/animated-background";
 import { OnboardingGate } from "@/components/providers/onboarding-gate";
 import { FeatureTour } from "@/components/tour/feature-tour";
 import { FocusCompanion } from "@/components/focus/focus-companion";
@@ -25,7 +24,6 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
     <HealthProvider>
       <SubscriptionProvider>
         <AuthGuard>
-          <AnimatedBackground />
           <OnboardingGate />
           <FeatureTour />
           <div className="flex h-[100dvh] flex-col">

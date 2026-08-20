@@ -4,7 +4,6 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { ArrowRight, Loader2, AlertTriangle } from "lucide-react";
 import { Button } from "@/components/ui/primitives";
-import { AnimatedBackground } from "@/components/ui/animated-background";
 import { SynapseOrb } from "@/components/synapse/orb";
 import { useAuth } from "@/components/providers/auth-provider";
 import { cn } from "@/lib/utils";
@@ -87,7 +86,6 @@ export default function LoginPage() {
 
   return (
     <div className="relative grid min-h-screen place-items-center px-5">
-      <AnimatedBackground variant="hero" />
       <div className="w-full max-w-md rounded-3xl border bg-surface/80 p-8 shadow-lift glass sa-rise">
         <div className="text-center">
           <div className="mx-auto w-fit"><SynapseOrb size={48} /></div>
