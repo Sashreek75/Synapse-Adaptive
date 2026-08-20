@@ -16,12 +16,14 @@ import { Button } from "@/components/ui/primitives";
 import { SynapseOrb } from "@/components/synapse/orb";
 import { Reveal } from "@/components/marketing/reveal";
 import { PricingCTA } from "@/components/marketing/pricing-cta";
+import { IntroTransition } from "@/components/marketing/intro-transition";
 import { PLANS, PLAN_ORDER } from "@/lib/billing/plans";
 import { cn } from "@/lib/utils";
 
 export default function LandingPage() {
   return (
     <div className="min-h-screen">
+      <IntroTransition />
       <StructuredData />
       <SiteHeader />
       <Hero />
@@ -176,7 +178,10 @@ function HeroProductViz() {
  * hero still leads with a real product visual rather than text alone. */
 function HeroProductVizMobile() {
   return (
-    <div className="mt-10 overflow-hidden rounded-2xl border bg-surface shadow-lift lg:hidden">
+    <div className="relative mt-10 lg:hidden">
+      <div aria-hidden className="sa-aura absolute -inset-5 -z-10 rounded-[2rem] opacity-60 blur-2xl"
+        style={{ background: "linear-gradient(100deg, #e79e6f, #c49aa4, #8085c8)" }} />
+      <div className="sa-float overflow-hidden rounded-2xl border bg-surface shadow-lift">
       <div className="flex items-center gap-2 border-b px-4 py-3">
         <SynapseOrb size={22} />
         <span className="text-sm font-semibold text-ink">Talk</span>
@@ -196,6 +201,7 @@ function HeroProductVizMobile() {
           <StateChip label="Protecting" value="SAT · 12 days" accent />
           <StateChip label="Maintaining" value="Startup" />
         </div>
+      </div>
       </div>
     </div>
   );
