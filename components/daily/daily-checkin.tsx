@@ -24,6 +24,7 @@ import { useHealth } from "@/components/providers/health-store";
 import { useSubscription } from "@/components/providers/subscription-provider";
 import { getPath } from "@/lib/paths";
 import { activeGoals } from "@/lib/goals";
+import { validateText, isMeaningful } from "@/lib/validation";
 import { dailyReflection, type DailyReflection } from "@/lib/intelligence";
 import { addCommitment, loadCommitments } from "@/lib/commitments";
 import { readMomentum, commitmentHint } from "@/lib/momentum";
@@ -273,6 +274,11 @@ export function DailyCheckIn() {
     } catch { setReflection(fallback); }
     finally { setReflecting(false); }
   }
+  // Keep keyboard-mashing out of the reasoning pipeline: free-text answers must be real words.
+  const progressCheck = validateText(progress, { minLength: 3, allowEmpty: true });
+  const lifeEventCheck = validateText(lifeEvent, { minLength: 3, allowEmpty: true });
+  const textBlocked = !progressCheck.ok || !lifeEventCheck.ok;
+
   function saveGenerated(items: DailyItemOutput[]) {
     const date = new Date().toISOString();
     const metrics: Partial<Record<MetricKey, number>> = {};
@@ -288,13 +294,15 @@ export function DailyCheckIn() {
         if (opt?.metric && opt.value != null) metrics[opt.metric] = opt.value;
         else if (opt) notes.push({ prompt: it.question, answer: opt.label });
       } else if (it.type === "note") {
-        const answer = (a.text || "").trim() || a.chip || "";
+        const typed = (a.text || "").trim();
+        // Chips are pre-written (always safe); typed answers must be meaningful to be kept.
+        const answer = typed ? (isMeaningful(typed, { minLength: 3 }) ? typed : "") : (a.chip || "");
         if (answer) notes.push({ prompt: it.question, answer });
       } else if (it.type === "reaction") {
         if (a.reaction != null) metrics.reaction_time = a.reaction;
       }
     });
-    if (progress.trim()) addContextNote(progressLabel, progress.trim());
+    if (isMeaningful(progress, { minLength: 3 })) addContextNote(progressLabel, progress.trim());
     addCheckIn({ date, kind: "daily", metrics, note: "Daily check-in" });
     for (const n of notes) addContextNote(n.prompt, n.answer);
     void runInstantRead(metrics, date, [progress.trim(), ...notes.map((n) => n.answer)]);
@@ -304,10 +312,10 @@ export function DailyCheckIn() {
     const date = new Date().toISOString();
     const metrics: Partial<Record<MetricKey, number>> = { sleep_quality: sleep, fatigue: 100 - energy, stress, mood };
     if (hasSymptoms) metrics.symptoms = symptoms;
-    if (progress.trim()) addContextNote(progressLabel, progress.trim());
+    if (isMeaningful(progress, { minLength: 3 })) addContextNote(progressLabel, progress.trim());
     addCheckIn({ date, kind: "daily", metrics, note: "Daily check-in" });
-    if (fallbackAnswer.trim()) addContextNote(fq.event, fallbackAnswer.trim());
-    if (lifeEvent.trim()) addContextNote(fq.event, lifeEvent.trim());
+    if (isMeaningful(fallbackAnswer, { minLength: 3 })) addContextNote(fq.event, fallbackAnswer.trim());
+    if (isMeaningful(lifeEvent, { minLength: 3 })) addContextNote(fq.event, lifeEvent.trim());
     void runInstantRead(metrics, date, [progress.trim(), fallbackAnswer.trim(), lifeEvent.trim()]);
   }
 
@@ -388,7 +396,9 @@ export function DailyCheckIn() {
           <input value={progress} onChange={(e) => setProgress(e.target.value)}
             placeholder="Even a small step — a task, a workout, a page written, a hard conversation…"
             className="w-full rounded-xl border bg-surface px-3 py-2.5 text-base text-ink placeholder:text-muted focus:outline-none" />
-          <p className="mt-1.5 text-xs text-muted">This is the heart of it — whatever you&apos;re working toward. The rest below is just how you&apos;re feeling: one lens, not the point.</p>
+          {progress.trim().length > 0 && progressCheck.message
+            ? <p className="mt-1.5 text-xs text-orange-400">{progressCheck.message}</p>
+            : <p className="mt-1.5 text-xs text-muted">This is the heart of it — whatever you&apos;re working toward. The rest below is just how you&apos;re feeling: one lens, not the point.</p>}
         </div>
 
         {plan ? (
@@ -400,7 +410,7 @@ export function DailyCheckIn() {
               <ItemView key={i} item={it} answer={ans[i]} onChange={(patch) => setItem(i, patch)} />
             ))}
             {plan.closing && <p className="text-sm text-muted">{plan.closing}</p>}
-            <Button className="w-full" onClick={() => saveGenerated(plan.items)}>Log today <Check className="h-4 w-4" /></Button>
+            <Button className="w-full" disabled={textBlocked} onClick={() => saveGenerated(plan.items)}>Log today <Check className="h-4 w-4" /></Button>
           </>
         ) : (
           <>
@@ -423,8 +433,9 @@ export function DailyCheckIn() {
               <input id="life-event" value={lifeEvent} onChange={(e) => setLifeEvent(e.target.value)}
                 placeholder="Travel, a big deadline, poor night, good news…"
                 className="w-full rounded-xl border bg-surface px-3 py-2.5 text-base text-ink placeholder:text-muted focus:outline-none" />
+              {lifeEvent.trim().length > 0 && lifeEventCheck.message && <p className="mt-1.5 text-xs text-orange-400">{lifeEventCheck.message}</p>}
             </div>
-            <Button className="w-full" onClick={saveFallback}>Log today <Check className="h-4 w-4" /></Button>
+            <Button className="w-full" disabled={textBlocked} onClick={saveFallback}>Log today <Check className="h-4 w-4" /></Button>
           </>
         )}
       </CardBody></Card>
@@ -542,6 +553,7 @@ function Q({ icon: Icon, label, value, setValue, labels }: { icon: typeof Moon; 
 export function CommitmentCapture({ suggestion, towards }: { suggestion: string; towards?: string }) {
   const [text, setText] = useState(suggestion);
   const [committed, setCommitted] = useState<string | null>(null);
+  const commitmentCheck = validateText(text, { minLength: 3 });
   useEffect(() => { setText(suggestion); }, [suggestion]);
   useEffect(() => {
     const t = new Date().toISOString().slice(0, 10);
@@ -565,7 +577,8 @@ export function CommitmentCapture({ suggestion, towards }: { suggestion: string;
       </div>
       <input value={text} onChange={(e) => setText(e.target.value)} placeholder="e.g. email three professors"
         className="w-full rounded-xl border bg-surface px-3 py-2.5 text-base text-ink placeholder:text-muted focus:outline-none" />
-      <Button className="w-full" disabled={!text.trim()} onClick={() => { const c = addCommitment(text.trim(), towards); setCommitted(c.text); }}>
+      {text.trim().length > 0 && commitmentCheck.message && <p className="text-xs text-orange-400">{commitmentCheck.message}</p>}
+      <Button className="w-full" disabled={!commitmentCheck.ok} onClick={() => { const c = addCommitment(text.trim(), towards); setCommitted(c.text); }}>
         This is my commitment <Check className="h-4 w-4" />
       </Button>
     </CardBody></Card>

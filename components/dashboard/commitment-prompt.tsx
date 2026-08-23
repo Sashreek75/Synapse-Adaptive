@@ -24,6 +24,7 @@ import {
   winsLine, driftLine, loadCommitments, type Commitment,
 } from "@/lib/commitments";
 import { readMomentum, type MomentumRead } from "@/lib/momentum";
+import { validateText } from "@/lib/validation";
 
 type Phase = "ask" | "partly" | "notyet";
 
@@ -155,10 +156,10 @@ export function CommitmentPrompt() {
             {smallerOpen ? (
               <div className="flex items-center gap-2">
                 <input value={smaller} autoFocus onChange={(e) => setSmaller(e.target.value)}
-                  onKeyDown={(e) => { if (e.key === "Enter" && smaller.trim()) { replaceCommitment(c.id, smaller.trim(), note.trim() ? `made smaller — ${note.trim()}` : "made smaller to protect momentum", towards); finish("Smaller, and doable. That's how momentum starts — I'll hold you to this one."); } }}
+                  onKeyDown={(e) => { if (e.key === "Enter" && validateText(smaller, { minLength: 3 }).ok) { replaceCommitment(c.id, smaller.trim(), note.trim() ? `made smaller — ${note.trim()}` : "made smaller to protect momentum", towards); finish("Smaller, and doable. That's how momentum starts — I'll hold you to this one."); } }}
                   placeholder="The smaller version you'll actually do…"
                   className="min-w-0 flex-1 rounded-xl border bg-surface px-3 py-2 text-sm text-ink placeholder:text-muted focus:outline-none" />
-                <Button size="sm" disabled={!smaller.trim()} onClick={() => { replaceCommitment(c.id, smaller.trim(), note.trim() ? `made smaller — ${note.trim()}` : "made smaller to protect momentum", towards); finish("Smaller, and doable. That's how momentum starts — I'll hold you to this one."); }}>Set</Button>
+                <Button size="sm" disabled={!validateText(smaller, { minLength: 3 }).ok} onClick={() => { replaceCommitment(c.id, smaller.trim(), note.trim() ? `made smaller — ${note.trim()}` : "made smaller to protect momentum", towards); finish("Smaller, and doable. That's how momentum starts — I'll hold you to this one."); }}>Set</Button>
               </div>
             ) : (
               <div className="flex flex-wrap gap-2">

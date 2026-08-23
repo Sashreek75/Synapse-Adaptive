@@ -19,6 +19,7 @@ import { Card, CardBody, Button } from "@/components/ui/primitives";
 import { SynapseOrb } from "@/components/synapse/orb";
 import { useHealth } from "@/components/providers/health-store";
 import { witness } from "@/lib/activity";
+import { validateName, validateText } from "@/lib/validation";
 import { cn } from "@/lib/utils";
 
 /** Life domains → the engine "path" (lens) each maps to. The label is person-first;
@@ -57,9 +58,12 @@ export function OnboardingFlow() {
   const pathLabel = primary?.label ?? "Personal growth";
 
   const toggle = (v: string) => setAreas((g) => (g.includes(v) ? g.filter((x) => x !== v) : [...g, v]));
+  // Validate the free-text answers so keyboard-mashing never becomes someone's "north star".
+  const nameCheck = validateName(name);
+  const aspirationCheck = validateText(aspiration, { minLength: 4 });
   const canNext =
-    (step === 0 && name.trim().length > 0) ||
-    (step === 1 && aspiration.trim().length > 0) || // the long-term goal, in their words, is what matters here
+    (step === 0 && nameCheck.ok) ||
+    (step === 1 && aspirationCheck.ok) || // the long-term goal, in their words, is what matters here
     (step === 2 && style.length > 0);
 
   const assembled = () => ({
@@ -118,6 +122,7 @@ export function OnboardingFlow() {
           {step === 0 && (
             <Shell title="Hi — I'm Synapse." subtitle="I help you cut through the noise to the one thing that matters, and I stay on your side until you follow through. I get sharper the longer we work together. What should I call you?">
               <input autoFocus value={name} onChange={(e) => setName(e.target.value)} onKeyDown={(e) => e.key === "Enter" && canNext && setStep(1)} placeholder="Your first name" className={inputCls} />
+              {name.trim().length > 0 && nameCheck.message && <p className="mt-1.5 text-xs text-orange-400">{nameCheck.message}</p>}
             </Shell>
           )}
 
@@ -129,6 +134,7 @@ export function OnboardingFlow() {
               <textarea autoFocus value={aspiration} onChange={(e) => setAspiration(e.target.value)} rows={4}
                 placeholder="e.g. Build the discipline and mamba-mentality focus to go all-in on what I care about — and never doubt I'll win."
                 className={cn(inputCls, "resize-none")} />
+              {aspiration.trim().length > 0 && aspirationCheck.message && <p className="-mt-1 text-xs text-orange-400">{aspirationCheck.message}</p>}
               <div>
                 <p className="mb-2 text-[11px] font-semibold uppercase tracking-wider text-muted">Which areas is this mostly about? <span className="font-normal normal-case text-muted/70">— optional, just helps me start</span></p>
                 <div className="flex flex-wrap gap-2">

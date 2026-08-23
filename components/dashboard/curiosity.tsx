@@ -5,6 +5,7 @@ import { MessageCircleQuestion, Check } from "lucide-react";
 import { Card, CardBody } from "@/components/ui/primitives";
 import { useHealth } from "@/components/providers/health-store";
 import { curiosityQuestion } from "@/lib/intelligence";
+import { validateText } from "@/lib/validation";
 import { cn } from "@/lib/utils";
 
 /** "Questions Synapse wants to ask" — adaptive curiosity that fills context gaps. */
@@ -43,8 +44,9 @@ export function Curiosity() {
           ))}
         </div>
         <div className="mt-3 flex gap-2">
-          <input value={custom} onChange={(e) => setCustom(e.target.value)} onKeyDown={(e) => e.key === "Enter" && answer(custom)} placeholder="…or tell me in your words" className="flex-1 rounded-full border bg-surface px-4 py-2 text-sm text-ink placeholder:text-muted focus:outline-none focus-visible:ring-2 focus-visible:ring-navy-400" />
+          <input value={custom} onChange={(e) => setCustom(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter" && validateText(custom).ok) answer(custom); }} placeholder="…or tell me in your words" className="flex-1 rounded-full border bg-surface px-4 py-2 text-sm text-ink placeholder:text-muted focus:outline-none focus-visible:ring-2 focus-visible:ring-navy-400" />
         </div>
+        {custom.trim().length > 0 && validateText(custom).message && <p className="mt-1.5 text-xs text-orange-400">{validateText(custom).message}</p>}
       </CardBody>
     </Card>
   );

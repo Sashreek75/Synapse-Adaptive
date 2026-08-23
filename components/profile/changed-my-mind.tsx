@@ -12,6 +12,7 @@ import {
   loadPrinciples, loadMindShifts, addPrinciple, updatePrinciple, removePrinciple, removeMindShift,
   type Principle, type MindShift,
 } from "@/lib/principles";
+import { validateText } from "@/lib/validation";
 
 export function ChangedMyMind() {
   const [principles, setPrinciples] = useState<Principle[]>([]);
@@ -25,7 +26,8 @@ export function ChangedMyMind() {
     return () => window.removeEventListener("synapse:principles", sync);
   }, []);
 
-  const add = () => { if (draft.trim()) { addPrinciple(draft); setDraft(""); } };
+  const draftCheck = validateText(draft, { minLength: 4 });
+  const add = () => { if (draftCheck.ok) { addPrinciple(draft); setDraft(""); } };
 
   return (
     <Card className="overflow-hidden">
@@ -63,8 +65,9 @@ export function ChangedMyMind() {
           )}
           <div className="mt-3 flex gap-2">
             <input value={draft} onChange={(e) => setDraft(e.target.value)} onKeyDown={(e) => e.key === "Enter" && add()} placeholder="Add a truth about yourself..." className="min-w-0 flex-1 rounded-lg border bg-surface px-3 py-1.5 text-sm text-ink placeholder:text-muted focus:outline-none" />
-            <button onClick={add} aria-label="Add principle" className="grid h-8 w-8 shrink-0 place-items-center rounded-full border text-muted hover:text-ink"><Plus className="h-4 w-4" /></button>
+            <button onClick={add} disabled={!draftCheck.ok} aria-label="Add principle" className="grid h-8 w-8 shrink-0 place-items-center rounded-full border text-muted hover:text-ink disabled:opacity-40"><Plus className="h-4 w-4" /></button>
           </div>
+          {draft.trim().length > 0 && draftCheck.message && <p className="mt-1.5 text-xs text-orange-400">{draftCheck.message}</p>}
         </div>
       </CardBody>
     </Card>

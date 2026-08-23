@@ -20,6 +20,7 @@ import { useSubscription } from "@/components/providers/subscription-provider";
 import { preGate, CRISIS_RESPONSE } from "@/ai/safety";
 import { loadCommitments } from "@/lib/commitments";
 import { loadHistory } from "@/lib/focus-session";
+import { isMeaningful } from "@/lib/validation";
 import { readMomentum } from "@/lib/momentum";
 import { convictionContextLines } from "@/lib/convictions";
 import { witness, activityContextBlock } from "@/lib/activity";
@@ -74,7 +75,8 @@ export function TalkSnapshot({ enrich = false }: { enrich?: boolean }) {
       if (!dailyDoneToday) { try { addCheckIn({ date: new Date().toISOString(), kind: "daily", metrics: {}, note: "Talked it through" }); } catch {} }
     }
     // Feed understanding + memory through the same channel the quick path uses (capped).
-    if (noted.current < 6) { noted.current += 1; try { addContextNote(noted.current === 1 ? "Talked through today" : "More from today's reflection", q); } catch {} }
+    // Only persist meaningful messages — don't let "asdfgh" become a remembered reflection.
+    if (noted.current < 6 && isMeaningful(q, { minLength: 4 })) { noted.current += 1; try { addContextNote(noted.current === 1 ? "Talked through today" : "More from today's reflection", q); } catch {} }
 
     try {
       const now = new Date().toLocaleString(undefined, { weekday: "long", month: "long", day: "numeric", hour: "numeric", minute: "2-digit" });

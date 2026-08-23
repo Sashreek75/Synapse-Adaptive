@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/primitives";
 import { SynapseOrb } from "@/components/synapse/orb";
 import { useHealth } from "@/components/providers/health-store";
 import { activeGoals, addGoal, getGoal, daysSinceProgress, daysUntilDue, type Goal } from "@/lib/goals";
+import { validateText } from "@/lib/validation";
 import { recordAllocation, priorAllocation, recordExecution, summarizeExecution, type AllocConfidence } from "@/lib/allocations";
 
 /**
@@ -152,9 +153,12 @@ export default function GoalsPage() {
     return () => { cancelled = true; };
   }, [goals, personCtx]);
 
+  // A goal steers the whole engine, so it must be real text — not "asdfgh".
+  const titleCheck = validateText(title, { minLength: 3 });
+  const whyCheck = validateText(why, { minLength: 3, allowEmpty: true });
   const add = () => {
     const t = title.trim();
-    if (!t) return;
+    if (!titleCheck.ok || !whyCheck.ok) return;
     addGoal({ title: t, why: why.trim() || undefined });
     setTitle(""); setWhy("");
   };
@@ -188,12 +192,16 @@ export default function GoalsPage() {
           <input value={title} onChange={(e) => setTitle(e.target.value)} onKeyDown={(e) => e.key === "Enter" && add()}
             placeholder="What do you want to achieve?"
             className="min-w-0 flex-1 rounded-xl border bg-surface px-3 py-2.5 text-sm text-ink placeholder:text-muted focus:outline-none" />
-          <Button onClick={add} disabled={!title.trim()}><Plus className="h-4 w-4" /> Add</Button>
+          <Button onClick={add} disabled={!titleCheck.ok || !whyCheck.ok}><Plus className="h-4 w-4" /> Add</Button>
         </div>
+        {title.trim().length > 0 && titleCheck.message && <p className="mt-1.5 text-xs text-orange-400">{titleCheck.message}</p>}
         {title.trim() && (
-          <input value={why} onChange={(e) => setWhy(e.target.value)} onKeyDown={(e) => e.key === "Enter" && add()}
-            placeholder="Why does this matter to you? (optional)"
-            className="mt-2 w-full rounded-xl border bg-surface px-3 py-2 text-sm text-ink placeholder:text-muted focus:outline-none" />
+          <>
+            <input value={why} onChange={(e) => setWhy(e.target.value)} onKeyDown={(e) => e.key === "Enter" && add()}
+              placeholder="Why does this matter to you? (optional)"
+              className="mt-2 w-full rounded-xl border bg-surface px-3 py-2 text-sm text-ink placeholder:text-muted focus:outline-none" />
+            {why.trim().length > 0 && whyCheck.message && <p className="mt-1.5 text-xs text-orange-400">{whyCheck.message}</p>}
+          </>
         )}
       </div>
 
