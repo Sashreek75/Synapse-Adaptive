@@ -136,10 +136,13 @@ export function InteractiveNeuralVortex({ className }: { className?: string }) {
     const uPointerPosition = gl.getUniformLocation(program, "u_pointer_position");
     const uScrollProgress = gl.getUniformLocation(program, "u_scroll_progress");
 
+    // Perf: this is a soft, blurred ambient field, so it does not need full device resolution.
+    // Rendering the shader at ~0.6x (capped) cuts per-frame GPU work by ~3x with no visible change.
+    const RENDER_SCALE = 0.6;
     const resizeCanvas = () => {
-      const devicePixelRatio = Math.min(window.devicePixelRatio, 2);
-      canvasEl.width = window.innerWidth * devicePixelRatio;
-      canvasEl.height = window.innerHeight * devicePixelRatio;
+      const scale = Math.min(window.devicePixelRatio || 1, 1.5) * RENDER_SCALE;
+      canvasEl.width = Math.max(1, Math.round(window.innerWidth * scale));
+      canvasEl.height = Math.max(1, Math.round(window.innerHeight * scale));
       gl.viewport(0, 0, canvasEl.width, canvasEl.height);
       gl.uniform1f(uRatio, canvasEl.width / canvasEl.height);
     };
@@ -162,12 +165,33 @@ export function InteractiveNeuralVortex({ className }: { className?: string }) {
       typeof window.matchMedia === "function" &&
       window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 
-    const render = () => {
+    // Perf: cap to ~30fps (an ambient field doesn't need 60), and stop entirely when the tab is
+    // hidden so Synapse never hogs the GPU while you're working in another tab.
+    const FRAME_MS = 1000 / 30;
+    let last = 0;
+    let running = false;
+
+    const render = (now: number) => {
+      if (!running) return;
+      animationRef.current = requestAnimationFrame(render);
+      if (now - last < FRAME_MS) return;
+      last = now;
       pointer.current.x += (pointer.current.tX - pointer.current.x) * 0.2;
       pointer.current.y += (pointer.current.tY - pointer.current.y) * 0.2;
       drawFrame();
+    };
+
+    const start = () => {
+      if (running) return;
+      running = true;
+      last = 0;
       animationRef.current = requestAnimationFrame(render);
     };
+    const stop = () => {
+      running = false;
+      if (animationRef.current !== null) cancelAnimationFrame(animationRef.current);
+    };
+    const onVisibility = () => { if (document.hidden) stop(); else start(); };
 
     if (prefersReduced) {
       // Center the "pointer" and draw a single still frame — no perpetual motion.
@@ -175,7 +199,8 @@ export function InteractiveNeuralVortex({ className }: { className?: string }) {
       pointer.current.y = pointer.current.tY = window.innerHeight / 2;
       drawFrame();
     } else {
-      render();
+      if (!document.hidden) start();
+      document.addEventListener("visibilitychange", onVisibility);
     }
 
     const handleMouseMove = (e: PointerEvent) => {
@@ -195,7 +220,8 @@ export function InteractiveNeuralVortex({ className }: { className?: string }) {
       window.removeEventListener("resize", resizeCanvas);
       window.removeEventListener("pointermove", handleMouseMove);
       window.removeEventListener("touchmove", handleTouchMove);
-      if (animationRef.current !== null) cancelAnimationFrame(animationRef.current);
+      document.removeEventListener("visibilitychange", onVisibility);
+      stop();
       gl.deleteProgram(program);
       gl.deleteShader(vertexShader);
       gl.deleteShader(fragmentShader);
