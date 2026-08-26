@@ -28,6 +28,40 @@ function isKeyboardRun(s: string): boolean {
   return KEYBOARD_SEQS.some((seq) => seq.includes(t));
 }
 
+// Letter pairs that legitimately occur in English. A vowel next to a consonant (or vice-versa) is
+// almost always fine; two vowels or two consonants together are only fine for known combinations.
+// A long "word" built mostly from combinations NOT on these lists (e.g. "febfoebfoeubfo": bf, oe, eu)
+// is a pronounceable-looking pseudo-word — gibberish that the vowel/keyboard checks alone miss.
+const VOWEL_DIGRAPHS = new Set([
+  "ai","au","ay","ea","ee","ei","ey","ie","io","ia","oa","oo","ou","ow","oy","oi","ue","ui","ya","ye","yo",
+]);
+const CONS_CLUSTERS = new Set([
+  "bl","br","ch","ck","cl","cr","ct","dg","dr","ds","dw","fl","fr","ft","gh","gl","gn","gr","ht","kn",
+  "ld","lf","lk","lm","lp","ls","lt","lv","mb","mp","ms","nc","nd","ng","nk","ns","nt","ph","pl","pr",
+  "ps","pt","rb","rc","rd","rf","rg","rk","rl","rm","rn","rp","rs","rt","rv","sc","sh","sk","sl","sm",
+  "sn","sp","sq","st","sw","th","tr","ts","tw","wh","wr","xt","xc",
+]);
+
+/** Does this look like a pronounceable-but-fake word? True = probably gibberish. */
+function looksMashy(input: string): boolean {
+  const t = input.toLowerCase().replace(/[^a-z]/g, "");
+  if (t.length < 8) return false; // too short to judge fairly
+  const isV = (c: string) => "aeiouy".includes(c);
+  let bad = 0, total = 0;
+  for (let i = 0; i < t.length - 1; i++) {
+    const a = t[i], b = t[i + 1];
+    total++;
+    const av = isV(a), bv = isV(b);
+    let ok: boolean;
+    if (av !== bv) ok = true;                       // consonant+vowel or vowel+consonant
+    else if (av && bv) ok = VOWEL_DIGRAPHS.has(a + b);
+    else ok = a === b || CONS_CLUSTERS.has(a + b);  // doubles ("ll") or known clusters
+    if (!ok) bad++;
+  }
+  // Real words carry the odd unusual pair; gibberish is riddled with impossible ones.
+  return total > 0 && bad >= 3 && bad / total >= 0.34;
+}
+
 const GIBBERISH = "That looks like random text — tell me in a few real words.";
 
 /**
@@ -36,9 +70,9 @@ const GIBBERISH = "That looks like random text — tell me in a few real words."
  */
 export function validateText(
   raw: string,
-  opts: { minLength?: number; allowEmpty?: boolean } = {},
+  opts: { minLength?: number; allowEmpty?: boolean; pronounceable?: boolean } = {},
 ): TextCheck {
-  const { minLength = 3, allowEmpty = false } = opts;
+  const { minLength = 3, allowEmpty = false, pronounceable = true } = opts;
   const s = (raw ?? "").trim();
 
   if (s.length === 0) return { ok: allowEmpty, message: null };
@@ -70,6 +104,10 @@ export function validateText(
     return { ok: false, message: GIBBERISH };
   }
 
+  // Pronounceable-looking pseudo-words ("febfoebfoeubfo") — real letters, but assembled from
+  // letter-pairs that don't occur in English. Skipped for names (often unusual or non-English).
+  if (pronounceable && looksMashy(s)) return { ok: false, message: GIBBERISH };
+
   return { ok: true, message: null };
 }
 
@@ -80,7 +118,7 @@ export function validateName(raw: string): TextCheck {
   if (s.length < 2) return { ok: false, message: "That's a little short — what should I call you?" };
   if (!/[a-zA-ZÀ-ɏ]/.test(s)) return { ok: false, message: "Please enter a name using letters." };
   if (/[^a-zA-ZÀ-ɏ\s.'\-]/.test(s)) return { ok: false, message: "A name shouldn't contain numbers or symbols." };
-  const g = validateText(s, { minLength: 2 });
+  const g = validateText(s, { minLength: 2, pronounceable: false });
   return g.ok ? { ok: true, message: null } : g;
 }
 

@@ -38,6 +38,9 @@ import { extractPrincipleTag, extractMindShiftTag, addPrinciple, addMindShift, p
 import { extractObserveTags } from "@/lib/observations";
 import { goalsContextBlock, findOrCreateGoal, decomposeGoal } from "@/lib/goals";
 import { detectGoalIntent } from "@/lib/goal-intent";
+import { dailyActivityLog } from "@/lib/daily-log";
+import { extractReachoutOffer } from "@/lib/reachout-intent";
+import { scheduleReachout } from "@/lib/push-client";
 import { detectFocusIntent, extractFocusOffer, type FocusIntent } from "@/lib/focus-intent";
 import { recordNavUse } from "@/lib/nav-hint";
 import { evaluatePresence, markPresenceShown, dismissPresence, recordPresenceOutcome, maybeNotify, presenceContextBlock, type PresenceSignal } from "@/lib/presence";
@@ -73,7 +76,7 @@ function describePage(p: string): string {
 export function CompanionPresence() {
   const router = useRouter();
   const pathname = usePathname();
-  const { mind, checkIns, addObservation } = useHealth();
+  const { mind, checkIns, contextNotes, addObservation } = useHealth();
   const { plan: tier } = useSubscription();
   const [focusActive, setFocusActive] = useState(false);
   const [open, setOpen] = useState(false);
@@ -203,6 +206,7 @@ export function CompanionPresence() {
         pftContextBlock(),
         presenceContextBlock(),
         activityContextBlock(),
+        dailyActivityLog(contextNotes),
         ...convictionContextLines(),
         mom.observation ? "Momentum: " + mom.observation : "",
         recent ? "RECENT CONVERSATION (continue it naturally, don't repeat yourself):" + NL + recent : "",
@@ -218,7 +222,9 @@ export function CompanionPresence() {
       // Stage 2: capture conversational behavioral observations (silent — never changes the reply text).
       const obs = extractObserveTags(ms.cleaned);
       for (const o of obs.observations) { try { addObservation(o.patternKey, o.note); } catch {} }
-      setMsgs((m) => [...m, { id: `a_${Date.now()}`, from: "synapse", text: obs.cleaned || "I'm here — say a little more?" }]);
+      const ro = extractReachoutOffer(obs.cleaned);
+      if (ro.offer) { try { void scheduleReachout(ro.offer.minutes, ro.offer.message); } catch {} }
+      setMsgs((m) => [...m, { id: `a_${Date.now()}`, from: "synapse", text: ro.cleaned || "I'm here — say a little more?" }]);
     } catch { setMsgs((m) => [...m, { id: `a_${Date.now()}`, from: "synapse", text: "I couldn't reach my reasoning just now — give it a second." }]); }
     finally { setBusy(false); scroll(); }
   }, [busy, mind, tier, router, pathname, msgs]);

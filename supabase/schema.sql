@@ -27,3 +27,47 @@ create policy "own row" on public.synapse_state
   for all
   using (auth.uid() = user_id)
   with check (auth.uid() = user_id);
+
+-- ============================================================================
+--  WEB PUSH — lets Synapse reach out first with an OS notification even when its
+--  tab is closed. Two tables:
+--    push_subscriptions  — each browser/device the user allowed notifications on
+--    scheduled_reachouts — a queue of "message X to user Y at time T" the cron sends
+--  Writes happen server-side with the service-role key, so RLS just protects reads.
+-- ============================================================================
+
+create table if not exists public.push_subscriptions (
+  id         uuid primary key default gen_random_uuid(),
+  user_id    uuid not null references auth.users on delete cascade,
+  endpoint   text not null unique,
+  p256dh     text not null,
+  auth       text not null,
+  ua         text,
+  created_at timestamptz not null default now()
+);
+create index if not exists push_subscriptions_user_idx on public.push_subscriptions (user_id);
+alter table public.push_subscriptions enable row level security;
+drop policy if exists "own subs" on public.push_subscriptions;
+create policy "own subs" on public.push_subscriptions
+  for all using (auth.uid() = user_id) with check (auth.uid() = user_id);
+
+create table if not exists public.scheduled_reachouts (
+  id          uuid primary key default gen_random_uuid(),
+  user_id     uuid not null references auth.users on delete cascade,
+  fire_at     timestamptz not null,
+  title       text not null,
+  body        text not null,
+  url         text,
+  kind        text not null default 'reachout',
+  status      text not null default 'pending',   -- pending | sent | canceled | failed
+  dedupe_key  text,
+  created_at  timestamptz not null default now(),
+  sent_at     timestamptz
+);
+create index if not exists reachouts_due_idx on public.scheduled_reachouts (status, fire_at);
+create unique index if not exists reachouts_dedupe_idx
+  on public.scheduled_reachouts (user_id, dedupe_key) where dedupe_key is not null;
+alter table public.scheduled_reachouts enable row level security;
+drop policy if exists "own reachouts" on public.scheduled_reachouts;
+create policy "own reachouts" on public.scheduled_reachouts
+  for all using (auth.uid() = user_id) with check (auth.uid() = user_id);

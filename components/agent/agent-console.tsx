@@ -14,6 +14,9 @@ import { workspaceContextBlock } from "@/lib/workspaces";
 import { evidenceContextBlock } from "@/lib/evidence";
 import { pftContextBlock } from "@/lib/pft";
 import { detectGoalIntent } from "@/lib/goal-intent";
+import { dailyActivityLog } from "@/lib/daily-log";
+import { extractReachoutOffer } from "@/lib/reachout-intent";
+import { scheduleReachout } from "@/lib/push-client";
 import { useRouter } from "next/navigation";
 import { detectNavIntent } from "@/lib/nav-intent";
 import { NAV_HINT_EXAMPLES, shouldShowNavHints, recordNavUse } from "@/lib/nav-hint";
@@ -154,7 +157,7 @@ export function AgentConsole({ embedded = false, immersive = false }: { embedded
     const openQ = providerQuestions.filter((q) => q.status === "open").map((q) => q.text);
     const streak = computeStreak(checkIns);
     const watching = focusAreas(series, profile.path).join(", ");
-    const notes = contextNotes.slice(-4).map((n) => `- "${n.answer}" (re: ${n.prompt})`).join("\n");
+    const dailyLog = dailyActivityLog(contextNotes);
     const daysSinceLast = last ? Math.round((Date.now() - new Date(last.date).getTime()) / 864e5) : null;
     const associations = computeAssociations(series, goalMetricsForPath(profile.path), 4);
     const connections = associations.length
@@ -167,7 +170,6 @@ export function AgentConsole({ embedded = false, immersive = false }: { embedded
       `Recent changes: ${changes}.`,
       `Currently watching most closely: ${watching}.`,
       `Consistency: ${streak.totalDays} total check-in days, current streak ${streak.currentStreak} days.`,
-      notes ? `Things they told me recently:\n${notes}` : "",
       openQ.length ? `Open questions they still want answered: ${openQ.join(" | ")}.` : "",
       recommendationLog.length
         ? `Suggestions I made previously (most recent last): ${recommendationLog.slice(-3).map((r) => `"${r.title}" (${new Date(r.date).toLocaleDateString()})`).join("; ")}. Follow up on these naturally when relevant.`
@@ -199,7 +201,7 @@ export function AgentConsole({ embedded = false, immersive = false }: { embedded
     const expHistory = experiments.length
       ? `Experiments we've run together (reference these naturally):\n${experiments.slice(-5).map((e) => { const r = reviewExperiment(e, series); return `- "${e.title}" — tried ${e.behavior} → ${r.outcome}`; }).join("\n")}`
       : "";
-    return `${who}\n\nMetric trends (0-100):\n${lines.join("\n")}\n\n${activity}${currentFocus ? `\n\n${currentFocus}` : ""}${connections ? `\n\n${connections}` : ""}${beliefs ? `\n\n${beliefs}` : ""}${conclusions ? `\n\n${conclusions}` : ""}${openQuestionsCtx ? `\n\n${openQuestionsCtx}` : ""}${theories ? `\n\n${theories}` : ""}${habitsCtx ? `\n\n${habitsCtx}` : ""}${playbook ? `\n\n${playbook}` : ""}${expHistory ? `\n\n${expHistory}` : ""}`;
+    return `${who}\n\nMetric trends (0-100):\n${lines.join("\n")}\n\n${activity}${dailyLog ? `\n\n${dailyLog}` : ""}${currentFocus ? `\n\n${currentFocus}` : ""}${connections ? `\n\n${connections}` : ""}${beliefs ? `\n\n${beliefs}` : ""}${conclusions ? `\n\n${conclusions}` : ""}${openQuestionsCtx ? `\n\n${openQuestionsCtx}` : ""}${theories ? `\n\n${theories}` : ""}${habitsCtx ? `\n\n${habitsCtx}` : ""}${playbook ? `\n\n${playbook}` : ""}${expHistory ? `\n\n${expHistory}` : ""}`;
   }, [hasData, profile, series, weeksTracked, focus, consistency, weeklyScore, recentChanges, providerQuestions, checkIns, contextNotes, recommendationLog, mind, experiments]);
 
   // The old suggestion bubbles were removed — the companion orb and the teach-once
@@ -336,7 +338,10 @@ export function AgentConsole({ embedded = false, immersive = false }: { embedded
       // Stage 2: capture any conversational behavioral observations (silent — never changes the reply text).
       const obs = extractObserveTags(ms.cleaned);
       for (const o of obs.observations) { try { addObservation(o.patternKey, o.note); } catch {} }
-      setChat([...next, { id: `a_${Date.now()}`, role: "assistant", content: obs.cleaned, sections: data.sections, evidenceUsed: data.evidenceUsed }]);
+      // If Synapse promised to check in later, schedule a REAL push so the promise is kept.
+      const ro = extractReachoutOffer(obs.cleaned);
+      if (ro.offer) { try { void scheduleReachout(ro.offer.minutes, ro.offer.message); } catch {} }
+      setChat([...next, { id: `a_${Date.now()}`, role: "assistant", content: ro.cleaned, sections: data.sections, evidenceUsed: data.evidenceUsed }]);
     } catch {
       setChat([...next, { id: `a_${Date.now()}`, role: "assistant", content: "I couldn't reach my reasoning engine just now — give it a moment and try again." }]);
     } finally { setBusy(false); scrollDown(); }

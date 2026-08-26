@@ -32,6 +32,14 @@ const schema = z.object({
   // Email (Resend)
   RESEND_API_KEY: z.string().optional(),
   EMAIL_FROM: z.string().default("Synapse Adaptive <hello@synapseadaptive.com>"),
+
+  // Web Push (VAPID) — lets Synapse reach out first via OS notifications, even when its tab is closed.
+  // Generate a keypair with `npx web-push generate-vapid-keys`. Public key is exposed to the client.
+  NEXT_PUBLIC_VAPID_PUBLIC_KEY: z.string().optional(),
+  VAPID_PRIVATE_KEY: z.string().optional(),
+  VAPID_SUBJECT: z.string().default("mailto:support@compliancewatchdog.com"),
+  /** Shared secret the scheduler endpoint requires, so only your cron can trigger sends. */
+  CRON_SECRET: z.string().optional(),
 });
 
 export const env = schema.parse({
@@ -55,6 +63,10 @@ export const env = schema.parse({
   NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY: process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY,
   RESEND_API_KEY: process.env.RESEND_API_KEY,
   EMAIL_FROM: process.env.EMAIL_FROM,
+  NEXT_PUBLIC_VAPID_PUBLIC_KEY: process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY,
+  VAPID_PRIVATE_KEY: process.env.VAPID_PRIVATE_KEY,
+  VAPID_SUBJECT: process.env.VAPID_SUBJECT,
+  CRON_SECRET: process.env.CRON_SECRET,
 });
 
 export const flags = {
@@ -62,4 +74,5 @@ export const flags = {
   authLive: !!env.NEXT_PUBLIC_SUPABASE_URL && !!env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
   billingLive: !!env.STRIPE_SECRET_KEY && !!env.STRIPE_PRICE_PRO,
   emailLive: !!env.RESEND_API_KEY,
+  pushLive: !!env.NEXT_PUBLIC_VAPID_PUBLIC_KEY && !!env.VAPID_PRIVATE_KEY,
 };
