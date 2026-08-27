@@ -40,7 +40,8 @@ import { goalsContextBlock, findOrCreateGoal, decomposeGoal } from "@/lib/goals"
 import { detectGoalIntent } from "@/lib/goal-intent";
 import { dailyActivityLog } from "@/lib/daily-log";
 import { extractReachoutOffer } from "@/lib/reachout-intent";
-import { scheduleReachout } from "@/lib/push-client";
+import { detectReachoutRequest } from "@/lib/when";
+import { scheduleReachout, scheduleReachoutAt, currentPushStatus } from "@/lib/push-client";
 import { detectFocusIntent, extractFocusOffer, type FocusIntent } from "@/lib/focus-intent";
 import { recordNavUse } from "@/lib/nav-hint";
 import { evaluatePresence, markPresenceShown, dismissPresence, recordPresenceOutcome, maybeNotify, presenceContextBlock, type PresenceSignal } from "@/lib/presence";
@@ -157,6 +158,21 @@ export function CompanionPresence() {
 
     // A declared ambition becomes a campaign: create + decompose quietly; the reply still talks it through.
     try { const gi = detectGoalIntent(q); if (gi) { const { goal, created } = findOrCreateGoal(gi.goal); if (created) decomposeGoal(goal.id).catch(() => {}); } } catch {}
+
+    // Explicit "check on me at 7:30" — schedule a real, on-time reach-out here too.
+    const roReq = detectReachoutRequest(q);
+    if (roReq) {
+      const status = await currentPushStatus();
+      const ok = await scheduleReachoutAt(roReq.fireAt, roReq.message);
+      const text = !ok
+        ? "I couldn't set that up — make sure you're signed in, then try again."
+        : status !== "on"
+          ? `Done — I'll check in ${roReq.label}. Turn on reach-outs in Settings → Notifications so I can actually notify you.`
+          : `Done — I'll check in ${roReq.label}. I've got it from here.`;
+      setMsgs((m) => [...m, { id: `a_${Date.now()}`, from: "synapse", text }]);
+      scroll();
+      return;
+    }
 
     // Locking in? Offer to keep time right here — the timer starts the moment they pick a length.
     const fIntent = detectFocusIntent(q);

@@ -13,7 +13,7 @@ import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
   ArrowRight, ArrowLeft, Briefcase, GraduationCap, Target, Dumbbell,
-  Repeat, Flame, HeartPulse, Compass, Sparkles, Loader2,
+  Repeat, Flame, HeartPulse, Compass, Sparkles, Loader2, BellRing,
 } from "lucide-react";
 import { Card, CardBody, Button } from "@/components/ui/primitives";
 import { SynapseOrb } from "@/components/synapse/orb";
@@ -171,6 +171,10 @@ export function OnboardingFlow() {
                   ))}
                 </div>
               </div>
+              <p className="flex items-start gap-2 rounded-xl border border-orange-500/20 bg-orange-500/5 px-3 py-2.5 text-xs leading-relaxed text-muted">
+                <BellRing className="mt-0.5 h-4 w-4 shrink-0 text-orange-500" />
+                <span>To really keep you accountable, I can reach out with a notification at the moment it matters — even when the app is closed. You&apos;ll switch that on in a few taps under Settings → Notifications. It&apos;s worth it.</span>
+              </p>
             </Shell>
           )}
 

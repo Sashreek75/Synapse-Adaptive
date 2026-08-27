@@ -136,6 +136,27 @@ export async function scheduleReachout(
   } catch { return false; }
 }
 
+/** Schedule a reach-out at an absolute time (used for user-requested "check on me at 7:30"). */
+export async function scheduleReachoutAt(
+  fireAt: Date,
+  message: string,
+  opts: { url?: string; title?: string; dedupeKey?: string } = {},
+): Promise<boolean> {
+  try {
+    const token = await accessToken();
+    if (!token) return false;
+    const res = await fetch("/api/push/schedule", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        token, fireAt: fireAt.toISOString(), body: message,
+        title: opts.title || "Synapse", url: opts.url || "/dashboard", dedupeKey: opts.dedupeKey,
+      }),
+    });
+    return res.ok;
+  } catch { return false; }
+}
+
 /** Fire a server-sent test notification to confirm the whole loop works. */
 export async function sendTestPush(): Promise<boolean> {
   const token = await accessToken();

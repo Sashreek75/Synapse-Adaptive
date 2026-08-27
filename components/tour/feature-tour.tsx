@@ -7,7 +7,7 @@
  */
 
 import { useState } from "react";
-import { ArrowRight, Compass, Target, ShieldCheck, Wrench, Sparkles } from "lucide-react";
+import { ArrowRight, Compass, Target, ShieldCheck, Wrench, Sparkles, BellRing } from "lucide-react";
 import { useHealth } from "@/components/providers/health-store";
 import { SynapseOrb } from "@/components/synapse/orb";
 import { Button } from "@/components/ui/primitives";
@@ -28,6 +28,11 @@ const steps = [
     icon: ShieldCheck,
     title: "It won't let it slip",
     body: "It remembers what you committed to, notices when you go quiet, and reaches out when it genuinely matters — keeping you accountable, never nagging.",
+  },
+  {
+    icon: BellRing,
+    title: "Let it actually reach out — turn this on",
+    body: "This is where most of the accountability comes from: Synapse can check in with a real notification at the exact moment it matters — even when this tab is closed. Just say “check on me at 7:30,” or it'll set the time itself. Flip it on in Settings → Notifications → “Let Synapse reach out first.” Skip this and it can only help when you remember to open it.",
   },
   {
     icon: Wrench,

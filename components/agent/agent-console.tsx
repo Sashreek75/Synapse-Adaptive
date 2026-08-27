@@ -16,7 +16,8 @@ import { pftContextBlock } from "@/lib/pft";
 import { detectGoalIntent } from "@/lib/goal-intent";
 import { dailyActivityLog } from "@/lib/daily-log";
 import { extractReachoutOffer } from "@/lib/reachout-intent";
-import { scheduleReachout } from "@/lib/push-client";
+import { detectReachoutRequest } from "@/lib/when";
+import { scheduleReachout, scheduleReachoutAt, currentPushStatus } from "@/lib/push-client";
 import { useRouter } from "next/navigation";
 import { detectNavIntent } from "@/lib/nav-intent";
 import { NAV_HINT_EXAMPLES, shouldShowNavHints, recordNavUse } from "@/lib/nav-hint";
@@ -306,6 +307,20 @@ export function AgentConsole({ embedded = false, immersive = false }: { embedded
     const fIntent = detectFocusIntent(q);
     if (fIntent.focus && !focusActive && !loadSession()) { setPendingFocus(fIntent); setBusy(false); scrollDown(); return; }
     setPendingFocus(null);
+    // Explicit "check on me at 7:30" — schedule a real reach-out deterministically (no model round-trip),
+    // so the promise is kept exactly on time. Confirm, and be honest if reach-outs aren't turned on.
+    const roReq = detectReachoutRequest(q);
+    if (roReq) {
+      const status = await currentPushStatus();
+      const ok = await scheduleReachoutAt(roReq.fireAt, roReq.message);
+      let line: string;
+      if (!ok) line = "I couldn't set that up — make sure you're signed in, then try again.";
+      else if (status !== "on") line = `Done — I'll check in ${roReq.label}. One thing: reach-outs are currently off, so turn them on in Settings → Notifications, or I won't be able to actually notify you.`;
+      else line = `Done — I'll check in ${roReq.label}. Go do your thing; I've got this on my end.`;
+      setChat([...next, { id: `a_${Date.now()}`, role: "assistant" as const, content: line }]);
+      setBusy(false); scrollDown();
+      return;
+    }
     const nav = detectNavIntent(q);
     if (nav) {
       recordNavUse();
