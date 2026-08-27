@@ -41,6 +41,7 @@ import { detectGoalIntent } from "@/lib/goal-intent";
 import { dailyActivityLog } from "@/lib/daily-log";
 import { extractReachoutOffer } from "@/lib/reachout-intent";
 import { detectReachoutRequest } from "@/lib/when";
+import { classifyReply } from "@/lib/affirmation";
 import { scheduleReachout, scheduleReachoutAt, currentPushStatus } from "@/lib/push-client";
 import { detectFocusIntent, extractFocusOffer, type FocusIntent } from "@/lib/focus-intent";
 import { recordNavUse } from "@/lib/nav-hint";
@@ -226,6 +227,13 @@ export function CompanionPresence() {
         ...convictionContextLines(),
         mom.observation ? "Momentum: " + mom.observation : "",
         recent ? "RECENT CONVERSATION (continue it naturally, don't repeat yourself):" + NL + recent : "",
+        (() => {
+          const prior = [...msgs].reverse().find((mm) => mm.from === "synapse" && mm.id !== "intro");
+          const r = prior ? classifyReply(q) : null;
+          if (r === "affirm") return `IMPORTANT: "${q}" is a short YES to your previous message (treat "eys"/"k"/"sure" as yes). Do NOT repeat it — act on what you just proposed.`;
+          if (r === "deny") return `IMPORTANT: "${q}" is a short NO to your previous message. Acknowledge briefly and move on; don't repeat the offer.`;
+          return "";
+        })(),
       ].filter(Boolean).join(NL);
       const res = await fetch("/api/chat", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ message: q, tier, context: ctx }) });
       const data = await res.json();

@@ -94,9 +94,11 @@ export function detectReachoutRequest(text: string, now: Date = new Date()): { f
   if (!text || !TRIGGER.test(text)) return null;
   const when = parseWhen(text, now);
   if (!when) return null;
-  // Try to capture what it's about ("...to email the professor").
-  const to = text.match(/\bto\s+(.{3,80}?)(?:\s+(?:at|in|by|tonight|tomorrow)\b|[.!?]|$)/i);
-  const about = to ? to[1].trim().replace(/[.!?]+$/, "") : "";
-  const message = about ? `You wanted to ${about} — did you?` : "Checking in — how's it going?";
+  // Try to capture what it's about. Prefer "remind me to X"; else "to X" but skip the filler "to me".
+  const tail = /(?:\s+(?:at|in|by|tonight|tomorrow|this)\b|[.!?]|$)/i.source;
+  const m1 = text.match(new RegExp(`\\bremind me to\\s+(.{2,80}?)${tail}`, "i"));
+  const m2 = m1 ? null : text.match(new RegExp(`\\bto\\s+(?!me\\b)(.{2,80}?)${tail}`, "i"));
+  const about = (m1?.[1] || m2?.[1] || "").trim().replace(/[.!?]+$/, "");
+  const message = about ? `Reminder: ${about}.` : "Checking in — how's it going?";
   return { fireAt: when.fireAt, label: when.label, message };
 }

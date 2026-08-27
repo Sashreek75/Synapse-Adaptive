@@ -17,6 +17,7 @@ import { detectGoalIntent } from "@/lib/goal-intent";
 import { dailyActivityLog } from "@/lib/daily-log";
 import { extractReachoutOffer } from "@/lib/reachout-intent";
 import { detectReachoutRequest } from "@/lib/when";
+import { classifyReply } from "@/lib/affirmation";
 import { scheduleReachout, scheduleReachoutAt, currentPushStatus } from "@/lib/push-client";
 import { useRouter } from "next/navigation";
 import { detectNavIntent } from "@/lib/nav-intent";
@@ -341,7 +342,16 @@ export function AgentConsole({ embedded = false, immersive = false }: { embedded
         if (priorUser) memoryPreamble = `Things the user has discussed with you in the past (they cleared the visible chat for a fresh start, but you DO remember everything — act like it, reference it naturally when relevant):\n${priorUser}\n\n`;
       } catch {}
       const nowLine = `Right now it is ${new Date().toLocaleString(undefined, { weekday: "long", month: "long", day: "numeric", year: "numeric", hour: "numeric", minute: "2-digit" })} — the user is messaging you at this exact moment. Anchor every time word to this: "today" is this date, "tonight" is this evening, "tomorrow" is the day after. If a commitment or plan is set for a future day, it is NOT happening yet — never tell them to start it now.`;
-      const fullContext = `${nowLine}\n\n${memoryPreamble}${context}${transcript ? `\n\nRecent conversation:\n${transcript}` : ""}`;
+      // If this is a terse yes/no to your last message (typos and all: "eys"="yes"), tell the model to
+      // ACT on its previous offer rather than re-asking — the #1 cause of "it just repeated itself."
+      const priorAssistant = [...next].reverse().find((m) => m.role === "assistant");
+      const reply = priorAssistant ? classifyReply(q) : null;
+      const replyNote = reply === "affirm"
+        ? `\n\nIMPORTANT: The user's message "${q}" is a short YES to your previous message (read typos generously — treat "eys"/"k"/"sure" as yes). Do NOT repeat or rephrase your previous message. Proceed and take the next concrete step on whatever you just proposed.`
+        : reply === "deny"
+          ? `\n\nIMPORTANT: The user's message "${q}" is a short NO/decline to your previous message. Acknowledge it in one line and move on — do NOT repeat the same offer.`
+          : "";
+      const fullContext = `${nowLine}\n\n${memoryPreamble}${context}${transcript ? `\n\nRecent conversation:\n${transcript}` : ""}${replyNote}`;
       const res = await fetch("/api/chat", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ message: q, tier: plan, context: fullContext }) });
       const data = await res.json();
       const rec = extractRecTag(String(data.content ?? ""));
