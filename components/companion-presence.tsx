@@ -175,8 +175,9 @@ export function CompanionPresence() {
       return;
     }
 
-    // Locking in? Offer to keep time right here — the timer starts the moment they pick a length.
-    const fIntent = detectFocusIntent(q);
+    // Only offer a timer when explicitly asked — never just because they mentioned work.
+    const asksTimer = /\b(timer|time me|pomodoro|set a timer|start (a|the) (timer|focus session|session|pomodoro))\b/i.test(q);
+    const fIntent = asksTimer ? detectFocusIntent(q) : { focus: false as const };
     if (fIntent.focus && !loadSession()) {
       setPendingFocus(fIntent);
       setMsgs((m) => [...m, { id: `a_${Date.now()}`, from: "synapse", text: fIntent.goal ? "On it — " + fIntent.goal + ". How long shall I keep time?" : "On it. How long shall I keep time?" }]);

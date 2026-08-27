@@ -138,14 +138,13 @@ export function AgentConsole({ embedded = false, immersive = false }: { embedded
       ...convictionContextLines(),
       (() => {
         const aw = commitmentAwaitingReport();
-        if (aw) return `A PROMISE THEY MADE TO THEMSELVES (still open, from a previous session): "${aw.text}". This is the single most important thread right now. OPEN the conversation by gently asking whether it happened — do not wait for them to raise it. If they did it, name it as who they are becoming. If they did not, do not glide past it: ask what got in the way, then help them restart it, make it smaller, or consciously swap it for something higher-leverage. It never just disappears.`;
+        if (aw) return `A PROMISE THEY MADE TO THEMSELVES (still open, from a previous session): "${aw.text}". Follow up on this — but ONLY after you have helped with whatever they actually brought to THIS message. If their message is a question or a task, answer/help with it FIRST; then, if it fits, fold in a light, optional check ("by the way — did yesterday's block happen?"). NEVER open with this, and never let it override or delay what they're asking right now. If they did it, name it as who they're becoming; if not, ask what got in the way and help them restart, shrink, or swap it. It doesn't disappear — but helping them comes first.`;
         const oc = openCommitment();
         return oc ? `The commitment they set today (a promise to themselves): "${oc.text}". Hold them to it warmly and weave it in when relevant.` : "";
       })(),
       "App capability: their numbers exist behind the scenes, but lead with what they MEAN and where they're headed, not charts. If they want to SEE their numbers, the app takes them there when they ask, then summarize the key movements in plain words.",
       "If they want to check in, reflect, see their numbers, or open their weekly review, the app takes them there automatically the moment they ask, so NEVER hand out links or file paths (never write things like slash-daily). Refer to places by name: today's snapshot, your numbers, your weekly review, the You page.",
-      "A focus timer is a tool you OFFER when it would genuinely help them BEGIN deep work — offer it and append the tag [[focus: what they're working on | minutes]] (minutes optional); it becomes a \"Start a focus session\" button. Decide from context, never keywords: only when they're actually starting work, never when they're reflecting on a past session, venting, or need care. If they explicitly ask (\"time me for 25\"), a chooser appears automatically.",
-      "Short cognitive 'sharpness' tasks exist if they want them; if you suggest one, just say so in plain words, no links or paths.",
+      "You can BUILD things on request — a tracker, a progress dashboard, a report or essay draft, a checklist, a decision board, a practice space, a study plan, even a timer — and take them into it. Do this ONLY when they ask for it or clearly want it; never push a tool (especially a timer) just because they mentioned work. If something they ask for is genuinely outside what you can make, say so plainly and offer the closest thing you can actually do.",
     ].filter(Boolean).join("\n");
     if (!hasData) return who;
     const lines = series.map((s) => {
@@ -303,9 +302,10 @@ export function AgentConsole({ embedded = false, immersive = false }: { embedded
     }
     // A declared ambition becomes a campaign: create + decompose quietly; the reply still talks it through.
     try { const gi = detectGoalIntent(q); if (gi) { const { goal, created } = findOrCreateGoal(gi.goal); if (created) decomposeGoal(goal.id).catch(() => {}); } } catch {}
-    // Locking in? Offer the timer immediately — deterministic, no model round-trip (that race
-    // was showing the chooser a message late). The chooser renders from pendingFocus below.
-    const fIntent = detectFocusIntent(q);
+    // A timer is a tool, not a reflex. Only offer it when they EXPLICITLY ask for one ("time me for 25",
+    // "start a timer/pomodoro") — never just because they mentioned studying or working.
+    const asksTimer = /\b(timer|time me|pomodoro|set a timer|start (a|the) (timer|focus session|session|pomodoro))\b/i.test(q);
+    const fIntent = asksTimer ? detectFocusIntent(q) : { focus: false as const };
     if (fIntent.focus && !focusActive && !loadSession()) { setPendingFocus(fIntent); setBusy(false); scrollDown(); return; }
     setPendingFocus(null);
     // Explicit "check on me at 7:30" — schedule a real reach-out deterministically (no model round-trip),
