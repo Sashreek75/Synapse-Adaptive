@@ -157,6 +157,22 @@ export async function scheduleReachoutAt(
   } catch { return false; }
 }
 
+export interface RecentReachout { id: string; title: string; body: string; url: string | null; fireAt: string }
+
+/** Reach-outs that already came due in the last 24h (for the offline catch-up on app open). */
+export async function fetchRecentReachouts(): Promise<RecentReachout[]> {
+  try {
+    const token = await accessToken();
+    if (!token) return [];
+    const res = await fetch("/api/push/recent", {
+      method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ token }),
+    });
+    if (!res.ok) return [];
+    const data = (await res.json()) as { reachouts?: RecentReachout[] };
+    return Array.isArray(data.reachouts) ? data.reachouts : [];
+  } catch { return []; }
+}
+
 /** Fire a server-sent test notification to confirm the whole loop works. */
 export async function sendTestPush(): Promise<boolean> {
   const token = await accessToken();

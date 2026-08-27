@@ -123,6 +123,23 @@ export async function duePending(nowIso: string, limit = 100): Promise<DueReacho
   }
 }
 
+export interface RecentReachout { id: string; title: string; body: string; url: string | null; fire_at: string }
+
+/** Reach-outs for a user whose time has already passed within a recent window — used for the
+ * client "catch-up" so a reminder that came due while the computer was off still shows on reopen. */
+export async function recentDueForUser(userId: string, sinceIso: string, nowIso: string): Promise<RecentReachout[]> {
+  if (!URL || !SERVICE) return [];
+  try {
+    const res = await sb(
+      `scheduled_reachouts?user_id=eq.${userId}&fire_at=lte.${encodeURIComponent(nowIso)}&fire_at=gte.${encodeURIComponent(sinceIso)}&select=id,title,body,url,fire_at&order=fire_at.desc&limit=20`,
+    );
+    if (!res.ok) return [];
+    return (await res.json()) as RecentReachout[];
+  } catch {
+    return [];
+  }
+}
+
 export async function markReachout(id: string, status: "sent" | "failed" | "canceled"): Promise<void> {
   if (!URL || !SERVICE) return;
   const patch: Record<string, unknown> = { status };
@@ -141,7 +158,7 @@ export async function sendToSubscription(sub: PushSub, payload: PushPayload): Pr
     await webpush.sendNotification(
       { endpoint: sub.endpoint, keys: { p256dh: sub.p256dh, auth: sub.auth } },
       JSON.stringify(payload),
-      { TTL: 12 * 3600 },
+      { TTL: 24 * 3600 }, // push service holds it up to 24h and delivers when the device reconnects
     );
     return { ok: true, gone: false };
   } catch (err) {
