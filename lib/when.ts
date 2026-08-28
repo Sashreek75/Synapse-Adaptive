@@ -72,8 +72,8 @@ export function parseWhen(text: string, now: Date = new Date()): WhenResult | nu
     const d = clockTime(parseInt(m[1], 10), m[2] ? parseInt(m[2], 10) : 0, m[3][0] === "a" ? "am" : "pm", now, dayHint);
     if (d) return finalize(d, now);
   }
-  // "at 7:30" / "at 18:00" (no am/pm)
-  m = t.match(/\bat\s+(\d{1,2})(?::(\d{2}))?\b/);
+  // "at 7:30" / "for 8" / "by 18:00" (no am/pm)
+  m = t.match(/\b(?:at|for|by|around)\s+(\d{1,2})(?::(\d{2}))?\b/);
   if (m) {
     const d = clockTime(parseInt(m[1], 10), m[2] ? parseInt(m[2], 10) : 0, null, now, dayHint);
     if (d) return finalize(d, now);
@@ -87,7 +87,7 @@ function finalize(d: Date, now: Date): WhenResult {
   return { fireAt: clamped, label: fmt(clamped) };
 }
 
-const TRIGGER = /\b(check (in )?(on|up on|with)? ?me|check on me|check in|remind me|nudge me|ping me|reach out to me|follow up with me|hold me accountable|wake me)\b/i;
+const TRIGGER = /\b(remind me|reminder\b|(?:give me|set|make|create|add|leave me|need|want|schedule)\s+(?:a|an|me a|me an)?\s*reminder|check (in )?(on|up on|with)? ?me|check on me|check in|nudge me|ping me|reach out to me|follow up with me|hold me accountable|wake me|tell me to)\b/i;
 
 /** A user explicitly asking to be checked on at a time → a concrete reach-out to schedule. */
 export function detectReachoutRequest(text: string, now: Date = new Date()): { fireAt: Date; label: string; message: string } | null {
@@ -95,7 +95,7 @@ export function detectReachoutRequest(text: string, now: Date = new Date()): { f
   const when = parseWhen(text, now);
   if (!when) return null;
   // Try to capture what it's about. Prefer "remind me to X"; else "to X" but skip the filler "to me".
-  const tail = /(?:\s+(?:at|in|by|tonight|tomorrow|this)\b|[.!?]|$)/i.source;
+  const tail = /(?:\s+(?:at|by|tonight|tomorrow|this)\b|\s+in\s+\d|[.!?]|$)/i.source;
   const m1 = text.match(new RegExp(`\\bremind me to\\s+(.{2,80}?)${tail}`, "i"));
   const m2 = m1 ? null : text.match(new RegExp(`\\bto\\s+(?!me\\b)(.{2,80}?)${tail}`, "i"));
   const about = (m1?.[1] || m2?.[1] || "").trim().replace(/[.!?]+$/, "");
