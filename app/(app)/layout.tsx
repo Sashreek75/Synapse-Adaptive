@@ -10,6 +10,8 @@ import { FeatureTour } from "@/components/tour/feature-tour";
 import { FocusCompanion } from "@/components/focus/focus-companion";
 import { CompanionPresence } from "@/components/companion-presence";
 import { ReachoutCatchup } from "@/components/reachout-catchup";
+import { ProactiveScheduler } from "@/components/proactive-scheduler";
+import { SynapseAlert } from "@/components/synapse-alert";
 
 /**
  * THE FRAME — deliberately almost nothing.
@@ -43,6 +45,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
 
             <main className="min-h-0 flex-1 overflow-y-auto overscroll-none">
               <div className="mx-auto w-full max-w-3xl px-4 py-5 sm:px-5 sm:py-9">
+                <SynapseAlert />
                 {children}
               </div>
             </main>
@@ -50,6 +53,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
           <FocusCompanion />
           <CompanionPresence />
           <ReachoutCatchup />
+          <ProactiveScheduler />
         </AuthGuard>
       </SubscriptionProvider>
     </HealthProvider>

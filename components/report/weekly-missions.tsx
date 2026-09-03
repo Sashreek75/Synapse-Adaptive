@@ -35,31 +35,15 @@ export function WeeklyMissions() {
   const [recs, setRecs] = useState<Recommendation[]>([]);
 
   useEffect(() => {
-    const sync = () => { setGoals(activeGoals()); setSpaces(activeWorkspaces()); };
+    const sync = () => { setGoals(activeGoals()); setSpaces([]); }; // Spaces removed — focus is decisions.
     sync();
     const oc = openCommitment();
     setOpenC(oc ? oc.text : null); setWins(winsLine()); setDrift(driftLine());
     const syncD = () => { setSelfReview(selfReviewLine()); setRecs(openRecommendations(40)); };
     syncD();
-    window.addEventListener("synapse:workspaces", sync);
     window.addEventListener("synapse:goals", sync);
     window.addEventListener("synapse:decisions", syncD);
-
-    // Once-per-week evolve pass: mature each space, still gated by approval inside it.
-    void (async () => {
-      const key = `synapse.wsEvolve.${weekKey()}`;
-      let done = false; try { done = localStorage.getItem(key) === "1"; } catch {}
-      const list = activeWorkspaces();
-      if (done || list.length === 0) return;
-      setEvolving(true);
-      try {
-        for (const w of list) { try { await evolveWorkspace(w.id); } catch {} }
-        try { localStorage.setItem(key, "1"); } catch {}
-        setSpaces(activeWorkspaces());
-      } finally { setEvolving(false); }
-    })();
-
-    return () => { window.removeEventListener("synapse:workspaces", sync); window.removeEventListener("synapse:goals", sync); window.removeEventListener("synapse:decisions", syncD); };
+    return () => { window.removeEventListener("synapse:goals", sync); window.removeEventListener("synapse:decisions", syncD); };
   }, []);
 
   const judge = (id: string, status: RecStatus) => { reviewRecommendation(id, status); setRecs(openRecommendations(40)); setSelfReview(selfReviewLine()); };

@@ -42,6 +42,8 @@ import { dailyActivityLog } from "@/lib/daily-log";
 import { extractReachoutOffer } from "@/lib/reachout-intent";
 import { detectReachoutRequest } from "@/lib/when";
 import { classifyReply } from "@/lib/affirmation";
+import { obligationsContextBlock } from "@/lib/obligations";
+import { situationContextBlock } from "@/lib/situation";
 import { scheduleReachout, scheduleReachoutAt, currentPushStatus } from "@/lib/push-client";
 import { detectFocusIntent, extractFocusOffer, type FocusIntent } from "@/lib/focus-intent";
 import { recordNavUse } from "@/lib/nav-hint";
@@ -78,7 +80,7 @@ function describePage(p: string): string {
 export function CompanionPresence() {
   const router = useRouter();
   const pathname = usePathname();
-  const { mind, checkIns, contextNotes, addObservation } = useHealth();
+  const { mind, profile, checkIns, contextNotes, addObservation } = useHealth();
   const { plan: tier } = useSubscription();
   const [focusActive, setFocusActive] = useState(false);
   const [open, setOpen] = useState(false);
@@ -149,14 +151,6 @@ export function CompanionPresence() {
 
     if (preGate(q).triggered) { setMsgs((m) => [...m, { id: `a_${Date.now()}`, from: "synapse", text: CRISIS_RESPONSE }]); return; }
 
-    // Reshape the product: build them a space and take them into it — never "I can't".
-    if (detectBuildIntent(q)) {
-      setMsgs((m) => [...m, { id: `a_${Date.now()}`, from: "synapse", text: "On it — building you a space for that." }]);
-      scroll();
-      createWorkspaceFromRequest(q, { goal: mind?.trajectory?.statement }).then((ws) => { setOpen(false); try { router.push("/workspaces/" + ws.id); } catch {} }).catch(() => {});
-      return;
-    }
-
     // A declared ambition becomes a campaign: create + decompose quietly; the reply still talks it through.
     try { const gi = detectGoalIntent(q); if (gi) { const { goal, created } = findOrCreateGoal(gi.goal); if (created) decomposeGoal(goal.id).catch(() => {}); } } catch {}
 
@@ -219,10 +213,11 @@ export function CompanionPresence() {
         challengeContextBlock(),
         decisionsContextBlock(),
         principlesContextBlock(),
-        workspaceContextBlock(),
         evidenceContextBlock(checkIns),
         pftContextBlock(),
         presenceContextBlock(),
+        situationContextBlock(),
+        obligationsContextBlock(profile),
         activityContextBlock(),
         dailyActivityLog(contextNotes),
         ...convictionContextLines(),

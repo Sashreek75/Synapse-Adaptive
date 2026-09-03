@@ -14,7 +14,7 @@ import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { Home, CreditCard, Settings, FileText, CalendarCheck, Menu, X, LogOut, LogIn, Target, Sparkles, MessageCircle, Timer, BarChart3, LayoutGrid } from "lucide-react";
+import { Home, CreditCard, Settings, FileText, CalendarCheck, Menu, X, LogOut, LogIn, Target, Sparkles, MessageCircle, Timer, BarChart3, LayoutGrid, NotebookPen } from "lucide-react";
 import { SynapseOrb } from "@/components/synapse/orb";
 import { useAuth } from "@/components/providers/auth-provider";
 import { cn } from "@/lib/utils";
@@ -35,6 +35,7 @@ const asks: Ask[] = [
 const rooms: Room[] = [
   { href: "/dashboard", label: "Talk", icon: Home, blurb: "The main conversation" },
   { href: "/goals", label: "Goals", icon: Target, blurb: "What you're working toward" },
+  { href: "/planner", label: "Planner", icon: NotebookPen, blurb: "Your tasks & notes — what I plan around" },
   { href: "/daily", label: "Daily Snapshot", icon: CalendarCheck, blurb: "Capture or reflect on today" },
   { href: "/report", label: "Weekly Review", icon: FileText, blurb: "Your weekly reflection" },
   { href: "/stats", label: "Progress", icon: BarChart3, blurb: "Am I actually getting better?" },
@@ -42,7 +43,6 @@ const rooms: Room[] = [
 ];
 
 const manage: Room[] = [
-  { href: "/workspaces", label: "Spaces", icon: LayoutGrid, blurb: "Anything I've built for you" },
   { href: "/settings", label: "Settings", icon: Settings, blurb: "Preferences, data & privacy" },
   { href: "/billing", label: "Plan & billing", icon: CreditCard, blurb: "Your plan" },
 ];

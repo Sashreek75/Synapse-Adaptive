@@ -24,6 +24,8 @@ import { detectNavIntent } from "@/lib/nav-intent";
 import { NAV_HINT_EXAMPLES, shouldShowNavHints, recordNavUse } from "@/lib/nav-hint";
 import { newSession, saveSession, loadSession, DURATION_PRESETS } from "@/lib/focus-session";
 import { openCommitment, commitmentAwaitingReport, loadCommitments } from "@/lib/commitments";
+import { obligationsContextBlock, topGoalTitle, looksLikeStudent } from "@/lib/obligations";
+import { situationContextBlock, buildSituation } from "@/lib/situation";
 import { readMomentum } from "@/lib/momentum";
 import { convictionContextLines } from "@/lib/convictions";
 import { witness, activityContextBlock } from "@/lib/activity";
@@ -121,7 +123,6 @@ export function AgentConsole({ embedded = false, immersive = false }: { embedded
       challengeContextBlock(),
       decisionsContextBlock(),
       principlesContextBlock(),
-      workspaceContextBlock(),
       evidenceContextBlock(checkIns),
       pftContextBlock(),
       (mind.trajectory?.statement || profile.definitionOfBetter) && `Working to become: ${mind.trajectory?.statement || profile.definitionOfBetter} (the objective — weigh advice against whether it moves them toward this)`,
@@ -144,7 +145,9 @@ export function AgentConsole({ embedded = false, immersive = false }: { embedded
       })(),
       "App capability: their numbers exist behind the scenes, but lead with what they MEAN and where they're headed, not charts. If they want to SEE their numbers, the app takes them there when they ask, then summarize the key movements in plain words.",
       "If they want to check in, reflect, see their numbers, or open their weekly review, the app takes them there automatically the moment they ask, so NEVER hand out links or file paths (never write things like slash-daily). Refer to places by name: today's snapshot, your numbers, your weekly review, the You page.",
-      "You can BUILD things on request — a tracker, a progress dashboard, a report or essay draft, a checklist, a decision board, a practice space, a study plan, even a timer — and take them into it. Do this ONLY when they ask for it or clearly want it; never push a tool (especially a timer) just because they mentioned work. If something they ask for is genuinely outside what you can make, say so plainly and offer the closest thing you can actually do.",
+      "Your job is DECISIONS and follow-through, not building apps — never offer to 'build a space/tool' or generate documents; that's not what you're for, and they have other tools for that. If they want to organize tasks or notes, that lives in their Planner (you can point them there). Stay on the one thing you're uniquely good at: helping them decide what matters and actually do it.",
+      situationContextBlock(),
+      obligationsContextBlock(profile),
     ].filter(Boolean).join("\n");
     if (!hasData) return who;
     const lines = series.map((s) => {
@@ -247,9 +250,18 @@ export function AgentConsole({ embedded = false, immersive = false }: { embedded
     // Every so often, share a question I'm genuinely still working on (curiosity).
     if (openQ && checkIns.length % 3 === 0) parts.push(`I'm still trying to understand ${lowerFirst(openQ.question)} — something we could dig into together.`);
 
-    // A soft, optional next step so there's always somewhere to go.
-    if (op.recommendation?.title) parts.push(`**Next step:** ${op.recommendation.title.replace(/\.$/, "")} — want me to explain why it fits you right now?`);
-    else parts.push(`What do you want to make progress on today?`);
+    // Lead with the biggest force acting on them right now. If the whole-board read surfaces a real
+    // signal (overload / obligations-beat-goals / drift), open with THAT — the confident call. Only
+    // when the board is clear do we ask what's on their plate (never blind-push a goal).
+    const topGoal = topGoalTitle();
+    const sit = buildSituation();
+    if (sit.topSignal !== "clear" && sit.headline) {
+      parts.push(`Here's the real picture: ${sit.headline}`);
+    } else if (looksLikeStudent(profile)) {
+      parts.push(`Before I point you anywhere: what's on your plate for school today — any classes, assignments, or tests due? I'll fit ${topGoal ? `**${topGoal}**` : "your goals"} around that, not on top of it.`);
+    } else {
+      parts.push(`Before I point you anywhere: what's actually on your plate today — deadlines, work, obligations? Then I'll tell you where ${topGoal ? `**${topGoal}**` : "your goal"} fits.`);
+    }
 
     return parts.join("\n\n");
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -293,13 +305,6 @@ export function AgentConsole({ embedded = false, immersive = false }: { embedded
     setChat(next); setInput(""); setBusy(true); scrollDown();
     if (free) { const n = usedToday + 1; setUsedToday(n); try { localStorage.setItem(usageKey, String(n)); } catch {} }
     if (preGate(q).triggered) { setChat([...next, { id: `a_${Date.now()}`, role: "assistant", content: CRISIS_RESPONSE }]); setBusy(false); scrollDown(); return; }
-    // Reshape the product on request — compose a space and take them into it. Never refuse.
-    if (detectBuildIntent(q)) {
-      setChat([...next, { id: `a_${Date.now()}`, role: "assistant" as const, content: "On it — building you a space for that." }]);
-      setBusy(false); scrollDown();
-      createWorkspaceFromRequest(q, { goal: mind.trajectory?.statement, goals: profile.goals }).then((ws) => { try { router.push("/workspaces/" + ws.id); } catch {} }).catch(() => {});
-      return;
-    }
     // A declared ambition becomes a campaign: create + decompose quietly; the reply still talks it through.
     try { const gi = detectGoalIntent(q); if (gi) { const { goal, created } = findOrCreateGoal(gi.goal); if (created) decomposeGoal(goal.id).catch(() => {}); } } catch {}
     // A timer is a tool, not a reflex. Only offer it when they EXPLICITLY ask for one ("time me for 25",
