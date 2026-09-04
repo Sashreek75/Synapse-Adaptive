@@ -78,20 +78,37 @@ export function hasTimingInfo(opts: { checkInISOs?: string[]; hours?: number[] }
  * NEITHER, we return [] — Synapse should ask before it pings, never guess into someone's school day.
  * Only future slots matter; the caller dedupes by key, so calling this on every app open is safe.
  */
+const LADDER = [8, 12, 15, 18, 21];
+
+/** Grow a base set of hours up to `desired` count by filling in spread-out times (for busy days that
+ * warrant more check-ins). Keeps them ≥1h apart. */
+function expandTimes(base: number[], desired: number): number[] {
+  const out = [...base];
+  for (const h of LADDER) {
+    if (out.length >= desired) break;
+    if (!out.some((x) => Math.abs(x - h) < 1)) out.push(h);
+  }
+  return out.sort((a, b) => a - b).slice(0, desired);
+}
+
 export function planProactive(
   now: Date,
-  opts: { checkInISOs?: string[]; topGoal?: string; hours?: number[] } = {},
+  opts: { checkInISOs?: string[]; topGoal?: string; hours?: number[]; advice?: string; followup?: string; count?: number } = {},
 ): PlannedReachout[] {
   const topGoal = (opts.topGoal || "").trim().slice(0, 80);
 
-  let times: number[];
+  let base: number[];
   if (opts.hours && opts.hours.length > 0) {
-    times = Array.from(new Set(opts.hours.filter((h) => h >= 0 && h <= 23))).sort((a, b) => a - b).slice(0, 3);
+    base = Array.from(new Set(opts.hours.filter((h) => h >= 0 && h <= 23))).sort((a, b) => a - b).slice(0, 5);
   } else {
     const active = typicalActiveHour(opts.checkInISOs || []);
-    if (active == null) return []; // not enough info — don't blind-schedule
-    times = [active];
+    // Prefer their learned active hour; otherwise DON'T stay silent — initiating is the whole point.
+    // Fall back to safe-ish defaults (midday + evening); they can refine exact times in Settings.
+    base = active != null ? [active] : [12, 19];
   }
+  // Frequency scales with the day: 2 is the floor, a crunch day earns up to 5.
+  const desired = Math.min(5, Math.max(base.length, opts.count ?? base.length));
+  const times = expandTimes(base, desired);
 
   const out: PlannedReachout[] = [];
   for (let day = 0; day <= 1; day++) {
@@ -100,8 +117,13 @@ export function planProactive(
     times.forEach((h, idx) => {
       const d = at(now, day, h);
       if (d.getTime() <= now.getTime() + 120_000) return; // past
-      const body = idx === 0 ? planLine(topGoal, variant) : lockInLine(topGoal, variant + idx);
-      out.push({ fireAt: iso(d), title: "Synapse", body, dedupeKey: `pro-${idx === 0 ? "plan" : `s${idx}`}-${dayKey}` });
+      const isFirst = idx === 0;
+      const isLast = idx === times.length - 1;
+      let body: string;
+      if (isFirst) body = opts.advice || planLine(topGoal, variant);          // lead with the real call
+      else if (isLast) body = opts.followup || lockInLine(topGoal, variant + idx); // close with the follow-up
+      else body = opts.advice ? "Quick check — is the priority still moving? Protect the one thing, let the rest wait." : lockInLine(topGoal, variant + idx);
+      out.push({ fireAt: iso(d), title: "Synapse", body, dedupeKey: `pro-${isFirst ? "plan" : `s${idx}`}-${dayKey}` });
     });
   }
   return out;

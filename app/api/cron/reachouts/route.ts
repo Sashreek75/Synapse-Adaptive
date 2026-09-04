@@ -26,18 +26,22 @@ async function run(req: Request) {
   if (!pushConfigured()) return NextResponse.json({ ok: false, error: "unconfigured" }, { status: 503 });
 
   const due = await duePending(new Date().toISOString(), 200);
-  let sent = 0, failed = 0;
+  let delivered = 0, queued = 0;
   for (const r of due) {
-    const delivered = await sendToUser(r.user_id, {
+    const n = await sendToUser(r.user_id, {
       title: r.title,
       body: r.body,
       url: r.url || "/dashboard",
       tag: `synapse-ro-${r.id}`,
     });
-    if (delivered > 0) { await markReachout(r.id, "sent"); sent++; }
-    else { await markReachout(r.id, "failed"); failed++; } // no live device — don't retry forever
+    // Always resolve it so the cron doesn't re-fire it every minute. It is NOT lost if the device was
+    // offline: Web Push holds it (24h TTL) and delivers when the browser reconnects, AND the in-app
+    // catch-up shows any missed reach-out the moment they next open Synapse. A closed laptop delays a
+    // reach-out; it never cancels it.
+    await markReachout(r.id, "sent");
+    if (n > 0) delivered++; else queued++;
   }
-  return NextResponse.json({ ok: true, processed: due.length, sent, failed });
+  return NextResponse.json({ ok: true, processed: due.length, delivered, queued });
 }
 
 export async function GET(req: Request) { return run(req); }

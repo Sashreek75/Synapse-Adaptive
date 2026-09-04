@@ -14,7 +14,7 @@ export async function POST(req: Request) {
   if (!uid) return NextResponse.json({ reachouts: [] });
 
   const now = new Date();
-  const since = new Date(now.getTime() - 24 * 3600_000);
+  const since = new Date(now.getTime() - 48 * 3600_000); // still deliver a reach-out missed while the laptop was closed for a day+
   const rows = await recentDueForUser(uid, since.toISOString(), now.toISOString());
   return NextResponse.json({
     reachouts: rows.map((r) => ({ id: r.id, title: r.title, body: r.body, url: r.url, fireAt: r.fire_at })),

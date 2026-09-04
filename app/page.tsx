@@ -16,7 +16,7 @@ import { Button } from "@/components/ui/primitives";
 import { SynapseOrb } from "@/components/synapse/orb";
 import { Reveal } from "@/components/marketing/reveal";
 import { PricingCTA } from "@/components/marketing/pricing-cta";
-import { IntroTransition } from "@/components/marketing/intro-transition";
+import { ScrollCinematic } from "@/components/marketing/scroll-cinematic";
 import { RobotPresence } from "@/components/marketing/robot-presence";
 import { PLANS, PLAN_ORDER } from "@/lib/billing/plans";
 import { cn } from "@/lib/utils";
@@ -24,10 +24,10 @@ import { cn } from "@/lib/utils";
 export default function LandingPage() {
   return (
     <div className="relative min-h-screen">
-      <IntroTransition />
       <RobotPresence />
       <StructuredData />
       <SiteHeader />
+      <ScrollCinematic />
       <Hero />
       {/* MOBILE gets a short, breathable funnel: hero → the one punchy idea → 3 steps → pricing → CTA.
           Everything heavier is desktop-only so a phone isn't handed a research paper to scroll. */}
