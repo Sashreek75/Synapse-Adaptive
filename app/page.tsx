@@ -17,6 +17,7 @@ import { SynapseOrb } from "@/components/synapse/orb";
 import { Reveal } from "@/components/marketing/reveal";
 import { PricingCTA } from "@/components/marketing/pricing-cta";
 import { ScrollCinematic } from "@/components/marketing/scroll-cinematic";
+import { LandingHeader } from "@/components/marketing/landing-header";
 import { RobotPresence } from "@/components/marketing/robot-presence";
 import { PLANS, PLAN_ORDER } from "@/lib/billing/plans";
 import { cn } from "@/lib/utils";
@@ -26,7 +27,7 @@ export default function LandingPage() {
     <div className="relative min-h-screen">
       <RobotPresence />
       <StructuredData />
-      <SiteHeader />
+      <LandingHeader />
       <ScrollCinematic />
       <Hero />
       {/* MOBILE gets a short, breathable funnel: hero → the one punchy idea → 3 steps → pricing → CTA.
@@ -49,30 +50,6 @@ export default function LandingPage() {
   );
 }
 
-function SiteHeader() {
-  return (
-    <header className="sticky top-0 z-50 border-b glass">
-      <div className="mx-auto flex h-16 max-w-6xl items-center justify-between px-5">
-        <Link href="/" className="flex items-center gap-2.5 font-semibold text-ink">
-          <SynapseOrb size={30} />
-          Synapse Adaptive
-        </Link>
-        <nav className="hidden items-center gap-7 text-sm text-muted md:flex">
-          <a href="#how" className="transition-colors hover:text-ink">How it works</a>
-          <a href="#agent" className="transition-colors hover:text-ink">Meet Synapse</a>
-          <a href="#features" className="transition-colors hover:text-ink">Features</a>
-          <a href="#pricing" className="transition-colors hover:text-ink">Pricing</a>
-          <a href="#faq" className="transition-colors hover:text-ink">FAQ</a>
-        </nav>
-        <div className="flex items-center gap-3">
-          <Link href="/login">
-            <Button size="sm">Open the app <ArrowRight className="h-4 w-4" /></Button>
-          </Link>
-        </div>
-      </div>
-    </header>
-  );
-}
 
 function Hero() {
   return (
