@@ -17,6 +17,7 @@ import { SynapseOrb } from "@/components/synapse/orb";
 import { Reveal } from "@/components/marketing/reveal";
 import { PricingCTA } from "@/components/marketing/pricing-cta";
 import { ScrollCinematic } from "@/components/marketing/scroll-cinematic";
+import { ScrollFX } from "@/components/marketing/scroll-fx";
 import { LandingHeader } from "@/components/marketing/landing-header";
 import { RobotPresence } from "@/components/marketing/robot-presence";
 import { PLANS, PLAN_ORDER } from "@/lib/billing/plans";
@@ -27,6 +28,7 @@ export default function LandingPage() {
     <div className="relative min-h-screen">
       <RobotPresence />
       <StructuredData />
+      <ScrollFX />
       <LandingHeader />
       <ScrollCinematic />
       <Hero />
@@ -100,12 +102,12 @@ function Hero() {
  * no robot. Desktop only; the mobile hero leads with the copy. */
 function HeroProductViz() {
   return (
-    <div className="relative mx-auto hidden w-full max-w-md lg:block [perspective:2000px]">
+    <div data-parallax="0.05" className="relative mx-auto hidden w-full max-w-md lg:block [perspective:2000px]">
       {/* Soft colored aura, drifting slowly behind the card. */}
       <div aria-hidden className="sa-aura absolute -inset-8 -z-10 rounded-[2.5rem] opacity-70 blur-3xl"
         style={{ background: "linear-gradient(100deg, #e79e6f, #c49aa4, #8085c8)" }} />
       {/* A floating slice of the real Synapse UI — a product shot, not stock art — gently rotating in 3D. */}
-      <div className="sa-hero3d overflow-hidden rounded-2xl border bg-surface shadow-lift">
+      <div data-tilt="9" className="sa-hero3d overflow-hidden rounded-2xl border bg-surface shadow-lift">
         <div className="flex">
           {/* slim app rail */}
           <div className="flex w-12 shrink-0 flex-col items-center gap-4 border-r bg-surface-2/60 py-4">
@@ -213,8 +215,8 @@ function Problem() {
         someone who removes the doubt and keeps you moving. The questions that actually stall you:
       </p>
       <div className="mt-10 grid gap-4 sm:grid-cols-2">
-        {qs.map((q) => (
-          <div key={q} className="rounded-2xl border bg-surface px-6 py-5 text-lg text-ink shadow-soft sa-card-hover">
+        {qs.map((q, i) => (
+          <div key={q} data-anim data-i={i} className="rounded-2xl border bg-surface px-6 py-5 text-lg text-ink shadow-soft sa-card-hover">
             <span className="text-orange-500">“</span>{q}<span className="text-orange-500">”</span>
           </div>
         ))}
@@ -241,9 +243,9 @@ function Solution() {
               { icon: Sparkles, t: "Clarity", d: "It reduces the uncertainty until the next step is obvious: one clear action, and the reason behind it. You always know exactly what to do next." },
               { icon: ShieldCheck, t: "Accountability", d: "It remembers what you committed to, notices when you drift, and follows up — and stays honest with you. Accountability, never nagging." },
               { icon: HeartPulse, t: "Support", d: "When a plan, a tool, or a push would help, it's there — breaking the hard thing down and building what you need to actually get through it." },
-            ].map(({ icon: Icon, t, d }) => (
-              <div key={t} className="rounded-2xl border border-white/10 bg-white/5 p-7 backdrop-blur transition-colors hover:bg-white/[0.08]">
-                <span className="grid h-11 w-11 place-items-center rounded-xl bg-orange-500/15">
+            ].map(({ icon: Icon, t, d }, i) => (
+              <div key={t} data-anim data-i={i} className="rounded-2xl border border-white/10 bg-white/5 p-7 backdrop-blur transition-colors hover:bg-white/[0.08]">
+                <span data-pop data-i={i} className="grid h-11 w-11 place-items-center rounded-xl bg-orange-500/15">
                   <Icon className="h-5 w-5 text-orange-300" />
                 </span>
                 <h3 className="mt-5 text-lg font-semibold">{t}</h3>
@@ -270,9 +272,9 @@ function HowItWorks() {
       <div className="relative mt-12 grid gap-6 md:grid-cols-3">
         <div className="absolute left-[16%] right-[16%] top-11 hidden border-t border-dashed border-line md:block" />
         {steps.map(({ icon: Icon, t, d }, i) => (
-          <div key={t} className="relative rounded-2xl border bg-surface p-7 shadow-soft sa-card-hover">
+          <div key={t} data-anim data-i={i} className="relative rounded-2xl border bg-surface p-7 shadow-soft sa-card-hover">
             <div className="flex items-center gap-3">
-              <span className="grid h-11 w-11 place-items-center rounded-xl bg-orange-100 text-orange-600 dark:bg-orange-500/15 dark:text-orange-300">
+              <span data-pop data-i={i} className="grid h-11 w-11 place-items-center rounded-xl bg-orange-100 text-orange-600 dark:bg-orange-500/15 dark:text-orange-300">
                 <Icon className="h-5 w-5" />
               </span>
               <span className="text-sm font-semibold text-muted">Step {i + 1}</span>
@@ -290,7 +292,7 @@ function AgentSpotlight() {
   return (
     <Section id="agent">
       <div className="grid items-center gap-12 lg:grid-cols-2">
-        <div>
+        <div data-anim="left">
           <Eyebrow>The heart of the product</Eyebrow>
           <H2>Synapse notices things — before you ask.</H2>
           <p className="mt-4 text-lg leading-relaxed text-muted">
@@ -316,7 +318,7 @@ function AgentSpotlight() {
         </div>
 
         {/* Sample proactive notice — the product's signature moment */}
-        <div className="rounded-3xl border bg-surface-2 p-2 shadow-lift">
+        <div data-anim="right" className="rounded-3xl border bg-surface-2 p-2 shadow-lift">
           <div className="rounded-2xl border bg-surface p-7">
             <div className="flex items-center gap-3">
               <SynapseOrb size={36} />
@@ -362,9 +364,9 @@ function Features() {
         Does this help you become who you&apos;re trying to become? If not, it isn&apos;t here.
       </p>
       <div className="mt-12 grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
-        {f.map(({ icon: Icon, t, d }) => (
-          <div key={t} className="group rounded-2xl border bg-surface p-7 shadow-soft sa-card-hover">
-            <span className="grid h-11 w-11 place-items-center rounded-xl bg-navy-100 text-navy-600 transition-colors group-hover:bg-orange-100 group-hover:text-orange-600 dark:bg-navy-800 dark:text-navy-300 dark:group-hover:bg-orange-500/15 dark:group-hover:text-orange-300">
+        {f.map(({ icon: Icon, t, d }, i) => (
+          <div key={t} data-anim data-i={i} className="group rounded-2xl border bg-surface p-7 shadow-soft sa-card-hover">
+            <span data-pop data-i={i} className="grid h-11 w-11 place-items-center rounded-xl bg-navy-100 text-navy-600 transition-colors group-hover:bg-orange-100 group-hover:text-orange-600 dark:bg-navy-800 dark:text-navy-300 dark:group-hover:bg-orange-500/15 dark:group-hover:text-orange-300">
               <Icon className="h-5 w-5" />
             </span>
             <h3 className="mt-5 font-semibold text-ink">{t}</h3>
@@ -388,8 +390,8 @@ function Testimonials() {
       <H2>Built to earn your trust, not just your attention.</H2>
       <p className="mt-3 max-w-2xl text-muted">We&apos;re early, so instead of putting words in users&apos; mouths, here&apos;s what the product actually commits to.</p>
       <div className="mt-12 grid gap-5 md:grid-cols-3">
-        {t.map(({ t, d }) => (
-          <div key={t} className="rounded-2xl border bg-surface-2 p-7 sa-card-hover">
+        {t.map(({ t, d }, i) => (
+          <div key={t} data-anim data-i={i} className="rounded-2xl border bg-surface-2 p-7 sa-card-hover">
             <h3 className="font-semibold text-ink">{t}</h3>
             <p className="mt-2 text-sm leading-relaxed text-muted">{d}</p>
           </div>
@@ -410,8 +412,8 @@ function Roadmap() {
       <Eyebrow>Roadmap</Eyebrow>
       <H2>Where we&apos;re headed.</H2>
       <div className="mt-12 grid gap-5 md:grid-cols-3">
-        {r.map(({ phase, t, d }) => (
-          <div key={t} className="rounded-2xl border bg-surface p-7 shadow-soft sa-card-hover">
+        {r.map(({ phase, t, d }, i) => (
+          <div key={t} data-anim data-i={i} className="rounded-2xl border bg-surface p-7 shadow-soft sa-card-hover">
             <span className="rounded-full bg-navy-900 px-3 py-1 text-xs font-semibold text-white dark:bg-navy-100 dark:text-navy-900">{phase}</span>
             <h3 className="mt-5 text-lg font-semibold text-ink">{t}</h3>
             <p className="mt-2 leading-relaxed text-muted">{d}</p>
@@ -476,7 +478,7 @@ function CTA() {
         <div className="absolute inset-0 mesh opacity-60" />
         <div className="absolute inset-0 sa-grid opacity-50" />
         <div className="relative">
-          <div className="mx-auto mb-7 w-fit"><SynapseOrb size={72} /></div>
+          <div className="sa-floaty mx-auto mb-7 w-fit"><SynapseOrb size={72} /></div>
           <h2 className="mx-auto max-w-2xl text-balance text-3xl font-semibold tracking-tight sm:text-4xl">
             Meet the partner who makes your next step obvious.
           </h2>
@@ -548,7 +550,7 @@ function AppleHealth() {
           <div className="p-4 text-orange-600 dark:text-orange-400">Synapse Adaptive</div>
         </div>
         {rows.map(([k, a, b], i) => (
-          <div key={i} className="grid grid-cols-3 border-b text-sm last:border-0">
+          <div key={i} data-anim data-i={i} className="grid grid-cols-3 border-b text-sm last:border-0">
             <div className="p-4 font-medium text-ink">{k}</div>
             <div className="p-4 text-muted">{a}</div>
             <div className="p-4 text-ink">{b}</div>
@@ -587,7 +589,7 @@ function Pricing() {
         {PLAN_ORDER.map((id) => {
           const p = PLANS[id];
           return (
-            <div key={id} className={`relative flex flex-col rounded-3xl border bg-surface p-7 shadow-soft sa-card-hover ${p.popular ? "ring-2 ring-orange-400 sa-border-glow on" : ""}`}>
+            <div key={id} data-anim data-i={PLAN_ORDER.indexOf(id)} className={`relative flex flex-col rounded-3xl border bg-surface p-7 shadow-soft sa-card-hover ${p.popular ? "ring-2 ring-orange-400 sa-border-glow on" : ""}`}>
               {p.popular && <div className="absolute right-4 top-4 rounded-full bg-orange-100 px-2.5 py-0.5 text-[11px] font-semibold text-orange-700 dark:bg-orange-500/15 dark:text-orange-300">Most popular</div>}
               <h3 className="text-lg font-semibold text-ink">{p.name}</h3>
               <p className="mt-2 text-4xl font-semibold tracking-tight text-ink">{p.priceLabel}<span className="text-base font-normal text-muted">{p.cadence === "monthly" ? "/mo" : ""}</span></p>
@@ -670,7 +672,7 @@ function SynapseFlow() {
       </div>
       <div className="mx-auto mt-12 grid max-w-5xl gap-4 sm:grid-cols-2 lg:grid-cols-4">
         {steps.map((s, i) => (
-          <div key={s.k} className="relative rounded-2xl border bg-surface p-5">
+          <div key={s.k} data-anim data-i={i} className="relative rounded-2xl border bg-surface p-5">
             <span className="text-[11px] font-semibold tracking-wider text-orange-400">0{i + 1}</span>
             <p className="mt-2 text-base font-semibold text-ink">{s.k}</p>
             <p className="mt-1.5 text-sm leading-relaxed text-muted">{s.d}</p>

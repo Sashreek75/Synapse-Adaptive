@@ -1,13 +1,14 @@
 "use client";
 
 /**
- * SCROLL CINEMATIC (Three.js) — a 3-act opening, all built from particles (no images):
- *   ACT 1  A swirling vortex of neurons COALESCES into a glowing brain as you fly toward it.
- *   ACT 2  HERO BEAT — the whole brain (blue web + orange synapses) fills the screen, turning.
- *   ACT 3  You whoosh INSIDE, through the neuron network, and zoom into one orange synapse that
- *          blooms into light as "Synapse" arrives.
- * Composition + camera path were tuned against an offline previsualization (see notes in repo).
- * Corner words POP in, one at a time, in their own corner. Scroll scrubs it (~3 scrolls).
+ * SCROLL CINEMATIC (Three.js) — a curved 3-act flight, all particles (no images):
+ *   ACT 1  You START inside a swirling vortex facing you; scrolling condenses it into a brain.
+ *   ACT 2  HERO — the whole brain (blue web + orange synapses) fills the screen; an orange
+ *          synapse light glows in the lower-right.
+ *   ACT 3  You bank down-right and fly THROUGH the interior neural nerve fibers into that
+ *          orange light, which blooms as "Synapse" arrives.
+ * Composition + curved camera path were tuned frame-by-frame against an offline previsualization.
+ * Corner words POP in one at a time. Scroll scrubs it (~3 scrolls).
  */
 
 import { useEffect, useRef } from "react";
@@ -18,7 +19,6 @@ const smooth = (x: number, a: number, b: number) => {
   return t * t * (3 - 2 * t);
 };
 const lerp = (a: number, b: number, t: number) => a + (b - a) * t;
-const ease = (t: number) => t * t; // gentle acceleration for the swoosh
 
 function glowTexture(): THREE.Texture {
   const s = 128;
@@ -41,11 +41,11 @@ function noise3(x: number, y: number, z: number) {
 // Each pops at its scroll point, in its own corner. Bright and quick — "out of nowhere".
 const WORDS: { t: string; cls: string; at: number }[] = [
   { t: "Focus", cls: "top-10 left-8", at: 0.05 },
-  { t: "Discipline", cls: "top-10 right-8", at: 0.14 },
-  { t: "Momentum", cls: "bottom-12 right-8", at: 0.22 },
-  { t: "Consistency", cls: "bottom-12 left-8", at: 0.30 },
+  { t: "Discipline", cls: "top-10 right-8", at: 0.13 },
+  { t: "Momentum", cls: "bottom-12 left-8", at: 0.21 },
+  { t: "Consistency", cls: "top-1/3 right-9", at: 0.55 },
   { t: "Clarity", cls: "top-1/3 left-9", at: 0.63 },
-  { t: "Follow-through", cls: "bottom-1/3 right-9", at: 0.70 },
+  { t: "Follow-through", cls: "bottom-1/4 left-10", at: 0.71 },
 ];
 
 export function ScrollCinematic() {
@@ -63,12 +63,26 @@ export function ScrollCinematic() {
     const reduced = typeof window.matchMedia === "function" && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
     const mobile = window.innerWidth < 768;
 
-    const D = 900;            // brain center at z = -D
-    const CAM_START = 320;    // start back in the vortex
-    const HERO = -500;        // brain fills the screen (400 from center) — the "behold" beat
-    const INSIDE = -815;      // flown through the surface, inside the network
-    const CAM_END = -835;     // zoomed into the synapse light (light sits at ~-895)
+    const D = 900;                    // brain-center group at z = -D
     const N = mobile ? 1300 : 2600;
+    const LIGHT: [number, number, number] = [132, -92, -885]; // orange synapse: lower-right, inside the brain
+
+    // curved camera path (world). straight through the vortex, then bank down-right to the light.
+    const CP = [0, 0.34, 0.54, 0.78, 1.0];
+    const CV: [number, number, number][] = [[0, 0, 330], [0, 0, -500], [26, -20, -685], [92, -70, -826], [126, -88, -858]];
+    const camAt = (p: number, out: [number, number, number]) => {
+      if (p <= CP[0]) { out[0] = CV[0][0]; out[1] = CV[0][1]; out[2] = CV[0][2]; return; }
+      for (let i = 1; i < CP.length; i++) {
+        if (p <= CP[i]) {
+          const t = smooth(p, CP[i - 1], CP[i]);
+          out[0] = lerp(CV[i - 1][0], CV[i][0], t);
+          out[1] = lerp(CV[i - 1][1], CV[i][1], t);
+          out[2] = lerp(CV[i - 1][2], CV[i][2], t);
+          return;
+        }
+      }
+      out[0] = CV[CV.length - 1][0]; out[1] = CV[CV.length - 1][1]; out[2] = CV[CV.length - 1][2];
+    };
 
     const renderer = new THREE.WebGLRenderer({ canvas, alpha: false, antialias: !mobile, powerPreference: "high-performance" });
     renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.5));
@@ -77,56 +91,69 @@ export function ScrollCinematic() {
     const scene = new THREE.Scene();
     scene.fog = new THREE.FogExp2(0x04070d, 0.0009);
     const camera = new THREE.PerspectiveCamera(74, 1, 1, 5000);
-    camera.position.set(0, 0, CAM_START);
 
     const tex = glowTexture();
     const blue = new THREE.Color(0x53a3ff);
     const cyan = new THREE.Color(0x8fd0ff);
     const orange = new THREE.Color(0xff8a2a);
 
-    const scatter = new Float32Array(N * 3);  // vortex start (relative to the brain-center group)
-    const brain = new Float32Array(N * 3);    // brain target (relative)
+    const scatter = new Float32Array(N * 3);
+    const brain = new Float32Array(N * 3);
     const pos = new Float32Array(N * 3);
     const colors = new Float32Array(N * 3);
 
-    for (let i = 0; i < N; i++) {
-      // ---- vortex: a spiral tunnel funnelling toward the camera ----
-      const arm = i % 3;
-      const tt = Math.random();
-      const ang = tt * Math.PI * 10 + arm * (Math.PI * 2 / 3) + Math.random() * 0.5;
-      const rad = 40 + (1 - tt) * 260 + Math.random() * 40;
-      scatter[i * 3] = Math.cos(ang) * rad;
-      scatter[i * 3 + 1] = Math.sin(ang) * rad;
-      scatter[i * 3 + 2] = 300 - tt * 760;
+    const clampEll = (v: [number, number, number]) => {
+      const q = (v[0] / 128) ** 2 + (v[1] / 98) ** 2 + (v[2] / 150) ** 2;
+      if (q > 1) { const k = 1 / Math.sqrt(q); v[0] *= k; v[1] *= k; v[2] *= k; }
+      return v;
+    };
 
-      // ---- brain target: two wrinkled hemispheres + cerebellum + brainstem ----
+    // ---- interior nerve fibers: random-walk strands through the brain volume ----
+    const STR = mobile ? 34 : 60, L = 14, SP = STR * L;
+    for (let s = 0; s < STR; s++) {
+      let x = (Math.random() - 0.5) * 150, y = (Math.random() - 0.5) * 120 - 8, z = (Math.random() - 0.5) * 200;
+      let dx = Math.random() - 0.5, dy = Math.random() - 0.5, dz = Math.random() - 0.5;
+      for (let l = 0; l < L; l++) {
+        const idx = s * L + l;
+        const v = clampEll([x, y, z]);
+        brain[idx * 3] = v[0]; brain[idx * 3 + 1] = v[1]; brain[idx * 3 + 2] = v[2];
+        const node = l === 0 || Math.random() < 0.14;
+        const col = node ? orange : cyan;
+        colors[idx * 3] = col.r; colors[idx * 3 + 1] = col.g; colors[idx * 3 + 2] = col.b;
+        dx += (Math.random() - 0.5) * 0.6; dy += (Math.random() - 0.5) * 0.6; dz += (Math.random() - 0.5) * 0.6;
+        const m = Math.hypot(dx, dy, dz) || 1, step = 20;
+        x += dx / m * step; y += dy / m * step; z += dz / m * step;
+      }
+    }
+    // ---- surface: hemispheres + cerebellum + brainstem (the silhouette) ----
+    for (let i = SP; i < N; i++) {
       const R = Math.random();
-      const orangeNode = Math.random() < 0.14;
       let bx: number, by: number, bz: number;
-      if (R < 0.80) {
+      if (R < 0.72) {
         const lobe = Math.random() < 0.5 ? 1 : -1;
         const u = Math.random() * Math.PI * 2, v = Math.acos(2 * Math.random() - 1);
         let X = Math.sin(v) * Math.cos(u) * 95, Y = Math.sin(v) * Math.sin(u) * 74, Z = Math.cos(v) * 118;
-        const disp = 6 + 7 * Math.abs(noise3(X, Y, Z));
-        const nrm = 1 + disp / 90; X *= nrm; Y *= nrm; Z *= nrm;
-        X += lobe * 24;                                  // split into hemispheres
-        if (Y > 18 && Math.abs(X) < 14) Y -= 18;         // longitudinal fissure at the top midline
+        const disp = 6 + 7 * Math.abs(noise3(X, Y, Z)); const nrm = 1 + disp / 90; X *= nrm; Y *= nrm; Z *= nrm;
+        X += lobe * 24; if (Y > 18 && Math.abs(X) < 14) Y -= 18;
         bx = X; by = Y + 8; bz = Z;
-      } else if (R < 0.93) {
-        const u = Math.random() * Math.PI * 2, v = Math.acos(2 * Math.random() - 1);
-        const rr = 40 * (0.85 + 0.15 * Math.sin(u * 8));
-        bx = Math.sin(v) * Math.cos(u) * rr * 0.9;
-        by = -58 + Math.cos(v) * rr * 0.6;
-        bz = -70 + Math.sin(v) * Math.sin(u) * rr * 0.9;
+      } else if (R < 0.9) {
+        const u = Math.random() * Math.PI * 2, v = Math.acos(2 * Math.random() - 1), rr = 40 * (0.85 + 0.15 * Math.sin(u * 8));
+        bx = Math.sin(v) * Math.cos(u) * rr * 0.9; by = -58 + Math.cos(v) * rr * 0.6; bz = -70 + Math.sin(v) * Math.sin(u) * rr * 0.9;
       } else {
-        bx = (Math.random() - 0.5) * 10;
-        by = -70 - Math.random() * 46;
-        bz = -52 + (Math.random() - 0.5) * 10;
+        bx = (Math.random() - 0.5) * 10; by = -70 - Math.random() * 46; bz = -52 + (Math.random() - 0.5) * 10;
       }
       brain[i * 3] = bx; brain[i * 3 + 1] = by; brain[i * 3 + 2] = bz;
-
-      const col = orangeNode ? orange : (Math.random() < 0.5 ? blue : cyan);
+      const col = Math.random() < 0.13 ? orange : blue;
       colors[i * 3] = col.r; colors[i * 3 + 1] = col.g; colors[i * 3 + 2] = col.b;
+    }
+    // ---- vortex start for every point: spiral tunnel, wide + close near camera, narrowing far ----
+    for (let i = 0; i < N; i++) {
+      const tt = Math.random(), arm = i % 3;
+      const ang = tt * Math.PI * 14 + arm * (Math.PI * 2 / 3) + Math.random() * 0.4;
+      const rad = 45 + (1 - tt) * 300 + Math.random() * 30;
+      scatter[i * 3] = Math.cos(ang) * rad;
+      scatter[i * 3 + 1] = Math.sin(ang) * rad;
+      scatter[i * 3 + 2] = 1160 - tt * 1160; // local; group at -D → world +260..-900
       pos[i * 3] = scatter[i * 3]; pos[i * 3 + 1] = scatter[i * 3 + 1]; pos[i * 3 + 2] = scatter[i * 3 + 2];
     }
 
@@ -134,54 +161,45 @@ export function ScrollCinematic() {
     const posAttr = new THREE.BufferAttribute(pos, 3);
     geo.setAttribute("position", posAttr);
     geo.setAttribute("color", new THREE.BufferAttribute(colors, 3));
-    const pointsMat = new THREE.PointsMaterial({ size: mobile ? 8 : 9, map: tex, vertexColors: true, transparent: true, blending: THREE.AdditiveBlending, depthWrite: false, sizeAttenuation: true, opacity: 0.95 });
+    const pointsMat = new THREE.PointsMaterial({ size: mobile ? 7 : 8, map: tex, vertexColors: true, transparent: true, blending: THREE.AdditiveBlending, depthWrite: false, sizeAttenuation: true, opacity: 0.95 });
     const points = new THREE.Points(geo, pointsMat);
-    points.position.set(0, 0, -D); // group centered on the brain so it rotates in place
+    points.position.set(0, 0, -D); // group centered on the brain — rotate.z spins the vortex in place
     scene.add(points);
 
-    // filament web — nearby brain points, drawn from the morphing positions each frame
-    const SEG = mobile ? 380 : 720;
-    const pairs = new Int32Array(SEG * 2);
-    for (let s = 0; s < SEG; s++) {
-      const a = (Math.random() * N) | 0; let b = a, best = Infinity;
-      for (let k = 0; k < 7; k++) {
-        const cand = (Math.random() * N) | 0;
+    // ---- nerve fiber lines: strand-consecutive (the fibers) + a little surface web ----
+    const SURF_WEB = mobile ? 150 : 280;
+    const nLines = STR * (L - 1) + SURF_WEB;
+    const pairs = new Int32Array(nLines * 2);
+    let pc = 0;
+    for (let s = 0; s < STR; s++) for (let l = 1; l < L; l++) { pairs[pc * 2] = s * L + l; pairs[pc * 2 + 1] = s * L + l - 1; pc++; }
+    for (let w = 0; w < SURF_WEB; w++) {
+      const a = SP + ((Math.random() * (N - SP)) | 0); let b = a, best = Infinity;
+      for (let k = 0; k < 6; k++) {
+        const cand = SP + ((Math.random() * (N - SP)) | 0);
         const dx = brain[a * 3] - brain[cand * 3], dy = brain[a * 3 + 1] - brain[cand * 3 + 1], dz = brain[a * 3 + 2] - brain[cand * 3 + 2];
         const d = dx * dx + dy * dy + dz * dz;
         if (cand !== a && d < best) { best = d; b = cand; }
       }
-      pairs[s * 2] = a; pairs[s * 2 + 1] = b;
+      pairs[pc * 2] = a; pairs[pc * 2 + 1] = b; pc++;
     }
-    const linePos = new Float32Array(SEG * 6);
+    const linePos = new Float32Array(nLines * 6);
     const lineGeo = new THREE.BufferGeometry();
     const lineAttr = new THREE.BufferAttribute(linePos, 3);
     lineGeo.setAttribute("position", lineAttr);
-    const lineMat = new THREE.LineBasicMaterial({ color: 0x3f7fe0, transparent: true, opacity: 0, blending: THREE.AdditiveBlending, depthWrite: false });
+    const lineMat = new THREE.LineBasicMaterial({ color: 0x4f9be8, transparent: true, opacity: 0, blending: THREE.AdditiveBlending, depthWrite: false });
     const lines = new THREE.LineSegments(lineGeo, lineMat);
     lines.position.set(0, 0, -D);
     scene.add(lines);
 
-    // bright orange synapse hotspots sitting on the brain (rotate with it)
-    const hotspots: THREE.Sprite[] = [];
-    for (let h = 0; h < 8; h++) {
-      const idx = (Math.random() * N) | 0;
-      const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex, color: 0xff9a2e, transparent: true, blending: THREE.AdditiveBlending, depthWrite: false, opacity: 0 }));
-      sp.scale.set(46, 46, 1);
-      sp.position.set(brain[idx * 3], brain[idx * 3 + 1], brain[idx * 3 + 2]);
-      points.add(sp);
-      hotspots.push(sp);
-    }
-
-    // the orange synapse LIGHT we fly into (world space, at brain center-front)
+    // ---- the orange synapse LIGHT we fly into (world space, lower-right) ----
     const lightGlow = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex, color: 0xff9a2e, transparent: true, blending: THREE.AdditiveBlending, depthWrite: false, opacity: 0 }));
-    lightGlow.scale.set(260, 260, 1); lightGlow.position.set(0, 0, -D + 5);
+    lightGlow.scale.set(230, 230, 1); lightGlow.position.set(LIGHT[0], LIGHT[1], LIGHT[2]);
     scene.add(lightGlow);
     const lightCore = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex, color: 0xffd27a, transparent: true, blending: THREE.AdditiveBlending, depthWrite: false, opacity: 0 }));
-    lightCore.scale.set(90, 90, 1); lightCore.position.set(0, 0, -D + 5);
+    lightCore.scale.set(82, 82, 1); lightCore.position.set(LIGHT[0], LIGHT[1], LIGHT[2]);
     scene.add(lightCore);
 
-    let W = 0, H = 0;
-    const resize = () => { W = window.innerWidth; H = window.innerHeight; renderer.setSize(W, H, false); camera.aspect = W / H; camera.updateProjectionMatrix(); };
+    const resize = () => { renderer.setSize(window.innerWidth, window.innerHeight, false); camera.aspect = window.innerWidth / window.innerHeight; camera.updateProjectionMatrix(); };
     resize();
     window.addEventListener("resize", resize);
 
@@ -192,15 +210,9 @@ export function ScrollCinematic() {
       return Math.min(1, Math.max(0, -r.top / scrollable));
     };
 
-    const camZ = (p: number) => {
-      if (p < 0.36) return lerp(CAM_START, HERO, smooth(p, 0, 0.36));       // approach + brain forms
-      if (p < 0.52) return HERO;                                            // HERO BEAT: behold the brain
-      if (p < 0.82) return lerp(HERO, INSIDE, ease(smooth(p, 0.52, 0.82))); // swoosh inside
-      return lerp(INSIDE, CAM_END, smooth(p, 0.82, 1));                     // zoom into the light
-    };
-
+    const cp: [number, number, number] = [0, 0, 0];
     const render = (p: number, t: number) => {
-      const morph = smooth(p, 0.06, 0.32); // vortex → brain
+      const morph = smooth(p, 0.06, 0.34); // vortex → brain
 
       for (let i = 0; i < N; i++) {
         const j = i * 3;
@@ -209,27 +221,28 @@ export function ScrollCinematic() {
         pos[j + 2] = lerp(scatter[j + 2], brain[j + 2], morph);
       }
       posAttr.needsUpdate = true;
-      for (let s = 0; s < SEG; s++) {
+      for (let s = 0; s < nLines; s++) {
         const a = pairs[s * 2] * 3, b = pairs[s * 2 + 1] * 3, o = s * 6;
         linePos[o] = pos[a]; linePos[o + 1] = pos[a + 1]; linePos[o + 2] = pos[a + 2];
         linePos[o + 3] = pos[b]; linePos[o + 4] = pos[b + 1]; linePos[o + 5] = pos[b + 2];
       }
       lineAttr.needsUpdate = true;
 
-      // swirl fastest while scattered, eases as the brain forms (never reverses)
-      points.rotation.y = t * 0.05 * (1 - 0.6 * morph);
-      lines.rotation.y = points.rotation.y;
+      // vortex swirl (pinwheel around the axis), eases off as the brain forms
+      points.rotation.z = t * 0.12 * (1 - 0.7 * morph);
+      lines.rotation.z = points.rotation.z;
 
-      camera.position.set(Math.sin(t * 0.3) * 6, Math.cos(t * 0.28) * 4, camZ(p));
-      camera.lookAt(0, 0, -D);
+      camAt(p, cp);
+      camera.position.set(cp[0] + Math.sin(t * 0.3) * 4, cp[1] + Math.cos(t * 0.26) * 3, cp[2]);
+      const lt = smooth(p, 0.46, 0.86);
+      camera.lookAt(lerp(0, LIGHT[0], lt), lerp(0, LIGHT[1], lt), lerp(-D, LIGHT[2], lt));
 
-      const fade = 1 - smooth(p, 0.9, 1);
+      const fade = 1 - smooth(p, 0.88, 1);
       pointsMat.opacity = 0.95 * fade;
-      lineMat.opacity = 0.24 * morph * fade;
-      for (const sp of hotspots) (sp.material as THREE.SpriteMaterial).opacity = morph * 0.7 * fade;
+      lineMat.opacity = (0.16 + 0.2 * smooth(p, 0.4, 0.72)) * morph * fade; // nerves brighten as you fly through
 
-      const arrive = smooth(p, 0.82, 1);
-      (lightGlow.material as THREE.SpriteMaterial).opacity = Math.max(morph * 0.18, arrive) * 0.85;
+      const arrive = smooth(p, 0.8, 1);
+      (lightGlow.material as THREE.SpriteMaterial).opacity = Math.max(smooth(p, 0.34, 0.6) * 0.5, arrive) * 0.9;
       (lightCore.material as THREE.SpriteMaterial).opacity = arrive * 0.6;
 
       renderer.render(scene, camera);
@@ -262,7 +275,6 @@ export function ScrollCinematic() {
       io.disconnect();
       if (rafRef.current) cancelAnimationFrame(rafRef.current);
       geo.dispose(); pointsMat.dispose(); lineGeo.dispose(); lineMat.dispose();
-      for (const sp of hotspots) (sp.material as THREE.Material).dispose();
       (lightGlow.material as THREE.Material).dispose(); (lightCore.material as THREE.Material).dispose();
       tex.dispose(); renderer.dispose();
     };
@@ -273,7 +285,6 @@ export function ScrollCinematic() {
       <div className="sticky top-0 h-screen overflow-hidden bg-[#04070d]">
         <canvas ref={canvasRef} className="absolute inset-0 h-full w-full" />
 
-        {/* words that pop, one at a time, in their own corner */}
         {WORDS.map((w, i) => (
           <span
             key={w.t}
