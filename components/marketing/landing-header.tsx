@@ -2,7 +2,7 @@
 
 /**
  * LANDING HEADER — hidden during the scroll cinematic, slides in once you've flown through and reached
- * the actual landing page. (Scroll-threshold based; the cinematic runway is ~4.6 viewports tall.)
+ * the actual landing page. (Scroll-threshold based; the cinematic runway is ~3.4 viewports tall.)
  */
 
 import { useEffect, useState } from "react";
@@ -16,7 +16,7 @@ export function LandingHeader() {
   const [show, setShow] = useState(false);
 
   useEffect(() => {
-    const onScroll = () => setShow(window.scrollY > window.innerHeight * 3.4);
+    const onScroll = () => setShow(window.scrollY > window.innerHeight * 2.5);
     onScroll();
     window.addEventListener("scroll", onScroll, { passive: true });
     return () => window.removeEventListener("scroll", onScroll);
