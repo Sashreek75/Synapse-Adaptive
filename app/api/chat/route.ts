@@ -32,11 +32,14 @@ function fallback(message: string, hasData: boolean): { content?: string; sectio
 
 type Tier = "free" | "pro" | "max";
 
-/** Per-tier reasoning directive. Free is still genuinely useful — just concise. */
+/** Per-tier DEPTH/LENGTH only — NOT a mandate to advise. Whether a reply ends with a next
+ *  step is decided by the turn's RESPONSE MODE, never by the tier. (A tier directive that
+ *  demanded a "next step" every turn was a root cause of replies over-reaching on plain
+ *  statements.) */
 const CHAT_DEPTH: Record<Tier, string> = {
-  free: "[Plan: Free — still give a real, personalized read: one specific observation grounded in their own data plus one concrete takeaway. Keep it to a few sentences. Save exhaustive multi-week pattern analysis for a fuller answer, and, only if it's naturally relevant, mention that deeper ongoing analysis is what Pro adds.]",
-  pro: "[Plan: Pro — connect signals across their weeks, reference specific trends and timing, and end with a concrete next step. Be substantive.]",
-  max: "[Plan: Max — this member has opted into the deepest analysis. Reason across their full history, connect multiple signals, weigh alternative explanations, note how the picture has evolved, and offer a clear, specific way forward. Be thorough and precise — never padded.]",
+  free: "[Plan: Free — concise: a real, specific, grounded reply in a few sentences. Match depth to what they actually asked; don't pad. Save exhaustive multi-week analysis for a fuller answer.]",
+  pro: "[Plan: Pro — substantive when the message warrants it: connect signals and reference specific trends/timing where relevant. Let the RESPONSE MODE decide whether to advise or end with a next step.]",
+  max: "[Plan: Max — deepest analysis WHEN the message calls for it: reason across history, weigh alternatives, note how the picture evolved. Still obey the RESPONSE MODE — a plain statement gets a brief acknowledgement, not an essay. Never padded.]",
 };
 
 export async function POST(req: Request) {

@@ -25,6 +25,7 @@ import { NAV_HINT_EXAMPLES, shouldShowNavHints, recordNavUse } from "@/lib/nav-h
 import { newSession, saveSession, loadSession, DURATION_PRESETS } from "@/lib/focus-session";
 import { openCommitment, commitmentAwaitingReport, loadCommitments } from "@/lib/commitments";
 import { obligationsContextBlock, topGoalTitle, looksLikeStudent } from "@/lib/obligations";
+import { plannerNotesContextBlock } from "@/lib/planner";
 import { situationContextBlock, buildSituation } from "@/lib/situation";
 import { readMomentum } from "@/lib/momentum";
 import { convictionContextLines } from "@/lib/convictions";
@@ -148,6 +149,7 @@ export function AgentConsole({ embedded = false, immersive = false }: { embedded
       "Your job is DECISIONS and follow-through, not building apps — never offer to 'build a space/tool' or generate documents; that's not what you're for, and they have other tools for that. If they want to organize tasks or notes, that lives in their Planner (you can point them there). Stay on the one thing you're uniquely good at: helping them decide what matters and actually do it.",
       situationContextBlock(),
       obligationsContextBlock(profile),
+      plannerNotesContextBlock(),
     ].filter(Boolean).join("\n");
     if (!hasData) return who;
     const lines = series.map((s) => {

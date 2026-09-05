@@ -43,6 +43,7 @@ import { extractReachoutOffer } from "@/lib/reachout-intent";
 import { detectReachoutRequest } from "@/lib/when";
 import { classifyReply } from "@/lib/affirmation";
 import { obligationsContextBlock } from "@/lib/obligations";
+import { plannerNotesContextBlock } from "@/lib/planner";
 import { situationContextBlock } from "@/lib/situation";
 import { scheduleReachout, scheduleReachoutAt, currentPushStatus } from "@/lib/push-client";
 import { detectFocusIntent, extractFocusOffer, type FocusIntent } from "@/lib/focus-intent";
@@ -218,6 +219,7 @@ export function CompanionPresence() {
         presenceContextBlock(),
         situationContextBlock(),
         obligationsContextBlock(profile),
+        plannerNotesContextBlock(),
         activityContextBlock(),
         dailyActivityLog(contextNotes),
         ...convictionContextLines(),

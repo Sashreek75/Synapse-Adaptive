@@ -13,6 +13,9 @@ import "server-only";
 
 import { callModel, extractJson } from "@/ai/client";
 import { CHAT_PROMPT, REPORT_PROMPT } from "@/ai/prompts";
+import { comprehend } from "@/ai/comprehend";
+import { buildTurnBrief } from "@/ai/modes";
+import { checkGrounding, repairDirective, minimalAcknowledgement } from "@/ai/grounding";
 import { postGate } from "@/ai/safety";
 import { reportSchema, insightSchema } from "@/ai/schemas";
 import { renderProactiveNotices, renderReport } from "@/ai/render";
@@ -145,22 +148,43 @@ export async function generateProactiveNotices(serieses: MetricSeries[], goals: 
   return base.filter((n) => postGate(`${n.observation} ${n.reasoning}`).ok);
 }
 
-export async function answerChat(message: string, context: string, tier: PlanId = "pro"): Promise<{ text: string; source: "model" | "fallback" }> {
-  // Thinking is off, so the whole budget is the visible reply. Max gets room to
-  // reason at length; free stays concise; pro sits in between.
+/**
+ * CHAT — a two-pass pipeline so replies FOLLOW from the message:
+ *   Pass 1  comprehend(): a fast, neutral reading — what was said vs. asked, and the RESPONSE MODE.
+ *   Pass 2  generation: mode-scoped; the mode overrides the persona's "always act" bias.
+ *   Pass 2b grounding guard: rejects invented user-states / temporal drift / unrequested coaching,
+ *           repairs once, then falls back to a safe acknowledgement for low-intent turns.
+ * The comprehension layer reads the conversation only (Stage-2 firewall preserved).
+ */
+export async function answerChat(message: string, context: string, tier: PlanId = "pro"): Promise<{ text: string; source: "model" | "fallback"; mode?: string }> {
   const maxTokens = tier === "free" ? 1100 : tier === "max" ? 2600 : 1800;
-  // Put the user's message FIRST and LAST so the (large) context can't bury it.
-  // The model's #1 job is to answer THIS message.
-  const user = `The person just sent you this message — answer it directly and specifically:\n"""\n${message}\n"""\n\nEVERYTHING YOU KNOW ABOUT THEM (context for grounding — do not just summarize it; use it to answer the message above):\n${context}\n\nNow reply to their message: "${message}"`;
-  const raw = await callModel({ system: CHAT_PROMPT.system, user, maxTokens });
-  if (raw && postGate(raw).ok) return { text: raw, source: "model" };
-  // One clean retry: a flagged/empty first attempt is often recoverable, and we'd
-  // rather retry than fall back to a generic answer that ignores the question.
-  if (!raw) {
-    const retry = await callModel({ system: CHAT_PROMPT.system, user, maxTokens, temperature: 0.5 });
-    if (retry && postGate(retry).ok) return { text: retry, source: "model" };
+
+  // ── Pass 1: comprehension ──
+  const { c } = await comprehend(message, context);
+  const brief = buildTurnBrief(c);
+
+  // ── Pass 2: mode-scoped generation. Message first AND last so context can't bury it. ──
+  const user = `${brief}\n\nThe person just sent you this message — answer it PER THE MODE ABOVE:\n"""\n${message}\n"""\n\nEVERYTHING YOU KNOW ABOUT THEM (grounding context — use it to answer, never just summarize it):\n${context}\n\nNow write ONLY your reply to: "${message}"`;
+
+  let raw = await callModel({ system: CHAT_PROMPT.system, user, maxTokens });
+  if (!raw) raw = await callModel({ system: CHAT_PROMPT.system, user, maxTokens, temperature: 0.5 }); // one clean retry on empty
+  if (!raw || !postGate(raw).ok) return { text: "", source: "fallback", mode: c.responseMode };
+
+  // ── Pass 2b: grounding guard (+ one repair) ──
+  const g = checkGrounding(message, raw, c);
+  if (g.ok) return { text: raw, source: "model", mode: c.responseMode };
+
+  const repairUser = `${user}\n\nREVISION REQUIRED — ${repairDirective(g.issues, c)}\n\nRewrite your reply now, obeying the mode.`;
+  const repaired = await callModel({ system: CHAT_PROMPT.system, user: repairUser, maxTokens, temperature: 0.3 });
+  if (repaired && postGate(repaired).ok && checkGrounding(message, repaired, c).ok) {
+    return { text: repaired, source: "model", mode: c.responseMode };
   }
-  return { text: "", source: "fallback" };
+  // Still over-reaching on a low-intent turn → return a safe, grounded acknowledgement
+  // rather than shipping invented coaching.
+  if (c.responseMode === "ACKNOWLEDGE" || c.responseMode === "REFLECT") {
+    return { text: minimalAcknowledgement(c), source: "model", mode: c.responseMode };
+  }
+  return { text: (repaired && postGate(repaired).ok) ? repaired : raw, source: "model", mode: c.responseMode };
 }
 
 import { PROFILE_PROMPT } from "@/ai/prompts";

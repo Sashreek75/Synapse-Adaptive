@@ -10,7 +10,8 @@
     "lint": "next lint",
     "typecheck": "tsc --noEmit",
     "users": "node scripts/count-users.mjs",
-    "waitlist": "node scripts/waitlist.mjs"
+    "waitlist": "node scripts/waitlist.mjs",
+    "eval:understanding": "tsx ai/evals/understanding.eval.ts"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.108.2",
