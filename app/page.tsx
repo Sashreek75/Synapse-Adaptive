@@ -25,7 +25,7 @@ import { cn } from "@/lib/utils";
 
 export default function LandingPage() {
   return (
-    <div className="relative min-h-screen">
+    <div id="main" className="relative min-h-screen">
       <RobotPresence />
       <StructuredData />
       <ScrollFX />
@@ -525,7 +525,11 @@ function Footer() {
           isn&apos;t a substitute for medical, legal, or financial guidance. In an emergency,
           contact your local emergency services.
         </p>
-        <p className="mt-4 text-xs text-muted">© {new Date().getFullYear()} Synapse Adaptive.</p>
+        <div className="mt-4 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-muted">
+          <span>© {new Date().getFullYear()} Synapse Adaptive.</span>
+          <Link href="/privacy" className="transition-colors hover:text-ink">Privacy</Link>
+          <Link href="/terms" className="transition-colors hover:text-ink">Terms</Link>
+        </div>
       </div>
     </footer>
   );

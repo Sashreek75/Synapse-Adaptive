@@ -19,11 +19,14 @@ export async function POST(req: Request) {
   } catch {
     return NextResponse.json({ error: "Invalid request" }, { status: 400 });
   }
-  if (!body?.series?.length) return NextResponse.json({ reasoning: null });
+  if (!body || typeof body !== "object" || !Array.isArray(body.series) || !body.series.length) {
+    return NextResponse.json({ reasoning: null });
+  }
+  const series = body.series.length > 500 ? body.series.slice(-500) : body.series;
 
   const result = await generateReasoning({
     profile: body.profile ?? {},
-    series: body.series,
+    series,
     recentChanges: body.recentChanges ?? [],
     experiments: body.experiments ?? [],
     beliefs: body.beliefs ?? [],

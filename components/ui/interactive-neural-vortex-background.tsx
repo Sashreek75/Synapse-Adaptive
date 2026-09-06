@@ -25,7 +25,7 @@ export function InteractiveNeuralVortex({ className }: { className?: string }) {
       (canvasEl.getContext("webgl") as WebGLRenderingContext | null) ||
       (canvasEl.getContext("experimental-webgl") as WebGLRenderingContext | null);
     if (!gl) {
-      console.error("WebGL not supported");
+      if (process.env.NODE_ENV !== "production") console.error("WebGL not supported");
       return;
     }
 
@@ -100,7 +100,7 @@ export function InteractiveNeuralVortex({ className }: { className?: string }) {
       glCtx.shaderSource(shader, source);
       glCtx.compileShader(shader);
       if (!glCtx.getShaderParameter(shader, glCtx.COMPILE_STATUS)) {
-        console.error("Shader error:", glCtx.getShaderInfoLog(shader));
+        if (process.env.NODE_ENV !== "production") console.error("Shader error:", glCtx.getShaderInfoLog(shader));
         glCtx.deleteShader(shader);
         return null;
       }
@@ -117,7 +117,7 @@ export function InteractiveNeuralVortex({ className }: { className?: string }) {
     gl.attachShader(program, fragmentShader);
     gl.linkProgram(program);
     if (!gl.getProgramParameter(program, gl.LINK_STATUS)) {
-      console.error("Program link error:", gl.getProgramInfoLog(program));
+      if (process.env.NODE_ENV !== "production") console.error("Program link error:", gl.getProgramInfoLog(program));
       return;
     }
     gl.useProgram(program);

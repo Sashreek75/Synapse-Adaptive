@@ -7,13 +7,22 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { ArrowRight } from "lucide-react";
+import { ArrowRight, Menu, X } from "lucide-react";
 import { Button } from "@/components/ui/primitives";
 import { SynapseOrb } from "@/components/synapse/orb";
 import { cn } from "@/lib/utils";
 
+const LINKS = [
+  { href: "#how", label: "How it works" },
+  { href: "#agent", label: "Meet Synapse" },
+  { href: "#features", label: "Features" },
+  { href: "#pricing", label: "Pricing" },
+  { href: "#faq", label: "FAQ" },
+];
+
 export function LandingHeader() {
   const [show, setShow] = useState(false);
+  const [menuOpen, setMenuOpen] = useState(false);
 
   useEffect(() => {
     const onScroll = () => setShow(window.scrollY > window.innerHeight * 2.5);
@@ -33,18 +42,45 @@ export function LandingHeader() {
           Synapse Adaptive
         </Link>
         <nav className="hidden items-center gap-7 text-sm text-muted md:flex">
-          <a href="#how" className="transition-colors hover:text-ink">How it works</a>
-          <a href="#agent" className="transition-colors hover:text-ink">Meet Synapse</a>
-          <a href="#features" className="transition-colors hover:text-ink">Features</a>
-          <a href="#pricing" className="transition-colors hover:text-ink">Pricing</a>
-          <a href="#faq" className="transition-colors hover:text-ink">FAQ</a>
+          {LINKS.map((l) => (
+            <a key={l.href} href={l.href} className="transition-colors hover:text-ink">{l.label}</a>
+          ))}
         </nav>
-        <div className="flex items-center gap-3">
-          <Link href="/login">
+        <div className="flex items-center gap-2">
+          <Link href="/login" className="hidden sm:block">
             <Button size="sm">Open the app <ArrowRight className="h-4 w-4" /></Button>
           </Link>
+          <button
+            onClick={() => setMenuOpen((v) => !v)}
+            aria-label={menuOpen ? "Close menu" : "Open menu"}
+            aria-expanded={menuOpen}
+            className="grid h-11 w-11 place-items-center rounded-xl text-ink transition hover:bg-surface-2 md:hidden"
+          >
+            {menuOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
+          </button>
         </div>
       </div>
+
+      {/* Mobile menu */}
+      {menuOpen && (
+        <nav className="border-t glass px-5 py-3 md:hidden">
+          <ul className="flex flex-col">
+            {LINKS.map((l) => (
+              <li key={l.href}>
+                <a href={l.href} onClick={() => setMenuOpen(false)}
+                  className="block rounded-lg px-2 py-3 text-base text-muted transition-colors hover:bg-surface-2 hover:text-ink">
+                  {l.label}
+                </a>
+              </li>
+            ))}
+            <li className="mt-2">
+              <Link href="/login" onClick={() => setMenuOpen(false)}>
+                <Button size="sm" className="w-full">Open the app <ArrowRight className="h-4 w-4" /></Button>
+              </Link>
+            </li>
+          </ul>
+        </nav>
+      )}
     </header>
   );
 }

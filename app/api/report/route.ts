@@ -22,7 +22,12 @@ export async function POST(req: Request) {
   } catch {
     return NextResponse.json({ error: "Invalid request" }, { status: 400 });
   }
-  if (!series?.length) return NextResponse.json({ report: null, notices: [] });
+  // Validate shape + cap size: series must be an array (bounded so a giant payload can't be abused),
+  // and profile must be a plain object.
+  if (!Array.isArray(series)) return NextResponse.json({ error: "Invalid request" }, { status: 400 });
+  if (series.length > 500) series = series.slice(-500);
+  if (!series.length) return NextResponse.json({ report: null, notices: [] });
+  if (!profile || typeof profile !== "object" || Array.isArray(profile)) return NextResponse.json({ error: "Invalid request" }, { status: 400 });
   if (tier !== "free" && tier !== "pro" && tier !== "max") tier = "pro";
 
   // Proactive-pattern detection follows the user's chosen path (their lens),

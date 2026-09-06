@@ -43,7 +43,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
               </div>
             </header>
 
-            <main className="min-h-0 flex-1 overflow-y-auto overscroll-none">
+            <main id="main" className="min-h-0 flex-1 overflow-y-auto overscroll-none">
               <div className="mx-auto w-full max-w-3xl px-4 py-5 sm:px-5 sm:py-9">
                 <SynapseAlert />
                 {children}

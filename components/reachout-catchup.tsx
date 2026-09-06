@@ -11,7 +11,7 @@
  */
 
 import { useEffect } from "react";
-import { fetchRecentReachouts } from "@/lib/push-client";
+import { fetchRecentReachouts, refreshPushSubscription } from "@/lib/push-client";
 
 const SHOWN_KEY = "synapse.ro.shown.v1";
 
@@ -59,8 +59,12 @@ export function ReachoutCatchup() {
           try { already = await reg.getNotifications({ tag: `synapse-ro-${it.id}` }); } catch {}
           if (already.length) { shown.push(it.id); changed = true; continue; }
 
+          // A notification is only useful when you're NOT already looking at Synapse. If this tab is
+          // focused/visible, don't fire a redundant OS notification — just mark it handled. (Real
+          // background delivery, for a closed/unfocused browser, comes from the server push cron.)
+          if (!document.hidden) { shown.push(it.id); changed = true; continue; }
+
           const lateMin = Math.round((now - fired) / 60000);
-          // Deliver promptly. Only call it out as delayed if it's meaningfully late (computer was off).
           const late = lateMin >= 3 ? `\n(Delayed — this was ${delayPhrase(lateMin)}.)` : "";
           await reg.showNotification(it.title || "Synapse", {
             body: `${it.body}${late}`,
@@ -78,6 +82,8 @@ export function ReachoutCatchup() {
       }
     };
 
+    // Keep the push subscription alive so real background delivery keeps working.
+    refreshPushSubscription().catch(() => {});
     run();
     // Poll continuously while the app is open — NOT just on focus — so an open-but-unfocused tab still
     // delivers due reach-outs on time. Cheap: one small POST a minute, and it early-outs when nothing's due.

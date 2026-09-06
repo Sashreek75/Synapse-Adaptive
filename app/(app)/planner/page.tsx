@@ -304,7 +304,7 @@ function LineRow({
         ) : line.type === "heading" ? (
           <span className="grid h-5 w-5 place-items-center text-muted/50"><HeadingIcon className="h-4 w-4" /></span>
         ) : (
-          <span className="grid h-5 w-5 place-items-center text-lg leading-none text-muted/40">•</span>
+          <span aria-hidden className="grid h-5 w-5 place-items-center text-lg leading-none text-muted/55">•</span>
         )}
       </div>
 
@@ -318,7 +318,7 @@ function LineRow({
         rows={1}
         placeholder={line.type === "heading" ? "Heading" : line.type === "task" ? "To-do…" : "Write, paste, or type ‘# ’ / ‘[] ’…"}
         className={cn(
-          "min-w-0 flex-1 resize-none bg-transparent py-1 leading-7 placeholder:text-muted/40 focus:outline-none",
+          "min-w-0 flex-1 resize-none bg-transparent py-1 leading-7 placeholder:text-muted/60 focus:outline-none",
           line.type === "heading" ? "text-xl font-semibold text-ink" : "text-[15px]",
           line.type === "task" && line.done ? "text-muted line-through" : "text-ink",
         )}
@@ -344,18 +344,18 @@ function LineRow({
         </div>
       )}
 
-      {/* row actions */}
-      <div className="mt-1 flex shrink-0 items-center gap-0.5 opacity-0 transition group-hover:opacity-100 focus-within:opacity-100">
-        <button onClick={() => onSetType(line.type === "task" ? "text" : "task")} title="Toggle task"
-          className={cn("grid h-7 w-7 place-items-center rounded-md transition hover:bg-surface-2", line.type === "task" ? "text-orange-500" : "text-muted hover:text-ink")}><CheckSquare className="h-4 w-4" /></button>
-        <button onClick={() => onSetType(line.type === "heading" ? "text" : "heading")} title="Toggle heading"
-          className={cn("grid h-7 w-7 place-items-center rounded-md transition hover:bg-surface-2", line.type === "heading" ? "text-orange-500" : "text-muted hover:text-ink")}><HeadingIcon className="h-4 w-4" /></button>
+      {/* row actions — always visible on touch (no hover), hover-revealed on desktop */}
+      <div className="mt-1 flex shrink-0 items-center gap-0.5 opacity-100 transition md:opacity-0 md:group-hover:opacity-100 md:focus-within:opacity-100">
+        <button onClick={() => onSetType(line.type === "task" ? "text" : "task")} title="Toggle task" aria-label="Toggle task"
+          className={cn("grid h-9 w-9 place-items-center rounded-md transition hover:bg-surface-2 md:h-7 md:w-7", line.type === "task" ? "text-orange-500" : "text-muted hover:text-ink")}><CheckSquare className="h-4 w-4" /></button>
+        <button onClick={() => onSetType(line.type === "heading" ? "text" : "heading")} title="Toggle heading" aria-label="Toggle heading"
+          className={cn("grid h-9 w-9 place-items-center rounded-md transition hover:bg-surface-2 md:h-7 md:w-7", line.type === "heading" ? "text-orange-500" : "text-muted hover:text-ink")}><HeadingIcon className="h-4 w-4" /></button>
         {line.type === "task" && (
-          <button onClick={() => setDueOpen((v) => !v)} title="Due date"
-            className="grid h-7 w-7 place-items-center rounded-md text-muted transition hover:bg-surface-2 hover:text-ink"><CalendarDays className="h-4 w-4" /></button>
+          <button onClick={() => setDueOpen((v) => !v)} title="Due date" aria-label="Set due date"
+            className="grid h-9 w-9 place-items-center rounded-md text-muted transition hover:bg-surface-2 hover:text-ink md:h-7 md:w-7"><CalendarDays className="h-4 w-4" /></button>
         )}
         <button onClick={onDelete} title="Delete line" aria-label="Delete line"
-          className="grid h-7 w-7 place-items-center rounded-md text-muted transition hover:bg-surface-2 hover:text-error"><Trash2 className="h-4 w-4" /></button>
+          className="grid h-9 w-9 place-items-center rounded-md text-muted transition hover:bg-surface-2 hover:text-error md:h-7 md:w-7"><Trash2 className="h-4 w-4" /></button>
       </div>
     </div>
   );

@@ -61,6 +61,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     <html lang="en" className="dark" suppressHydrationWarning>
       <head><script dangerouslySetInnerHTML={{ __html: themeScript }} /></head>
       <body className={inter.variable}>
+        <a href="#main" className="skip-link">Skip to content</a>
         {/* Site-wide living background: a navy+orange neural vortex over black, with a soft scrim
             on top so foreground text and cards stay readable. */}
         <VortexBackground className="opacity-80" />

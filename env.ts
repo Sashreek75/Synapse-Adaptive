@@ -41,6 +41,14 @@ const schema = z.object({
   VAPID_SUBJECT: z.string().default("mailto:support@compliancewatchdog.com"),
   /** Shared secret the scheduler endpoint requires, so only your cron can trigger sends. */
   CRON_SECRET: z.string().optional(),
+
+  // QStash (Upstash) — event-driven scheduler for exact-time reach-outs, even with the browser closed.
+  // Publishing needs the token; verifying the delivery callback needs the signing keys. QSTASH_URL is
+  // the region base URL shown in the Upstash console (e.g. https://qstash-eu-central-1.upstash.io).
+  QSTASH_URL: z.string().default("https://qstash.upstash.io"),
+  QSTASH_TOKEN: z.string().optional(),
+  QSTASH_CURRENT_SIGNING_KEY: z.string().optional(),
+  QSTASH_NEXT_SIGNING_KEY: z.string().optional(),
 });
 
 export const env = schema.parse({
@@ -68,6 +76,10 @@ export const env = schema.parse({
   VAPID_PRIVATE_KEY: process.env.VAPID_PRIVATE_KEY,
   VAPID_SUBJECT: process.env.VAPID_SUBJECT,
   CRON_SECRET: process.env.CRON_SECRET,
+  QSTASH_URL: process.env.QSTASH_URL,
+  QSTASH_TOKEN: process.env.QSTASH_TOKEN,
+  QSTASH_CURRENT_SIGNING_KEY: process.env.QSTASH_CURRENT_SIGNING_KEY,
+  QSTASH_NEXT_SIGNING_KEY: process.env.QSTASH_NEXT_SIGNING_KEY,
 });
 
 export const flags = {
@@ -76,4 +88,5 @@ export const flags = {
   billingLive: !!env.STRIPE_SECRET_KEY && !!env.STRIPE_PRICE_PRO,
   emailLive: !!env.RESEND_API_KEY,
   pushLive: !!env.NEXT_PUBLIC_VAPID_PUBLIC_KEY && !!env.VAPID_PRIVATE_KEY,
+  qstashLive: !!env.QSTASH_TOKEN,
 };

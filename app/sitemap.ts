@@ -5,8 +5,10 @@ const base = (process.env.NEXT_PUBLIC_APP_URL || "https://synapse-adaptive.verce
 
 export default function sitemap(): MetadataRoute.Sitemap {
   const now = new Date();
-  // Only the public marketing page belongs in the index. /login is a utility/auth page, not content.
+  // Public, indexable pages only. /login is a utility/auth page, so it's excluded.
   return [
     { url: `${base}/`, lastModified: now, changeFrequency: "weekly", priority: 1 },
+    { url: `${base}/privacy`, lastModified: now, changeFrequency: "yearly", priority: 0.3 },
+    { url: `${base}/terms`, lastModified: now, changeFrequency: "yearly", priority: 0.3 },
   ];
 }

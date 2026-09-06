@@ -316,6 +316,9 @@ export function maybeNotify(sig: PresenceSignal): void {
     if (typeof window === "undefined" || !("Notification" in window)) return;
     if (Notification.permission !== "granted") return;
     if (sig.urgency !== "now") return; // only the strongest reasons earn an OS-level interruption
+    // Don't OS-notify while they're actively looking at Synapse — the orb already shows it, so a
+    // system notification is just noise. Only fire when the tab is hidden/backgrounded.
+    if (typeof document !== "undefined" && !document.hidden) return;
     new Notification("Synapse", { body: sig.headline, tag: sig.id });
   } catch { /* notifications are a bonus, never a requirement */ }
 }

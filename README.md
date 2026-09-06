@@ -1,326 +1,134 @@
-🧠 Synapse Adaptive
+# Synapse Adaptive
 
-An adaptive AI partner that learns how you work—and helps you become who you want to become.
+An AI partner in follow-through — it gives you clarity, direction, accountability, and support to
+consistently reach the goals that matter. Built with Next.js 14 (App Router), TypeScript, Tailwind,
+Supabase (auth + sync), Google Gemini (AI), Stripe (billing), Resend (email), and Web Push.
 
-Synapse Adaptive is an AI partner built around one simple belief:
+The app is designed to run **fully without keys** (on-device mode + deterministic AI fallback). Each
+integration turns on simply by adding its environment variable — no code changes.
 
-The most valuable AI isn't the one that knows the most facts. It's the one that understands you the best.
+---
 
-Unlike assistants that forget every conversation or productivity apps that only track tasks, Synapse builds an evolving understanding of how you think, work, recover, make decisions, and follow through.
+## Quick start
 
-Every interaction helps it become a better partner.
+```bash
+npm install
+cp .env.example .env.local   # then fill in the keys you want (all optional to start)
+npm run dev                  # http://localhost:3000
+```
 
-🚀 The Problem
+## Scripts
 
-Most tools solve isolated problems.
+| Command | What it does |
+| --- | --- |
+| `npm run dev` | Start the dev server |
+| `npm run build` | Production build (run before every deploy) |
+| `npm run start` | Serve the production build |
+| `npm run typecheck` | `tsc --noEmit` — the source of truth for correctness |
+| `npm run eval:understanding` | Run the conversation-understanding eval suite |
+| `npm run lint` | Next.js lint |
 
-Calendars organize time.
+> Type safety is enforced via `tsc`; lint is not allowed to block production builds.
 
-To-do lists organize tasks.
+---
 
-Health apps organize data.
+## Environment variables
 
-Chatbots answer questions.
+All are optional; a feature simply switches on when its keys are present (see `env.ts`). **Anything
+without the `NEXT_PUBLIC_` prefix is server-only and must never be exposed to the browser.**
 
-None of them answer the question people actually care about:
+**Core AI**
+- `GEMINI_API_KEY` — Google Gemini key. Without it, the app uses a deterministic fallback voice.
+- `GEMINI_MODEL` / `GEMINI_FAST_MODEL` — model names (defaults are sensible flash models).
 
-"Knowing everything you know about me, what's the highest-leverage thing I should do next?"
+**Auth + database (Supabase)**
+- `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY` — enable accounts + cross-device sync.
+- `SUPABASE_SERVICE_ROLE_KEY` — **server-only.** Used by the waitlist + admin aggregation. Full DB access — guard it.
+- `NEXT_PUBLIC_FOUNDER_EMAILS` — comma-separated emails treated as founders.
 
-Even when good advice exists, another problem appears:
+**Admin**
+- `ADMIN_PASSWORD` — **required in production** to open `/admin`. There is no default; if unset, the admin API fails closed.
 
-People don't struggle because they don't know what to do.
+**Billing (Stripe)** — optional; without these, billing runs in a local mock.
+- `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`, `STRIPE_PRICE_PRO`, `STRIPE_PRICE_MAX`, `NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY`.
 
-They struggle because doing it tomorrow is harder than deciding today.
+**Email (Resend)**
+- `RESEND_API_KEY`, `EMAIL_FROM`.
 
-Most software ends where the advice begins.
+**Web Push (reach-outs)** — generate with `npx web-push generate-vapid-keys`.
+- `NEXT_PUBLIC_VAPID_PUBLIC_KEY` (public), `VAPID_PRIVATE_KEY` (server-only), `VAPID_SUBJECT`.
+- `CRON_SECRET` — required if you use the cron backstop; without it the cron fails closed.
 
-💡 Our Solution
+**QStash (exact-time background reach-outs)** — the primary scheduler (see below).
+- `QSTASH_TOKEN` (publish), `QSTASH_CURRENT_SIGNING_KEY`, `QSTASH_NEXT_SIGNING_KEY` (verify the callback). All from the Upstash console.
 
-Synapse is an adaptive partner.
+**App URL**
+- `NEXT_PUBLIC_APP_URL` — your deployed origin (used for canonical URLs, sitemap, emails).
 
-It doesn't just answer questions.
+---
 
-It builds an evolving model of who you're becoming and uses that understanding to help you make better decisions every day.
+## Deploying (Vercel)
 
-Over time it learns:
+1. Push to your Git remote and import the repo in Vercel.
+2. Add the environment variables above in **Project → Settings → Environment Variables**.
+3. Deploy. `npm run build` runs automatically.
 
-what motivates you
-what drains you
-what consistently works
-what repeatedly doesn't
-which goals truly matter
-where your momentum is building
-where you're quietly drifting
+### Reach-outs (background notifications)
 
-Then it helps you take one meaningful step forward.
+Background delivery — a reach-out that arrives with the browser **fully closed** — needs a server-side
+timer. This app uses **QStash (Upstash)** as the primary scheduler, so there is nothing to poll.
 
-🧠 Core Philosophy
+**How it works:** when a reach-out is scheduled (`/api/push/schedule`), the row is saved AND handed to
+QStash with an exact fire time. At that moment QStash calls `/api/push/deliver` (verified by signature),
+which sends the Web Push. No cron, no per-minute pinger, delivers to the minute even when closed.
 
-Most AI tries to answer:
+**Setup (once):**
+1. Create a free account at [upstash.com](https://upstash.com) → QStash.
+2. Copy the **Token** and the **Current** + **Next** signing keys.
+3. In Vercel → Environment Variables, set `QSTASH_TOKEN`, `QSTASH_CURRENT_SIGNING_KEY`,
+   `QSTASH_NEXT_SIGNING_KEY`, and make sure `NEXT_PUBLIC_APP_URL` is your real https domain (QStash must
+   be able to reach `/api/push/deliver`).
+4. Redeploy. That's it — scheduled reach-outs now fire in the background.
 
-"What do you want?"
+**Layers of reliability (all automatic):**
+- QStash → `/api/push/deliver` — exact-time background delivery (browser closed). Primary.
+- `/api/cron/reachouts` — optional backstop (Vercel daily cron, or an external `?secret=<CRON_SECRET>`
+  pinger) that sweeps any row QStash didn't deliver. Deduped by id, so no double-sends.
+- In-app catch-up — while a tab is open (even unfocused) it delivers anything still due; it stays quiet
+  when the tab is focused (you don't need a notification for a page you're already looking at).
 
-Synapse asks:
+### Supabase setup
 
-"Who are you trying to become, and what's the highest-leverage thing I can do right now to help you get there?"
-
-That question drives every feature in the product.
-
-✨ What Makes Synapse Different?
-Productivity Apps
-
-Track tasks.
-
-They don't understand the person doing them.
-
-AI Chatbots
-
-Give intelligent answers.
-
-But every conversation starts over.
-
-Habit Trackers
-
-Measure consistency.
-
-But they rarely understand why habits succeed or fail.
-
-Synapse
-
-Builds a long-term understanding of you.
-
-Remembers what matters.
-
-Learns from outcomes.
-
-Changes its mind when the evidence changes.
-
-Helps you act—not just think.
-
-🧠 How Synapse Works
-
-Synapse continuously gathers evidence from your interactions.
-
-That evidence becomes an evolving Person Model containing things like:
-
-your goals
-your trajectory
-recurring behaviors
-reliable strengths
-open questions
-commitments you've made
-habits you've built
-patterns it's confident about
-patterns it's still uncertain about
-
-Nothing is assumed.
-
-Everything is earned.
-
-If Synapse doesn't know something yet, it says so.
-
-🔄 The Core Loop
-
-Every interaction follows the same loop.
-
-Understand
-
-Learn what's happening.
-
-↓
-
-Reason
-
-Identify the highest-leverage opportunity.
-
-↓
-
-Commit
-
-Choose one meaningful next step.
-
-↓
-
-Act
-
-Support you while you actually do it.
-
-↓
-
-Reflect
-
-Find out what happened.
-
-↓
-
-Adapt
-
-Update its understanding of you.
-
-Over months, this creates something much more valuable than a history of conversations.
-
-It creates a relationship.
-
-🚀 Core Features
-🧠 Adaptive AI Partner
-
-Synapse isn't one fixed assistant.
-
-It adapts how it helps depending on what you need.
-
-Sometimes it becomes a planner.
-
-Sometimes a coach.
-
-Sometimes a strategist.
-
-Sometimes it simply listens.
-
-The role changes naturally based on the situation—not because you select a mode.
-
-🎯 Focus Companion
-
-Tell Synapse what you're working on.
-
-It quietly becomes a floating companion while you work.
-
-It:
-
-keeps time
-stays silent while you're in flow
-notices when you've genuinely drifted
-checks in sparingly
-helps you finish what you started
-
-It watches your rhythm—not your screen.
-
-🪞 The "You" Page
-
-Rather than showing a profile, Synapse shows its current understanding of you.
-
-Including:
-
-who you're becoming
-patterns it's confident about
-ideas it's still testing
-habits you've built
-moments where it changed its mind
-what it thinks matters most next
-
-It's a living mirror—not a dashboard.
-
-📈 Momentum
-
-Synapse doesn't measure streaks.
-
-It measures momentum.
-
-Are you building?
-
-Recovering?
-
-Stalling?
-
-Drifting?
-
-Momentum helps Synapse decide when to challenge you, when to simplify the next step, and when to simply ask what's going on.
-
-🤝 Commitments
-
-Every meaningful conversation ends with one concrete commitment.
-
-The next time you return, Synapse remembers.
-
-Not to judge.
-
-To continue the conversation.
-
-Progress isn't forgotten.
-
-Neither are promises.
-
-📊 Weekly Review
-
-Once a week, Synapse steps back.
-
-It doesn't summarize your data.
-
-It explains:
-
-what changed
-what surprised it
-what it's learning about you
-what it changed its mind about
-the highest-leverage decision for next week
-
-The goal isn't reporting.
-
-It's understanding.
-
-🧪 Built on Evidence
-
-Synapse never pretends to know more than it does.
-
-Every meaningful conclusion must earn enough evidence before it's surfaced.
-
-The reasoning engine uses statistical confidence, hypothesis tracking, and long-term memory to decide when an insight is trustworthy.
-
-When the evidence is weak, Synapse simply says:
-
-"I don't know yet."
-
-That honesty is a feature—not a limitation.
-
-🛡 Safety
-
-Synapse is designed to support—not replace—human judgment.
-
-It does not diagnose medical conditions, prescribe treatments, or make decisions for you.
-
-Its role is to help you think more clearly, notice patterns you might otherwise miss, and make better-informed choices.
-
-You remain in control.
-
-🎨 Design Principles
-
-Every interaction should feel:
-
-Calm
-Personal
-Thoughtful
-Honest
-Adaptive
-Quietly intelligent
-
-The best version of Synapse shouldn't feel like software.
-
-It should feel like someone who genuinely understands how you work.
-
-🌎 Long-Term Vision
-
-We believe AI shouldn't simply become smarter.
-
-It should become better at understanding people.
-
-Our vision is to build an adaptive partner that grows alongside each person for years—learning, changing its mind, supporting ambitions, protecting momentum, and helping people become who they want to become.
-
-Not by replacing human judgment.
-
-By making it better.
-
-🛠 Technology
-Next.js
-TypeScript
-React
-Tailwind CSS
-Adaptive reasoning engine
-Long-term Person Model
-Evidence-based hypothesis system
-Momentum & commitment layer
-Focus Companion
-Persistent memory
-📄 License
-
-This project is currently under active development.
-
-All rights reserved unless otherwise specified.
+- Create the `synapse_state` table with row-level security scoping each row to `auth.uid() = user_id`.
+- (Optional) Create the `waitlist` table (SQL is documented in `app/api/waitlist/route.ts`).
+- Enable the auth providers you want (Email, Google) and add your deployed URL to the redirect allow-list.
+
+---
+
+## Project layout
+
+```
+app/                  Routes (App Router). Public marketing at app/page.tsx; the signed-in app under app/(app)/.
+  api/                Route handlers (chat, push, billing, cron, admin, …). Model routes are rate-limited.
+ai/                   The AI pipeline: comprehension → mode-scoped generation → grounding; prompts, schemas, safety.
+components/           UI. marketing/* (landing), shell/* (app frame), synapse/* (orb), companion-presence.tsx (orb chat).
+lib/                  Domain logic: goals, commitments, planner, presence, push, situation, rate-limit, etc.
+public/sw.js          Service worker for Web Push.
+env.ts                Validated environment (never read process.env elsewhere).
+```
+
+## How to make common changes
+
+- **Copy / marketing:** `app/page.tsx` and `components/marketing/*`.
+- **Assistant behavior / persona:** `ai/personality.ts` (charter) and `ai/prompts/index.ts` (per-task prompts).
+- **Chat reasoning:** `ai/comprehend.ts` (intent + mode), `ai/modes.ts` (per-mode rules), `ai/pipeline.ts` (flow), `ai/grounding.ts` (guardrails).
+- **SEO:** metadata in `app/layout.tsx` (+ per-page `metadata`), `app/robots.ts`, `app/sitemap.ts`, `app/opengraph-image.tsx`.
+- **Legal:** `app/privacy/page.tsx`, `app/terms/page.tsx`.
+
+## Security notes
+
+- Keep secrets in `.env.local` only; never commit it. Rotate any key that has been shared or exposed.
+- Model + waitlist + checkout endpoints are rate-limited (`lib/rate-limit.ts`); `/admin` is password-gated
+  and throttled server-side; the cron and admin fail closed without their secrets.
+- Before any release: run `npm run typecheck` and `npm run build`, and confirm `ADMIN_PASSWORD` and
+  `CRON_SECRET` are set in production.

@@ -94,17 +94,62 @@ export interface ReachoutInput {
   dedupeKey?: string;
 }
 
-export async function insertReachout(r: ReachoutInput): Promise<boolean> {
-  if (!URL || !SERVICE) return false;
-  const res = await sb("scheduled_reachouts?on_conflict=user_id,dedupe_key", {
+/** Insert a scheduled reach-out; returns the row id (so we can hand it to QStash), or null. */
+export async function insertReachout(r: ReachoutInput): Promise<string | null> {
+  if (!URL || !SERVICE) return null;
+  const res = await sb("scheduled_reachouts?on_conflict=user_id,dedupe_key&select=id", {
     method: "POST",
-    headers: { Prefer: "resolution=merge-duplicates,return=minimal" },
+    headers: { Prefer: "resolution=merge-duplicates,return=representation" },
     body: JSON.stringify({
       user_id: r.userId, fire_at: r.fireAt, title: r.title, body: r.body,
       url: r.url || null, kind: r.kind || "reachout", dedupe_key: r.dedupeKey || null,
     }),
   });
-  return res.ok;
+  if (!res.ok) return null;
+  try { const rows = (await res.json()) as { id?: string }[]; return rows?.[0]?.id ?? null; } catch { return null; }
+}
+
+export interface FullReachout { id: string; user_id: string; title: string; body: string; url: string | null; status: string }
+
+/** Look up one reach-out by id (used by the QStash delivery callback to send + mark it). */
+export async function getReachoutById(id: string): Promise<FullReachout | null> {
+  if (!URL || !SERVICE) return null;
+  try {
+    const res = await sb(`scheduled_reachouts?id=eq.${encodeURIComponent(id)}&select=id,user_id,title,body,url,status&limit=1`);
+    if (!res.ok) return null;
+    const rows = (await res.json()) as FullReachout[];
+    return rows?.[0] ?? null;
+  } catch { return null; }
+}
+
+/**
+ * Hand a scheduled reach-out to QStash, which will call our /api/push/deliver endpoint at the exact
+ * fire time — this is what makes reach-outs arrive with the browser fully closed, no cron polling.
+ * No-ops unless QSTASH_TOKEN is set and the app has a public https URL to be called back on.
+ */
+export async function scheduleReachoutDelivery(id: string, fireAtMs: number): Promise<boolean> {
+  const token = env.QSTASH_TOKEN;
+  const appUrl = (env.NEXT_PUBLIC_APP_URL || "").replace(/\/+$/, "");
+  if (!token || !/^https:\/\//i.test(appUrl)) return false;
+  const deliverUrl = `${appUrl}/api/push/deliver`;
+  const qstashBase = (env.QSTASH_URL || "https://qstash.upstash.io").replace(/\/+$/, "");
+  const notBefore = Math.max(Math.floor(fireAtMs / 1000), Math.floor(Date.now() / 1000) + 1);
+  try {
+    const res = await fetch(`${qstashBase}/v2/publish/${deliverUrl}`, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${token}`,
+        "content-type": "application/json",
+        "Upstash-Not-Before": String(notBefore),
+        "Upstash-Retries": "3",
+        // Dedupe on the reach-out id so a re-schedule of the same row doesn't double-queue.
+        "Upstash-Deduplication-Id": `ro-${id}`,
+      },
+      body: JSON.stringify({ id }),
+      cache: "no-store",
+    });
+    return res.ok;
+  } catch { return false; }
 }
 
 export interface DueReachout { id: string; user_id: string; title: string; body: string; url: string | null }

@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { verifyUserId, insertReachout, pushConfigured } from "@/lib/push/server";
+import { verifyUserId, insertReachout, scheduleReachoutDelivery, pushConfigured } from "@/lib/push/server";
 
 export const runtime = "nodejs";
 
@@ -30,7 +30,7 @@ export async function POST(req: Request) {
   const title = (body?.title || "Synapse").toString().slice(0, 120);
   const text = (body?.body || "Checking in — how did it go?").toString().slice(0, 400);
 
-  const ok = await insertReachout({
+  const id = await insertReachout({
     userId: uid,
     fireAt: new Date(fireAtMs).toISOString(),
     title,
@@ -38,5 +38,9 @@ export async function POST(req: Request) {
     url: body?.url || "/dashboard",
     dedupeKey: body?.dedupeKey,
   });
-  return NextResponse.json({ ok, fireAt: new Date(fireAtMs).toISOString() });
+  // Hand it to QStash for exact-time background delivery (fires with the browser closed). The DB row
+  // stays as a backstop for the in-app catch-up. If QStash isn't configured this is a no-op.
+  let scheduled = false;
+  if (id) scheduled = await scheduleReachoutDelivery(id, fireAtMs);
+  return NextResponse.json({ ok: !!id, scheduled, fireAt: new Date(fireAtMs).toISOString() });
 }

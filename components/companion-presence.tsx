@@ -92,6 +92,17 @@ export function CompanionPresence() {
   const [presence, setPresence] = useState<PresenceSignal | null>(null);
   const shownRef = useRef<PresenceSignal | null>(null); // the surfaced-but-unresolved signal, for learning
   const endRef = useRef<HTMLDivElement>(null);
+  const dialogRef = useRef<HTMLDivElement>(null);
+
+  // Accessibility: when the chat opens, move focus into it and allow Escape to close.
+  useEffect(() => {
+    if (!open) return;
+    const t = dialogRef.current?.querySelector("textarea") as HTMLTextAreaElement | null;
+    t?.focus();
+    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") setOpen(false); };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [open]);
 
   // Step aside whenever the Focus Companion owns the orb.
   useEffect(() => {
@@ -298,7 +309,7 @@ export function CompanionPresence() {
   return (
     <div className="fixed bottom-4 right-4 z-[70] flex flex-col items-end gap-2 pb-[env(safe-area-inset-bottom)] pr-[env(safe-area-inset-right)] print:hidden">
       {open && (
-        <div role="dialog" aria-label="Talk to Synapse" className="flex w-[min(20rem,88vw)] flex-col overflow-hidden rounded-3xl border bg-surface/95 shadow-lift backdrop-blur animate-fade-up">
+        <div ref={dialogRef} role="dialog" aria-modal="true" aria-label="Talk to Synapse" className="flex w-[min(20rem,88vw)] flex-col overflow-hidden rounded-3xl border bg-surface/95 shadow-lift backdrop-blur animate-fade-up">
           <div className="flex items-center justify-between gap-3 border-b px-4 py-3">
             <button onClick={() => { setOpen(false); try { router.push("/dashboard"); } catch {} }} title="Back to home" aria-label="Back to home"
               className="flex items-center gap-2 rounded-full py-0.5 pr-2 text-left transition-opacity hover:opacity-70">
@@ -306,7 +317,7 @@ export function CompanionPresence() {
               <span className="text-sm font-semibold text-ink">Synapse</span>
               <Home className="h-3.5 w-3.5 text-muted" />
             </button>
-            <button onClick={() => setOpen(false)} aria-label="Close" className="grid h-8 w-8 place-items-center rounded-full text-muted hover:bg-surface-2 hover:text-ink"><X className="h-4 w-4" /></button>
+            <button onClick={() => setOpen(false)} aria-label="Close" className="grid h-10 w-10 place-items-center rounded-full text-muted hover:bg-surface-2 hover:text-ink"><X className="h-4 w-4" /></button>
           </div>
           <div className="max-h-64 space-y-2 overflow-y-auto px-4 py-3">
             {msgs.map((m) => {
@@ -352,7 +363,7 @@ export function CompanionPresence() {
             <ChatTextarea value={input} onValueChange={setInput} onSubmit={() => void send(input)} maxHeight={120}
               placeholder="Ask Synapse anything…"
               className="min-w-0 flex-1 rounded-2xl border bg-surface px-3 py-1.5 text-sm leading-relaxed text-ink placeholder:text-muted focus:outline-none" />
-            <button onClick={() => void send(input)} disabled={busy || !input.trim()} aria-label="Send" className="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-orange-500 text-white transition hover:bg-orange-600 disabled:opacity-50"><ArrowRight className="h-4 w-4" /></button>
+            <button onClick={() => void send(input)} disabled={busy || !input.trim()} aria-label="Send" className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-orange-500 text-white transition hover:bg-orange-600 disabled:opacity-50"><ArrowRight className="h-4 w-4" /></button>
           </div>
         </div>
       )}
@@ -368,7 +379,7 @@ export function CompanionPresence() {
               <button onClick={() => clearPresence(presence)} className="rounded-full px-2.5 py-1 text-xs font-medium text-muted transition hover:text-ink">Not now</button>
             </div>
           </div>
-          <button onClick={() => clearPresence(presence)} aria-label="Dismiss" className="grid h-7 w-7 shrink-0 place-items-center rounded-full text-muted hover:bg-surface-2 hover:text-ink"><X className="h-4 w-4" /></button>
+          <button onClick={() => clearPresence(presence)} aria-label="Dismiss" className="grid h-9 w-9 shrink-0 place-items-center rounded-full text-muted hover:bg-surface-2 hover:text-ink"><X className="h-4 w-4" /></button>
         </div>
       )}
 

@@ -36,7 +36,13 @@ button:active, [role="button"]:active { transform: scale(0.985); }
 /* ui-ux-pro-max checklist: pointer cursor on every clickable, and a clearly-visible, on-brand focus ring. */
 button:not(:disabled), [role="button"]:not([aria-disabled="true"]), summary, label[for] { cursor: pointer; }
 button:disabled { cursor: not-allowed; }
-:focus-visible { outline: 2px solid rgba(249,115,22,0.8); outline-offset: 2px; border-radius: 6px; }
+/* Keyboard focus must ALWAYS be visible. `!important` so it wins over the many inputs/buttons that
+   use Tailwind's `focus:outline-none` (higher specificity) — otherwise keyboard users lose the ring. */
+:focus-visible { outline: 2px solid rgba(249,115,22,0.9) !important; outline-offset: 2px; border-radius: 6px; }
+/* A visually-hidden skip link that appears on keyboard focus. */
+.skip-link { position: absolute; left: 12px; top: -60px; z-index: 100; padding: 8px 14px; border-radius: 10px;
+  background: var(--surface, #0b1b2c); color: var(--ink, #eef4fb); font-size: 14px; transition: top .15s ease; }
+.skip-link:focus { top: 12px; }
 
 /* Mobile: inputs must be >=16px or iOS Safari zooms in on focus. Also allow the
    layout to use the *visual* viewport height and respect the home-indicator. */

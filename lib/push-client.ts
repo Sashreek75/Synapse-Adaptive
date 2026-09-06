@@ -91,6 +91,36 @@ export async function enablePush(): Promise<PushStatus> {
   return res.ok ? "on" : "off";
 }
 
+/**
+ * Self-heal on load: if notifications are granted but the push subscription is missing or has been
+ * rotated/expired by the browser, re-subscribe and re-register it with the server. A silently-dead
+ * subscription is a common reason background push stops arriving while the in-app fallback still works.
+ * No-ops (and never prompts) unless permission is already granted.
+ */
+export async function refreshPushSubscription(): Promise<PushStatus> {
+  if (!pushSupported()) return "unsupported";
+  const key = vapidKey();
+  if (!key) return "unconfigured";
+  if (Notification.permission !== "granted") return Notification.permission === "denied" ? "denied" : "off";
+  try {
+    const reg = await registration();
+    await navigator.serviceWorker.ready;
+    const sub =
+      (await reg.pushManager.getSubscription()) ||
+      (await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: urlBase64ToUint8Array(key) as unknown as BufferSource }));
+    const payload = serialize(sub);
+    if (!payload) return "off";
+    const token = await accessToken();
+    // Re-register (idempotent server-side, keyed by endpoint) so the server always has a live sub.
+    await fetch("/api/push/subscribe", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ token, subscription: payload, ua: navigator.userAgent }),
+    });
+    return "on";
+  } catch { return "off"; }
+}
+
 /** Unsubscribe this device and tell the server to forget it. */
 export async function disablePush(): Promise<PushStatus> {
   if (!pushSupported()) return "unsupported";
