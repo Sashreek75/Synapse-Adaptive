@@ -1,5 +1,14 @@
 import { NextResponse } from "next/server";
+import crypto from "crypto";
 import { env } from "@/env";
+import { rateLimited } from "@/lib/rate-limit";
+
+/** Constant-time string compare so the password can't be timing-attacked. */
+function safeEqual(a: string, b: string): boolean {
+  const ab = Buffer.from(a), bb = Buffer.from(b);
+  if (ab.length !== bb.length) return false;
+  return crypto.timingSafeEqual(ab, bb);
+}
 
 /**
  * POST /api/admin/stats — { password }
@@ -43,11 +52,19 @@ async function fetchAuthUsers(url: string, key: string): Promise<AuthUser[]> {
 }
 
 export async function POST(req: Request) {
+  // Brute-force protection: this endpoint returns all-user PII, so throttle hard, server-side.
+  if (rateLimited(req, "admin-stats", 5, 10 * 60_000)) {
+    return NextResponse.json({ ok: false, error: "Too many attempts. Try again later." }, { status: 429 });
+  }
+  // Fail CLOSED if no admin password is configured — never fall back to a guessable default.
+  if (!env.ADMIN_PASSWORD) {
+    return NextResponse.json({ ok: false, error: "unavailable" }, { status: 503 });
+  }
   let body: unknown = null;
   try { body = await req.json(); } catch {}
   const password = typeof (body as { password?: unknown })?.password === "string" ? (body as { password: string }).password : "";
 
-  if (password !== env.ADMIN_PASSWORD) {
+  if (!safeEqual(password, env.ADMIN_PASSWORD)) {
     return NextResponse.json({ ok: false, error: "unauthorized" }, { status: 401 });
   }
 

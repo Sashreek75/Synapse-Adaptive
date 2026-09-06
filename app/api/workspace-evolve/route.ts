@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { rateLimited } from "@/lib/rate-limit";
 import { callModel, extractJson } from "@/ai/client";
 import { WORKSPACE_EVOLVE_PROMPT } from "@/ai/prompts";
 import { postGate } from "@/ai/safety";
@@ -35,6 +36,7 @@ function clamp(raw: unknown): WorkspaceEvolveOutput | null {
 }
 
 export async function POST(req: Request) {
+  if (rateLimited(req, "workspace-evolve", 15, 60_000)) return NextResponse.json({ error: "Slow down a moment." }, { status: 429 });
   let body: EvolveRequest;
   try { body = await req.json(); } catch { return NextResponse.json({ evolve: null }); }
   const title = (body.title || "").slice(0, 200);

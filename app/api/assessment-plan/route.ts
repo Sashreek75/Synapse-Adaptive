@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { rateLimited } from "@/lib/rate-limit";
 import { callModel, extractJson } from "@/ai/client";
 import { ASSESSMENT_PROMPT } from "@/ai/prompts";
 import { clampPlan, planAssessmentLocal, catalogForPrompt, type PlannerContext } from "@/lib/assessments/planner";
@@ -15,6 +16,7 @@ export const runtime = "nodejs";
  * BOTH the model prompt and the local fallback, so a protest always lands.
  */
 export async function POST(req: Request) {
+  if (rateLimited(req, "assessment-plan", 20, 60_000)) return NextResponse.json({ error: "Slow down a moment." }, { status: 429 });
   let ctx: PlannerContext;
   try { ctx = await req.json(); } catch { return NextResponse.json({ error: "Invalid request" }, { status: 400 }); }
   if (!ctx || !Array.isArray(ctx.snapshots)) return NextResponse.json({ error: "Invalid context" }, { status: 400 });

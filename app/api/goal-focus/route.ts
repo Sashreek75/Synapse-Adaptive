@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { rateLimited } from "@/lib/rate-limit";
 import { callModel, extractJson } from "@/ai/client";
 import { GOAL_FOCUS_PROMPT } from "@/ai/prompts";
 import { postGate } from "@/ai/safety";
@@ -41,6 +42,7 @@ function cleanAllocation(raw: unknown, valid: Set<string>): Alloc | undefined {
 }
 
 export async function POST(req: Request) {
+  if (rateLimited(req, "goal-focus", 20, 60_000)) return NextResponse.json({ error: "Slow down a moment." }, { status: 429 });
   let body: FocusReq;
   try { body = await req.json(); } catch { return NextResponse.json({ focus: null }); }
   const goals = Array.isArray(body.goals) ? body.goals.slice(0, 12) : [];

@@ -1,21 +1,23 @@
 import { NextResponse } from "next/server";
 import { createCheckoutSession } from "@/lib/billing/stripe";
 import { env } from "@/env";
+import { rateLimited } from "@/lib/rate-limit";
 
 export const runtime = "nodejs";
 
 /** Start the Pro ($10/mo) upgrade. Returns a Checkout URL to redirect to. */
 export async function POST(req: Request) {
-  let email: string | undefined;
+  if (rateLimited(req, "checkout", 10, 60_000)) return NextResponse.json({ error: "Slow down a moment." }, { status: 429 });
   let plan: "pro" | "max" = "pro";
   try {
-    ({ email, plan } = await req.json());
+    ({ plan } = await req.json());
   } catch {
     /* body optional */
   }
   try {
+    // We do NOT accept a client-supplied email — Stripe Checkout collects and verifies it itself, so
+    // nobody can spin up sessions prefilled with someone else's address.
     const { url, mock } = await createCheckoutSession({
-      email,
       plan: plan === "max" ? "max" : "pro",
       successUrl: `${env.NEXT_PUBLIC_APP_URL}/billing?status=success`,
       cancelUrl: `${env.NEXT_PUBLIC_APP_URL}/billing?status=cancelled`,

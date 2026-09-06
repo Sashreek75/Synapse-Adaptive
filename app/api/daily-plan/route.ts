@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { rateLimited } from "@/lib/rate-limit";
 import { callModel, extractJson } from "@/ai/client";
 import { DAILY_PROMPT } from "@/ai/prompts";
 import { postGate } from "@/ai/safety";
@@ -64,6 +65,7 @@ function clampCheckin(raw: unknown): DailyCheckinOutput | null {
 }
 
 export async function POST(req: Request) {
+  if (rateLimited(req, "daily-plan", 20, 60_000)) return NextResponse.json({ error: "Slow down a moment." }, { status: 429 });
   let body: DailyPlanRequest;
   try {
     body = await req.json();

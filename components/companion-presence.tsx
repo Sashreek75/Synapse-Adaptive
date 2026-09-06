@@ -23,7 +23,7 @@ import { useHealth } from "@/components/providers/health-store";
 import { useSubscription } from "@/components/providers/subscription-provider";
 import { preGate, CRISIS_RESPONSE } from "@/ai/safety";
 import { loadSession, newSession, saveSession, DURATION_PRESETS } from "@/lib/focus-session";
-import { loadCommitments } from "@/lib/commitments";
+import { loadCommitments, pruneStaleCommitments } from "@/lib/commitments";
 import { loadHistory } from "@/lib/focus-session";
 import { readMomentum } from "@/lib/momentum";
 import { convictionContextLines } from "@/lib/convictions";
@@ -104,6 +104,9 @@ export function CompanionPresence() {
     return () => { window.removeEventListener("synapse:focus-start", h); window.removeEventListener("synapse:focus-end", h); window.removeEventListener("storage", h); };
   }, []);
 
+  // Self-heal on load: lapse any commitment left open for days so nothing stale ever resurfaces.
+  useEffect(() => { try { pruneStaleCommitments(); } catch {} }, []);
+
   // PRESENCE — reach out first, but only when it's earned. Evaluates only while the orb is
   // closed; most of the time it finds nothing, which is exactly the point.
   useEffect(() => {
@@ -126,10 +129,80 @@ export function CompanionPresence() {
     return () => { if (shownRef.current) { recordPresenceOutcome(shownRef.current.kind, "ignored"); shownRef.current = null; } };
   }, [pathname]);
 
-  const openPresence = (sig: PresenceSignal) => { recordPresenceOutcome(sig.kind, "opened"); shownRef.current = null; setPresence(null); setPendingFocus(null); setMsgs([{ id: "intro", from: "synapse", text: sig.headline }]); setOpen(true); };
   const clearPresence = (sig: PresenceSignal) => { recordPresenceOutcome(sig.kind, "dismissed"); shownRef.current = null; dismissPresence(sig); setPresence(null); };
 
   const scroll = () => requestAnimationFrame(() => endRef.current?.scrollIntoView({ behavior: "smooth" }));
+
+  // Run the invisible tag protocols on a model reply (record rec/principle/mindshift/observation,
+  // schedule any earned reach-out) and return clean text. Shared by the typed chat AND the proactive
+  // opener so both behave identically — same engine, same side effects.
+  const handleModelReply = useCallback((raw: string): string => {
+    const rec = extractRecTag(raw);
+    if (rec.text) { try { recordRecommendation(rec.text, rec.goalId); } catch {} }
+    const pr = extractPrincipleTag(rec.cleaned);
+    if (pr.text) { try { addPrinciple(pr.text); } catch {} }
+    const ms = extractMindShiftTag(pr.cleaned);
+    if (ms.to) { try { addMindShift({ from: ms.from ?? "", to: ms.to }); } catch {} }
+    const obs = extractObserveTags(ms.cleaned);
+    for (const o of obs.observations) { try { addObservation(o.patternKey, o.note); } catch {} }
+    const ro = extractReachoutOffer(obs.cleaned);
+    if (ro.offer) { try { void scheduleReachout(ro.offer.minutes, ro.offer.message); } catch {} }
+    return ro.cleaned;
+  }, [addObservation]);
+
+  // The FULL context Synapse reasons over — IDENTICAL to the main chat's. Both the typed orb chat and
+  // the proactive opener use this, so the companion is never "dumber" or out of sync with the engine.
+  const assembleContext = useCallback((recentConvo: string, extra: string[] = []): string => {
+    const now = new Date().toLocaleString(undefined, { weekday: "long", month: "long", day: "numeric", hour: "numeric", minute: "2-digit" });
+    const goal = mind?.trajectory?.statement;
+    const mom = readMomentum(loadCommitments(), loadHistory());
+    const here = pathname || "/";
+    return [
+      "Right now it is " + now + ".",
+      "You are Synapse, riding along in a small companion window the user opened over whatever page they're on — one continuous conversation that travels with them everywhere. Answer right here in 1-3 short sentences: warm, specific, and immediately useful. Lead with the single most valuable thing and stop; never write a long paragraph or a wall of text — if it is getting long, cut it. Never mention pages, routes, or navigation — you are simply with them.",
+      "The user is currently looking at " + describePage(here) + ". If they ask what something here means — a check-in question, one of their numbers, what the weekly report is saying — answer it directly and specifically, using what you know about them. They are already on this page, so never offer to take them where they already are.",
+      here.startsWith("/onboarding")
+        ? "IMPORTANT CONTEXT: they are in first-time setup right now, on the step where they pick focus areas — and they can select MORE THAN ONE. The exact options on screen are: Work & career; Studying & learning; Focus & productivity; Fitness & training; Building better habits; Stress & wellbeing; Health & wellbeing; Personal growth. If they ask which to choose, first tell them they can pick several, then point to the specific option(s) from THIS list that match what they told you. Do NOT tell them to lock in a task for tomorrow or start a focus session — they are still setting up."
+        : "",
+      goal ? "They are working to become: " + goal + "." : "",
+      goalsContextBlock(),
+      allocationContextBlock(),
+      calibrationContextBlock(),
+      challengeContextBlock(),
+      decisionsContextBlock(),
+      principlesContextBlock(),
+      evidenceContextBlock(checkIns),
+      pftContextBlock(),
+      presenceContextBlock(),
+      situationContextBlock(),
+      obligationsContextBlock(profile),
+      plannerNotesContextBlock(),
+      activityContextBlock(),
+      dailyActivityLog(contextNotes),
+      ...convictionContextLines(),
+      mom.observation ? "Momentum: " + mom.observation : "",
+      recentConvo ? "RECENT CONVERSATION (continue it naturally, don't repeat yourself):" + NL + recentConvo : "",
+      ...extra,
+    ].filter(Boolean).join(NL);
+  }, [mind, profile, checkIns, contextNotes, pathname]);
+
+  // The proactive opener — generated through the SAME engine + context as the main chat (not a canned
+  // string), seeded by the earned signal, so it opens grounded in what's ACTUALLY recent and relevant.
+  const openPresence = useCallback(async (sig: PresenceSignal) => {
+    recordPresenceOutcome(sig.kind, "opened"); shownRef.current = null; setPresence(null); setPendingFocus(null);
+    setMsgs([{ id: "intro", from: "synapse", text: sig.headline }]); // instant placeholder while the engine composes
+    setOpen(true); setBusy(true); scroll();
+    try {
+      const ctx = assembleContext("", [
+        `YOU ARE OPENING THIS CONVERSATION (the user hasn't spoken yet). Your internal reason for reaching out: ${sig.why} Open in 1–2 warm, specific sentences grounded in what's ACTUALLY recent and relevant right now. If that reason is stale or no longer what matters most, do NOT force it — lead with what actually matters. Never present something old as if it just happened.`,
+      ]);
+      const res = await fetch("/api/chat", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ message: sig.ask, tier, context: ctx }) });
+      const data = await res.json();
+      const text = handleModelReply(String((data && data.content) || ""));
+      if (text) setMsgs([{ id: "intro", from: "synapse", text }]);
+    } catch { /* keep the placeholder headline */ }
+    finally { setBusy(false); scroll(); }
+  }, [assembleContext, handleModelReply, tier]);
 
   // Synapse offered to build a tool — create it and open the space.
   const buildFromOffer = useCallback((description: string) => {
@@ -196,60 +269,22 @@ export function CompanionPresence() {
 
     setBusy(true);
     try {
-      const now = new Date().toLocaleString(undefined, { weekday: "long", month: "long", day: "numeric", hour: "numeric", minute: "2-digit" });
-      const goal = mind?.trajectory?.statement;
-      const mom = readMomentum(loadCommitments(), loadHistory());
       const recent = msgs.filter((m) => m.id !== "intro").slice(-6).map((m) => (m.from === "you" ? "User: " : "You: ") + m.text).join(NL);
-      const ctx = [
-        "Right now it is " + now + ".",
-        "You are Synapse, riding along in a small companion window the user opened over whatever page they're on — one continuous conversation that travels with them everywhere. Answer right here in 1-3 short sentences: warm, specific, and immediately useful. Lead with the single most valuable thing and stop; never write a long paragraph or a wall of text — if it is getting long, cut it. Never mention pages, routes, or navigation — you are simply with them.",
-        "The user is currently looking at " + describePage(here) + ". If they ask what something here means — a check-in question, one of their numbers, what the weekly report is saying — answer it directly and specifically, using what you know about them. They are already on this page, so never offer to take them where they already are.",
-        here.startsWith("/onboarding")
-          ? "IMPORTANT CONTEXT: they are in first-time setup right now, on the step where they pick focus areas — and they can select MORE THAN ONE. The exact options on screen are: Work & career; Studying & learning; Focus & productivity; Fitness & training; Building better habits; Stress & wellbeing; Health & wellbeing; Personal growth. If they ask which to choose, first tell them they can pick several, then point to the specific option(s) from THIS list that match what they told you (e.g. wanting to be more focused, productive, and disciplined → pick 'Focus & productivity', and usually 'Building better habits' too). Do NOT tell them to lock in a task for tomorrow or start a focus session — they are still setting up; keep it to choosing the right area(s) on this screen."
-          : "",
-        goal ? "They are working to become: " + goal + "." : "",
-        goalsContextBlock(),
-        allocationContextBlock(),
-        calibrationContextBlock(),
-        challengeContextBlock(),
-        decisionsContextBlock(),
-        principlesContextBlock(),
-        evidenceContextBlock(checkIns),
-        pftContextBlock(),
-        presenceContextBlock(),
-        situationContextBlock(),
-        obligationsContextBlock(profile),
-        plannerNotesContextBlock(),
-        activityContextBlock(),
-        dailyActivityLog(contextNotes),
-        ...convictionContextLines(),
-        mom.observation ? "Momentum: " + mom.observation : "",
-        recent ? "RECENT CONVERSATION (continue it naturally, don't repeat yourself):" + NL + recent : "",
-        (() => {
-          const prior = [...msgs].reverse().find((mm) => mm.from === "synapse" && mm.id !== "intro");
-          const r = prior ? classifyReply(q) : null;
-          if (r === "affirm") return `IMPORTANT: "${q}" is a short YES to your previous message (treat "eys"/"k"/"sure" as yes). Do NOT repeat it — act on what you just proposed.`;
-          if (r === "deny") return `IMPORTANT: "${q}" is a short NO to your previous message. Acknowledge briefly and move on; don't repeat the offer.`;
-          return "";
-        })(),
-      ].filter(Boolean).join(NL);
+      const affirm = (() => {
+        const prior = [...msgs].reverse().find((mm) => mm.from === "synapse" && mm.id !== "intro");
+        const r = prior ? classifyReply(q) : null;
+        if (r === "affirm") return `IMPORTANT: "${q}" is a short YES to your previous message (treat "eys"/"k"/"sure" as yes). Do NOT repeat it — act on what you just proposed.`;
+        if (r === "deny") return `IMPORTANT: "${q}" is a short NO to your previous message. Acknowledge briefly and move on; don't repeat the offer.`;
+        return "";
+      })();
+      const ctx = assembleContext(recent, affirm ? [affirm] : []);
       const res = await fetch("/api/chat", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ message: q, tier, context: ctx }) });
       const data = await res.json();
-      const rec = extractRecTag(String((data && data.content) || ""));
-      if (rec.text) { try { recordRecommendation(rec.text, rec.goalId); } catch {} }
-      const pr = extractPrincipleTag(rec.cleaned);
-      if (pr.text) { try { addPrinciple(pr.text); } catch {} }
-      const ms = extractMindShiftTag(pr.cleaned);
-      if (ms.to) { try { addMindShift({ from: ms.from ?? "", to: ms.to }); } catch {} }
-      // Stage 2: capture conversational behavioral observations (silent — never changes the reply text).
-      const obs = extractObserveTags(ms.cleaned);
-      for (const o of obs.observations) { try { addObservation(o.patternKey, o.note); } catch {} }
-      const ro = extractReachoutOffer(obs.cleaned);
-      if (ro.offer) { try { void scheduleReachout(ro.offer.minutes, ro.offer.message); } catch {} }
-      setMsgs((m) => [...m, { id: `a_${Date.now()}`, from: "synapse", text: ro.cleaned || "I'm here — say a little more?" }]);
+      const text = handleModelReply(String((data && data.content) || ""));
+      setMsgs((m) => [...m, { id: `a_${Date.now()}`, from: "synapse", text: text || "I'm here — say a little more?" }]);
     } catch { setMsgs((m) => [...m, { id: `a_${Date.now()}`, from: "synapse", text: "I couldn't reach my reasoning just now — give it a second." }]); }
     finally { setBusy(false); scroll(); }
-  }, [busy, mind, tier, router, pathname, msgs]);
+  }, [busy, tier, router, pathname, msgs, assembleContext, handleModelReply]);
 
   useEffect(() => {
     if (open && msgs.length === 0) setMsgs([{ id: "intro", from: "synapse", text: "I'm right here, on this page with you. Ask me anything — including whatever you're looking at." }]);

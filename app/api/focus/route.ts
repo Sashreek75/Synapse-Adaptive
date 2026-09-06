@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { rateLimited } from "@/lib/rate-limit";
 import { generateReasoning, type ReasoningInput } from "@/ai/reasoning";
 import type { PlanId } from "@/lib/billing/plans";
 
@@ -11,6 +12,7 @@ export const runtime = "nodejs";
  * unavailable, so the loop is never empty.
  */
 export async function POST(req: Request) {
+  if (rateLimited(req, "focus", 30, 60_000)) return NextResponse.json({ error: "Slow down a moment." }, { status: 429 });
   let body: ReasoningInput & { tier?: PlanId };
   try {
     body = await req.json();

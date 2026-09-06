@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { rateLimited } from "@/lib/rate-limit";
 import { callModel, extractJson } from "@/ai/client";
 import { WORKSPACE_PROMPT } from "@/ai/prompts";
 import { postGate } from "@/ai/safety";
@@ -31,6 +32,7 @@ function clampWorkspace(raw: unknown): WorkspaceSpecOutput | null {
 }
 
 export async function POST(req: Request) {
+  if (rateLimited(req, "workspace", 15, 60_000)) return NextResponse.json({ error: "Slow down a moment." }, { status: 429 });
   let body: WorkspaceRequest;
   try { body = await req.json(); } catch { return NextResponse.json({ workspace: null }); }
   const request = (body.request || "").slice(0, 400);

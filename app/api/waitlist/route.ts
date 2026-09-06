@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { appendFile } from "node:fs/promises";
 import { join } from "node:path";
 import { env } from "@/env";
+import { rateLimited } from "@/lib/rate-limit";
 
 /**
  * POST /api/waitlist — { email, plan: "pro" | "max", note? }
@@ -65,6 +66,7 @@ async function storeLocally(row: WaitlistRow): Promise<boolean> {
 }
 
 export async function POST(req: Request) {
+  if (rateLimited(req, "waitlist", 5, 60_000)) return NextResponse.json({ ok: false, error: "Too many requests." }, { status: 429 });
   let body: unknown = null;
   try {
     body = await req.json();

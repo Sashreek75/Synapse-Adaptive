@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { verifyWebhook } from "@/lib/billing/stripe";
-import { env } from "@/env";
+import { env, flags } from "@/env";
 import {
   sendEmail,
   receiptEmail,
@@ -35,6 +35,11 @@ export async function POST(req: Request) {
     console.error("[billing] webhook verify failed", err);
     return NextResponse.json({ error: "Invalid signature" }, { status: 400 });
   }
+
+  // Only act on events when billing is LIVE (which means the signature above was actually verified).
+  // In mock/unconfigured mode we accept-and-ignore so nobody can POST a fake event to make us email
+  // arbitrary addresses via Resend.
+  if (!flags.billingLive) return NextResponse.json({ received: true, mock: true });
 
   const obj = event?.data?.object ?? {};
   const name: string = obj.customer_name || obj.customer_details?.name || "there";

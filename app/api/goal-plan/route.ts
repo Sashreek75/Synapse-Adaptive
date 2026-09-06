@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { rateLimited } from "@/lib/rate-limit";
 import { callModel, extractJson } from "@/ai/client";
 import { GOAL_PLAN_PROMPT } from "@/ai/prompts";
 import { postGate } from "@/ai/safety";
@@ -24,6 +25,7 @@ function clampPlan(raw: unknown): GoalPlanOutput | null {
 }
 
 export async function POST(req: Request) {
+  if (rateLimited(req, "goal-plan", 20, 60_000)) return NextResponse.json({ error: "Slow down a moment." }, { status: 429 });
   let body: GoalPlanRequest;
   try { body = await req.json(); } catch { return NextResponse.json({ plan: null }); }
   const title = (body.title || "").slice(0, 200);

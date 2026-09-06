@@ -2,7 +2,7 @@
   "name": "synapse-adaptive",
   "version": "0.1.0",
   "private": true,
-  "description": "Synapse Adaptive — AI Health Intelligence Between Healthcare Appointments",
+  "description": "Synapse Adaptive — an AI partner in follow-through: clarity, direction, accountability, and support to reach the goals that matter.",
   "scripts": {
     "dev": "next dev",
     "build": "next build",

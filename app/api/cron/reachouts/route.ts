@@ -1,6 +1,13 @@
 import { NextResponse } from "next/server";
+import crypto from "crypto";
 import { env } from "@/env";
 import { duePending, markReachout, sendToUser, pushConfigured } from "@/lib/push/server";
+
+function safeEqual(a: string, b: string): boolean {
+  const ab = Buffer.from(a), bb = Buffer.from(b);
+  if (ab.length !== bb.length) return false;
+  return crypto.timingSafeEqual(ab, bb);
+}
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -14,11 +21,14 @@ export const dynamic = "force-dynamic";
  * pinger can pass `?secret=<secret>`.
  */
 function authorized(req: Request): boolean {
-  if (!env.CRON_SECRET) return true; // no secret configured → allow (dev)
+  // Fail CLOSED: with no secret configured, only allow in development. In production an unset secret
+  // must NOT leave the send loop open to the public.
+  if (!env.CRON_SECRET) return process.env.NODE_ENV !== "production";
   const url = new URL(req.url);
-  if (url.searchParams.get("secret") === env.CRON_SECRET) return true;
+  const q = url.searchParams.get("secret");
+  if (q && safeEqual(q, env.CRON_SECRET)) return true;
   const auth = req.headers.get("authorization") || "";
-  return auth === `Bearer ${env.CRON_SECRET}`;
+  return safeEqual(auth, `Bearer ${env.CRON_SECRET}`);
 }
 
 async function run(req: Request) {

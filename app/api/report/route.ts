@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { rateLimited } from "@/lib/rate-limit";
 import { generateReport, generateProactiveNotices } from "@/ai/pipeline";
 import { goalMetricsForPath } from "@/lib/paths";
 import type { PlanId } from "@/lib/billing/plans";
@@ -12,6 +13,7 @@ export const runtime = "nodejs";
  * deterministic coach-voice fallback. No server-side fake data anywhere.
  */
 export async function POST(req: Request) {
+  if (rateLimited(req, "report", 15, 60_000)) return NextResponse.json({ error: "Slow down a moment." }, { status: 429 });
   let profile: HealthProfile & { path?: string };
   let series: MetricSeries[];
   let tier: PlanId = "pro";

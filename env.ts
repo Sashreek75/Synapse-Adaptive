@@ -19,8 +19,9 @@ const schema = z.object({
   NEXT_PUBLIC_SUPABASE_ANON_KEY: z.string().optional(),
   /** Server-only admin key (waitlist API + scripts). Never NEXT_PUBLIC, never in the client. */
   SUPABASE_SERVICE_ROLE_KEY: z.string().optional(),
-  /** Password that unlocks the founder admin dashboard (server-verified). Override in prod. */
-  ADMIN_PASSWORD: z.string().default("synapseisthebest"),
+  /** Password that unlocks the founder admin dashboard (server-verified). REQUIRED in prod — there is
+   *  no default, so if it's unset the admin endpoint fails closed (never a known/guessable fallback). */
+  ADMIN_PASSWORD: z.string().optional(),
 
   // Billing (Stripe)
   STRIPE_SECRET_KEY: z.string().optional(),

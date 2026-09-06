@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { Inter } from "next/font/google";
 import "./globals.css";
 import { AuthProvider } from "@/components/providers/auth-provider";
-import { InteractiveNeuralVortex } from "@/components/ui/interactive-neural-vortex-background";
+import { VortexBackground } from "@/components/ui/vortex-lazy";
 
 const inter = Inter({ subsets: ["latin"], variable: "--font-sans", display: "swap" });
 
@@ -63,7 +63,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       <body className={inter.variable}>
         {/* Site-wide living background: a navy+orange neural vortex over black, with a soft scrim
             on top so foreground text and cards stay readable. */}
-        <InteractiveNeuralVortex className="opacity-80" />
+        <VortexBackground className="opacity-80" />
         <div
           aria-hidden
           className="pointer-events-none fixed inset-0 -z-10"

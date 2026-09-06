@@ -1,12 +1,13 @@
 "use client";
 
 /**
- * REACH-OUT CATCH-UP — the offline safety net.
+ * REACH-OUT CATCH-UP — the safety net that makes reach-outs reliable whenever the tab is open.
  *
- * If a reach-out came due while the computer was closed, the push service may or may not deliver it
- * on reconnect. This makes it reliable: whenever the app opens (or regains focus), it asks the server
- * for reach-outs whose time already passed, and shows any it hasn't shown on THIS device yet —
- * noting that it was delayed because the computer was off. Renders nothing.
+ * True background push (tab fully closed) is delivered by the service worker when the server cron
+ * sends it. But if the cron is flaky, or the tab is OPEN-but-unfocused, that push may not surface in
+ * time. So this polls the server continuously while the app is open (not only on focus), and shows any
+ * due reach-out it hasn't shown on THIS device — UNLESS a push already displayed it (deduped by tag),
+ * so it never double-alerts. Result: an open tab always delivers on time, focused or not. Renders nothing.
  */
 
 import { useEffect } from "react";
@@ -52,13 +53,17 @@ export function ReachoutCatchup() {
           if (shown.includes(it.id)) continue;
           const fired = new Date(it.fireAt).getTime();
           if (Number.isNaN(fired) || fired > now) continue;
-          const lateMin = Math.round((now - fired) / 60000);
-          // Under ~3 min late it likely arrived on time via push — don't double-alert.
-          if (lateMin < 3) { shown.push(it.id); changed = true; continue; }
 
-          const body = `${it.body}\n(Delayed — your computer was off; this was ${delayPhrase(lateMin)}.)`;
+          // If a real push already displayed this (same tag) and it's still on screen, don't double-alert.
+          let already: Notification[] = [];
+          try { already = await reg.getNotifications({ tag: `synapse-ro-${it.id}` }); } catch {}
+          if (already.length) { shown.push(it.id); changed = true; continue; }
+
+          const lateMin = Math.round((now - fired) / 60000);
+          // Deliver promptly. Only call it out as delayed if it's meaningfully late (computer was off).
+          const late = lateMin >= 3 ? `\n(Delayed — this was ${delayPhrase(lateMin)}.)` : "";
           await reg.showNotification(it.title || "Synapse", {
-            body,
+            body: `${it.body}${late}`,
             icon: "/icon.svg",
             badge: "/icon.svg",
             tag: `synapse-ro-${it.id}`, // same tag as the push, so it replaces rather than duplicates
@@ -74,9 +79,14 @@ export function ReachoutCatchup() {
     };
 
     run();
+    // Poll continuously while the app is open — NOT just on focus — so an open-but-unfocused tab still
+    // delivers due reach-outs on time. Cheap: one small POST a minute, and it early-outs when nothing's due.
+    const iv = setInterval(run, 45_000);
     const onVis = () => { if (!document.hidden) run(); };
+    const onOnline = () => run();
     document.addEventListener("visibilitychange", onVis);
-    return () => document.removeEventListener("visibilitychange", onVis);
+    window.addEventListener("online", onOnline);
+    return () => { clearInterval(iv); document.removeEventListener("visibilitychange", onVis); window.removeEventListener("online", onOnline); };
   }, []);
 
   return null;

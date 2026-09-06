@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { answerChat } from "@/ai/pipeline";
 import { preGate, CRISIS_RESPONSE } from "@/ai/safety";
+import { rateLimited } from "@/lib/rate-limit";
 
 export const runtime = "nodejs";
 
@@ -43,6 +44,7 @@ const CHAT_DEPTH: Record<Tier, string> = {
 };
 
 export async function POST(req: Request) {
+  if (rateLimited(req, "chat", 40, 60_000)) return NextResponse.json({ role: "assistant", content: "One sec — that came through very fast. Try again in a moment." }, { status: 429 });
   let message = "";
   let context = "";
   let tier: Tier = "pro";

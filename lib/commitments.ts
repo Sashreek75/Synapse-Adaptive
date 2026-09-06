@@ -31,6 +31,8 @@ export interface Commitment {
 }
 
 const dayOf = (iso: string) => iso.slice(0, 10);
+const startOfDay = (d: Date) => new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
+const ageInDays = (iso: string, now: Date) => Math.floor((startOfDay(now) - startOfDay(new Date(iso))) / 864e5);
 
 export function loadCommitments(): Commitment[] {
   try { const r = localStorage.getItem(COMMITMENTS_KEY); return r ? (JSON.parse(r) as Commitment[]) : []; } catch { return []; }
@@ -46,11 +48,38 @@ export function openCommitment(list: Commitment[] = loadCommitments()): Commitme
   return open.length ? open[open.length - 1] : null;
 }
 
-/** The open commitment made on a PRIOR session — the one it's time to check in on. */
-export function commitmentAwaitingReport(list: Commitment[] = loadCommitments(), now = new Date()): Commitment | null {
+/**
+ * The open commitment made on a PRIOR session — the one it's time to check in on — but ONLY if it's
+ * still RECENT. A promise from yesterday is worth revisiting; one from 5 days ago is stale and
+ * resurfacing it just confuses ("you said schoolwork mattered" days after the conversation moved on).
+ * So we cap it: made on a prior day AND no older than `maxAgeDays`.
+ */
+export function commitmentAwaitingReport(list: Commitment[] = loadCommitments(), now = new Date(), maxAgeDays = 2): Commitment | null {
   const c = openCommitment(list);
   if (!c) return null;
-  return dayOf(c.createdAt) < now.toISOString().slice(0, 10) ? c : null;
+  if (dayOf(c.createdAt) >= now.toISOString().slice(0, 10)) return null; // made today → not "from a prior session"
+  return ageInDays(c.createdAt, now) <= maxAgeDays ? c : null;            // older than the window → stale, don't resurface
+}
+
+/**
+ * Self-healing: any commitment left OPEN longer than `maxOpenDays` is quietly lapsed to "dropped"
+ * (with a reason, never silently) so it stops polluting presence, obligations, and openers. Called on
+ * app load. Keeps the loop honest — a promise nobody reported on for days is no longer live.
+ */
+export function pruneStaleCommitments(now = new Date(), maxOpenDays = 4): boolean {
+  const list = loadCommitments();
+  const iso = now.toISOString();
+  let changed = false;
+  for (const c of list) {
+    if (c.status !== "open") continue;
+    if (ageInDays(c.createdAt, now) > maxOpenDays) {
+      c.status = "dropped"; c.resolvedAt = iso; c.reason = "went stale — never reported back";
+      c.history.push({ at: iso, status: "dropped", note: "auto-lapsed (stale)" });
+      changed = true;
+    }
+  }
+  if (changed) { save(list); emit(); }
+  return changed;
 }
 
 /** Make (or, if one already exists today, revise) today's ONE commitment. Any older
