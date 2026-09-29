@@ -36,6 +36,46 @@ const ADVICE_MARKERS: RegExp[] = [
   /\bnext step\b/i, /\bfirst,?\s+(?:do|start|tackle|knock)\b/i, /^\s*\d+[.)]\s+/m, /\bmake a plan\b/i,
 ];
 
+/** In a RECOMMEND turn the user asked you to DECIDE. These phrases dodge that — they hand the
+ *  decision back without making one. The cardinal failure of a decision engine. */
+const HEDGE_PATTERNS: RegExp[] = [
+  /\bit (?:really |ultimately |all |just )?depends\b/i,
+  /\bdepends (?:on|entirely on) (?:you|your|how you|what you)\b/i,
+  /\bboth (?:are (?:equally )?important|matter|have merit|are valid)\b/i,
+  /\bthey'?re both (?:important|valid|good options)\b/i,
+  /\bup to you\b/i, /\byour call\b/i,
+  /\b(?:that'?s|it'?s) (?:a )?(?:personal|your) (?:choice|decision|call)\b/i,
+  /\bthere'?s no (?:right|wrong|clear|single|one) (?:answer|choice|option)\b/i,
+  /\b(?:it'?s |that'?s )?hard to say\b/i,
+  /\bi can'?t (?:really )?(?:say|decide|tell you|make that call)\b/i,
+  /\beither (?:one )?(?:works|is fine|could work|would work)\b/i,
+  /\byou could (?:go with |pick |choose )?either\b/i,
+  /\bwhatever (?:feels right|you (?:think|prefer|decide))\b/i,
+  /\bonly you can (?:decide|answer|know)\b/i,
+  /\bdo what feels right\b/i,
+];
+/** Any of these means the reply DID commit to a pick — so a stray hedge phrase is not a dodge. */
+const COMMIT_PATTERNS: RegExp[] = [
+  /\bi'?d (?:start|do|go|pick|choose|focus|lean|put|give|tackle|prioriti[sz]e|say)\b/i,
+  /\bi would (?:start|do|go|pick|choose|focus|lean|prioriti[sz]e)\b/i,
+  /\bif (?:it were|i were) (?:me|you)\b/i,
+  /\bmy (?:pick|take|call|vote|recommendation|advice|money'?s on)\b/i,
+  /\bgo with\b/i, /\bstart with\b/i, /\blean(?:s|ing)? toward\b/i,
+  /\bprioriti[sz]e\b/i, /\bfocus on\b/i,
+  /\bdo (?:the |your )?[\w-]+ first\b/i,
+  /\bthe (?:better|smarter|stronger|right|clear) (?:move|call|choice|play|option) (?:here )?is\b/i,
+];
+
+/** In a CORRECT turn, re-arguing the rejected reading (rather than adopting it) is the failure. */
+const DEFENSIVE_PATTERNS: RegExp[] = [
+  /\bwhat i (?:meant|was saying) was\b/i,
+  /\b(?:like|as) i (?:said|mentioned|noted|explained)\b/i,
+  /\bi (?:was|wasn'?t) (?:trying to say|saying|suggesting)\b/i,
+  /\bto clarify what i (?:said|meant)\b/i,
+  /\bi (?:think|feel like) you (?:mis(?:understood|read)|took (?:that|it|me))\b/i,
+  /\bactually,? i (?:was|am) (?:right|correct)\b/i,
+];
+
 const has = (re: RegExp, s: string) => re.test(s);
 
 export interface GroundingResult { ok: boolean; issues: string[]; }
@@ -66,6 +106,27 @@ export function checkGrounding(message: string, reply: string, c: Comprehension)
   if ((c.responseMode === "ACKNOWLEDGE" || c.responseMode === "REFLECT")) {
     const qs = (reply.match(/\?/g) || []).length;
     if (qs >= 2) issues.push("asks multiple questions instead of letting them lead");
+  }
+
+  // 4b. A RECOMMEND turn must actually DECIDE. Hedging ("it depends", "both matter", "up to you")
+  //     without committing hands the choice back — the one thing they explicitly asked you not to do.
+  //     Asking the single question that would settle it is allowed (that's a legitimate pick-blocker).
+  if (c.responseMode === "RECOMMEND") {
+    const committed = COMMIT_PATTERNS.some((re) => has(re, reply));
+    const hedged = HEDGE_PATTERNS.some((re) => has(re, reply));
+    if (hedged && !committed && !reply.includes("?")) {
+      issues.push("hedges instead of committing to a pick (they asked you to decide — name your call, or ask the one question that would settle it)");
+    }
+  }
+
+  // 5. Correction turns: take the correction and move on. The reply must NOT re-litigate the
+  //    rejected read or drown the fix in apology — both make Synapse feel defensive, not corrigible.
+  if (c.responseMode === "CORRECT") {
+    const apologies = (reply.match(/\b(sorry|apolog(?:y|ies|ize|ise|ized|ised)|my (?:bad|mistake))\b/gi) || []).length;
+    if (apologies >= 2) issues.push("over-apologizes instead of just correcting course");
+    if (DEFENSIVE_PATTERNS.some((re) => has(re, reply))) {
+      issues.push("re-states or defends the old interpretation instead of taking the correction");
+    }
   }
 
   return { ok: issues.length === 0, issues };

@@ -10,7 +10,10 @@ import { env, flags } from "@/env";
  * that's 404 (gone) or 429 (quota) simply gets skipped — the agent stays up as
  * long as ANY available model has quota.
  */
-export interface ModelCall { system?: string; user: string; fast?: boolean; maxTokens?: number; temperature?: number }
+/** `images`: optional inline images (base64, no data: prefix) sent alongside the text — used by the
+ *  browser orb to let Synapse see the tab the person is looking at. Gemini flash models are multimodal. */
+export interface ModelImage { mimeType: string; data: string }
+export interface ModelCall { system?: string; user: string; fast?: boolean; maxTokens?: number; temperature?: number; images?: ModelImage[] }
 
 const API = "https://generativelanguage.googleapis.com/v1beta";
 const headers = () => ({ "content-type": "application/json", "x-goog-api-key": env.GEMINI_API_KEY as string });
@@ -66,7 +69,10 @@ function buildBody(c: ModelCall, noThinking: boolean) {
   if (noThinking) generationConfig.thinkingConfig = { thinkingBudget: 0 };
   return {
     ...(c.system ? { systemInstruction: { parts: [{ text: c.system }] } } : {}),
-    contents: [{ role: "user", parts: [{ text: c.user }] }],
+    contents: [{ role: "user", parts: [
+      ...(c.images ?? []).map((img) => ({ inline_data: { mime_type: img.mimeType, data: img.data } })),
+      { text: c.user },
+    ] }],
     generationConfig,
   };
 }

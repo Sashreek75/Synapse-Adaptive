@@ -11,6 +11,7 @@
 import { fallbackComprehension } from "@/ai/comprehend-core";
 import { buildTurnBrief } from "@/ai/modes";
 import { checkGrounding } from "@/ai/grounding";
+import { reopeningContext, type Recommendation } from "@/lib/decisions";
 import type { ResponseMode } from "@/ai/schemas";
 
 let pass = 0, fail = 0;
@@ -89,6 +90,52 @@ console.log("\nWiring — turn brief");
   ok("brief states RESPONSE MODE: ACKNOWLEDGE", /RESPONSE MODE: ACKNOWLEDGE/.test(brief));
   ok("brief carries the grounding hard-rule", /GROUNDING \(hard rule/.test(brief));
   ok("brief marks it as a statement, not a request", /statement, not a request/.test(brief));
+}
+
+// ── Test 9 — Compound (statement + request) → decision ──
+console.log("\nTest 9 — compound statement + request");
+ok("‘I have two assignments today. Which should I do first?’ → RECOMMEND", modeOf("I have two assignments today. Which should I do first?") === "RECOMMEND");
+ok("‘…which matters more, the SAT or the startup?’ → RECOMMEND", modeOf("Honestly which matters more right now, the SAT or the startup?") === "RECOMMEND");
+
+// ── Test 10 — Decision reopening awareness ──
+console.log("\nTest 10 — reopening a prior decision");
+{
+  const days = (n: number) => new Date(Date.now() - n * 86_400_000).toISOString();
+  const calls: Recommendation[] = [
+    { id: "r1", at: days(2), text: "protect the SAT this week and let the startup wait", status: "open" },
+    { id: "r2", at: days(9), text: "email three professors about the research role", status: "worked" },
+  ];
+  const reopen = reopeningContext("should i really protect the SAT or push the startup now?", calls);
+  ok("detects the user revisiting the SAT-vs-startup call", /REOPENING A DECISION/.test(reopen));
+  ok("references the actual prior recommendation text", /protect the SAT/.test(reopen));
+  ok("tells the model to reference it, not restart", /Reference the earlier call|hold your position/.test(reopen));
+  ok("an unrelated message does NOT trigger reopening", reopeningContext("what should i eat for dinner tonight", calls) === "");
+  const failed: Recommendation[] = [{ id: "r3", at: days(3), text: "wake up at 5am to study before school", status: "failed" }];
+  ok("a failed prior call is flagged as failed (don't just re-recommend)", /did NOT work last time/.test(reopeningContext("should i try waking up at 5am again to study?", failed)));
+}
+
+// ── Test 11 — Correction: take it, don't re-litigate or over-apologize ──
+console.log("\nTest 11 — correction is taken, not defended");
+{
+  const msg = "No, that's not what I meant — I meant the SAT, not the startup.";
+  ok("‘No, that's not what I meant…’ → CORRECT", modeOf(msg) === "CORRECT");
+  ok("a clean corrected reply PASSES", grounded(msg, "Got it — the SAT, then. Earliest deadline still wins, so I'd give tonight to that.").ok);
+  ok("re-stating the old read is REJECTED", !grounded(msg, "What I meant was that the startup deserves your focus tonight.").ok);
+  ok("blaming the user for misreading is REJECTED", !grounded(msg, "I think you misunderstood me — I was saying the startup comes first.").ok);
+  ok("drowning it in apology is REJECTED", !grounded(msg, "I'm so sorry, my mistake, sorry about that — the SAT it is.").ok);
+  ok("a single ‘sorry’ is fine", grounded(msg, "Sorry — the SAT, got it. That's where I'd put tonight.").ok);
+}
+
+// ── Test 12 — A decision turn must DECIDE (no hedging) ──
+console.log("\nTest 12 — RECOMMEND must commit, not hedge");
+{
+  const msg = "Should I work on the startup or the SAT tonight?";
+  ok("‘startup or SAT tonight?’ → RECOMMEND", modeOf(msg) === "RECOMMEND");
+  ok("a committed pick PASSES", grounded(msg, "I'd start with the SAT — its date is fixed and the startup can flex a day.").ok);
+  ok("‘it depends / both are important’ is REJECTED", !grounded(msg, "Honestly it depends — both are important, so it's really your call.").ok);
+  ok("‘up to you’ with no pick is REJECTED", !grounded(msg, "There's no right answer here; up to you which one you'd rather do.").ok);
+  ok("asking the ONE deciding question PASSES", grounded(msg, "Which has the nearer deadline — is the SAT this weekend, or further out? That decides it.").ok);
+  ok("a stray ‘it depends’ but a clear pick PASSES", grounded(msg, "It depends a little on your energy, but I'd go with the SAT tonight — fixed date wins.").ok);
 }
 
 console.log(`\n==================\n${pass} passed, ${fail} failed\n`);

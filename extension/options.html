@@ -1,0 +1,92 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Synapse Orb — Settings</title>
+<style>
+  :root { --bg:#07111d; --card:#0b1726; --line:rgba(124,157,191,.18); --fg:#e8eef6; --mute:#8aa0b8; --accent:#f97316; }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--fg); font: 14.5px/1.55 ui-sans-serif, system-ui, "Segoe UI", Roboto, sans-serif; }
+  main { max-width: 720px; margin: 0 auto; padding: 40px 20px 60px; }
+  header { display: flex; align-items: center; gap: 14px; margin-bottom: 28px; }
+  header img { width: 48px; height: 48px; }
+  h1 { font-size: 24px; margin: 0; letter-spacing: -.02em; }
+  header p { margin: 2px 0 0; color: var(--mute); }
+  section { background: var(--card); border: 1px solid var(--line); border-radius: 16px; padding: 20px; margin-bottom: 16px; }
+  h2 { font-size: 15px; margin: 0 0 4px; }
+  .hint { color: var(--mute); font-size: 13px; margin: 0 0 12px; }
+  label { display: block; font-weight: 600; font-size: 13px; margin: 14px 0 6px; }
+  input[type=text], input[type=number], textarea { width: 100%; background: #0f2034; color: var(--fg); border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; font: inherit; outline: none; }
+  input:focus, textarea:focus { border-color: rgba(249,140,60,.6); }
+  textarea { min-height: 96px; resize: vertical; }
+  .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  .check { display: flex; gap: 10px; align-items: center; font-weight: 500; margin-top: 14px; }
+  .check input { accent-color: var(--accent); width: 16px; height: 16px; }
+  button { border: 0; border-radius: 10px; padding: 10px 16px; font: inherit; font-weight: 600; cursor: pointer; background: var(--accent); color: #fff; }
+  button.ghost { background: rgba(255,255,255,.07); color: #c8d6e5; }
+  .bar { display: flex; gap: 10px; align-items: center; margin-top: 14px; flex-wrap: wrap; }
+  #saved, #ping { color: var(--mute); font-size: 13px; }
+  .stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
+  .stat { background: #0f2034; border-radius: 12px; padding: 12px; }
+  .stat b { display: block; font-size: 22px; }
+  .stat span { color: var(--mute); font-size: 12px; }
+  ul { margin: 12px 0 0; padding-left: 18px; color: var(--mute); font-size: 13px; }
+  li { margin: 3px 0; }
+  li b { color: var(--fg); font-weight: 600; }
+  @media (max-width: 560px) { .grid, .stats { grid-template-columns: 1fr; } }
+</style>
+</head>
+<body>
+<main>
+  <header>
+    <img src="icons/orb-128.png" alt="">
+    <div><h1>Synapse Orb</h1><p>Clarity and discipline, at the edge of your browser.</p></div>
+  </header>
+
+  <section>
+    <h2>Today</h2>
+    <p class="hint">What happened at the gate since midnight.</p>
+    <div class="stats">
+      <div class="stat"><b id="sPasses">0</b><span>passes granted</span></div>
+      <div class="stat"><b id="sMin">0</b><span>minutes on distractions</span></div>
+      <div class="stat"><b id="sDeny">0</b><span>denied or timed out</span></div>
+    </div>
+    <ul id="events"></ul>
+  </section>
+
+  <section>
+    <h2>What you're working toward</h2>
+    <p class="hint">Synapse uses this to judge your arguments at the gate and to give you advice in the chat. Be specific.</p>
+    <textarea id="goals" placeholder="e.g. Ship the Synapse orb by Friday. Keep my stats grade above a 90. Finish the tech ethics essay draft this week."></textarea>
+  </section>
+
+  <section>
+    <h2>Distracting sites</h2>
+    <p class="hint">One per line. Subdomains count too (youtube.com covers m.youtube.com).</p>
+    <textarea id="sites"></textarea>
+    <div class="grid">
+      <div><label for="windowSeconds">Seconds to make your case</label><input type="number" id="windowSeconds" min="5" max="120"></div>
+      <div><label for="maxMinutes">Longest pass Synapse can grant (minutes)</label><input type="number" id="maxMinutes" min="1" max="120"></div>
+    </div>
+  </section>
+
+  <section>
+    <h2>The orb</h2>
+    <label class="check"><input type="checkbox" id="orbEverywhere"> Show the orb on every site (hidden at the right edge until you hover)</label>
+    <label class="check"><input type="checkbox" id="shareScreenDefault"> Start with “Let Synapse see this tab” switched on</label>
+    <p class="hint" style="margin-top:12px">Shortcut: <b>Alt+Shift+S</b> opens the orb on any page. Change it at chrome://extensions/shortcuts.</p>
+  </section>
+
+  <section>
+    <h2>Synapse server</h2>
+    <p class="hint">Where your Synapse app is running. The AI key stays on the server; the extension never sees it.</p>
+    <input type="text" id="serverUrl" placeholder="http://localhost:3000">
+    <div class="bar"><button class="ghost" id="test">Test connection</button><span id="ping"></span></div>
+  </section>
+
+  <div class="bar"><button id="save">Save</button><span id="saved"></span></div>
+</main>
+<script src="options.js"></script>
+</body>
+</html>

@@ -6,7 +6,7 @@ import { detectBuildIntent, extractBuildOffer } from "@/lib/build-intent";
 import { createWorkspaceFromRequest } from "@/lib/workspaces";
 import { goalsContextBlock, findOrCreateGoal, decomposeGoal } from "@/lib/goals";
 import { challengeContextBlock } from "@/lib/coaching";
-import { extractRecTag, recordRecommendation, decisionsContextBlock } from "@/lib/decisions";
+import { extractRecTag, recordRecommendation, decisionsContextBlock, reopeningContext } from "@/lib/decisions";
 import { allocationContextBlock, calibrationContextBlock } from "@/lib/allocations";
 import { extractPrincipleTag, extractMindShiftTag, addPrinciple, addMindShift, principlesContextBlock } from "@/lib/principles";
 import { extractObserveTags } from "@/lib/observations";
@@ -358,7 +358,8 @@ export function AgentConsole({ embedded = false, immersive = false }: { embedded
         : reply === "deny"
           ? `\n\nIMPORTANT: The user's message "${q}" is a short NO/decline to your previous message. Acknowledge it in one line and move on — do NOT repeat the same offer.`
           : "";
-      const fullContext = `${nowLine}\n\n${memoryPreamble}${context}${transcript ? `\n\nRecent conversation:\n${transcript}` : ""}${replyNote}`;
+      const reopenNote = (() => { try { const r = reopeningContext(q); return r ? `\n\n${r}` : ""; } catch { return ""; } })();
+      const fullContext = `${nowLine}\n\n${memoryPreamble}${context}${transcript ? `\n\nRecent conversation:\n${transcript}` : ""}${replyNote}${reopenNote}`;
       const res = await fetch("/api/chat", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ message: q, tier: plan, context: fullContext }) });
       const data = await res.json();
       const rec = extractRecTag(String(data.content ?? ""));

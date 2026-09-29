@@ -32,7 +32,7 @@ import { detectNavIntent } from "@/lib/nav-intent";
 import { detectBuildIntent, extractBuildOffer } from "@/lib/build-intent";
 import { createWorkspaceFromRequest, workspaceContextBlock } from "@/lib/workspaces";
 import { challengeContextBlock } from "@/lib/coaching";
-import { extractRecTag, recordRecommendation, decisionsContextBlock } from "@/lib/decisions";
+import { extractRecTag, recordRecommendation, decisionsContextBlock, reopeningContext } from "@/lib/decisions";
 import { allocationContextBlock, calibrationContextBlock } from "@/lib/allocations";
 import { extractPrincipleTag, extractMindShiftTag, addPrinciple, addMindShift, principlesContextBlock } from "@/lib/principles";
 import { extractObserveTags } from "@/lib/observations";
@@ -288,7 +288,8 @@ export function CompanionPresence() {
         if (r === "deny") return `IMPORTANT: "${q}" is a short NO to your previous message. Acknowledge briefly and move on; don't repeat the offer.`;
         return "";
       })();
-      const ctx = assembleContext(recent, affirm ? [affirm] : []);
+      const reopen = reopeningContext(q);
+      const ctx = assembleContext(recent, [affirm, reopen].filter(Boolean) as string[]);
       const res = await fetch("/api/chat", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ message: q, tier, context: ctx }) });
       const data = await res.json();
       const text = handleModelReply(String((data && data.content) || ""));

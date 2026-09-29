@@ -59,6 +59,13 @@ export async function POST(req: Request) {
   const { text, source } = await answerChat(message, ctx, tier);
   if (source === "model" && text) return NextResponse.json({ role: "assistant", content: text });
 
-  const hasData = !!context && context !== "No data yet." && /Metric trends/.test(context);
+  // Does the context carry genuine substance about this person — on ANY surface — vs. a brand-new
+  // empty user? Keyed to the stable section headers our context blocks emit, NOT to one health-era
+  // string ("Metric trends"). The old single-string check meant an established user talking through
+  // the orb, or anyone with goals/planner/decisions but no metric check-ins, was wrongly told "I
+  // don't have any check-ins from you yet" whenever the model briefly hiccuped. Any of these markers
+  // ⇒ established ⇒ the honest "transient hiccup" message instead of the onboarding nudge.
+  const DATA_MARKERS = /Metric trends|This week'?s focus|Your Playbook|What I currently believe|Connections I'?ve found|Working to become:|\bGoals:|THEIR PLANNER|THE WHOLE BOARD|WHAT YOU HAVE ALREADY TRIED|Recent calls you'?ve made|REOPENING A DECISION|A PROMISE THEY MADE|commitment they set today|FOLLOW-THROUGH LIKELIHOOD/i;
+  const hasData = !!context && context.trim() !== "No data yet." && DATA_MARKERS.test(context);
   return NextResponse.json({ role: "assistant", ...fallback(message, hasData) });
 }

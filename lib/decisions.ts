@@ -89,19 +89,64 @@ export function winningStrategies(): Tally[] {
   return tallies().filter((t) => t.worked >= 2 && t.failed === 0).sort((a, b) => b.worked - a.worked);
 }
 
+const relativeDay = (iso: string, now = Date.now()): string => {
+  const days = Math.floor((now - new Date(iso).getTime()) / 86_400_000);
+  if (days <= 0) return "today";
+  if (days === 1) return "yesterday";
+  if (days < 7) return `${days} days ago`;
+  if (days < 14) return "last week";
+  return `${Math.floor(days / 7)} weeks ago`;
+};
+
+/** The most recent calls Synapse has made, newest first — the material for staying consistent. */
+export function recentCalls(n = 5): Recommendation[] {
+  return [...loadDecisions()].sort((a, b) => b.at.localeCompare(a.at)).slice(0, n);
+}
+
+/**
+ * If the current message looks like it's REVISITING a decision Synapse already made, return a line
+ * telling the model to hold consistent (reference the prior call; only revise with new information;
+ * say so plainly if it's changing its mind). Deterministic token-overlap match against recent calls.
+ */
+export function reopeningContext(message: string, calls: Recommendation[] = recentCalls(12)): string {
+  // Keep contentful tokens: words of 4+ chars, plus short but distinctive digit-bearing tokens (e.g. "5am", "3pm").
+  const tokenize = (s: string) => norm(s).split(" ").filter((w) => w.length >= 4 || /\d/.test(w));
+  const words = new Set(tokenize(message));
+  if (words.size < 2) return "";
+  let best: { rec: Recommendation; overlap: number } | null = null;
+  for (const rec of calls) {
+    const recWords = tokenize(rec.text);
+    if (!recWords.length) continue;
+    const hits = recWords.filter((w) => words.has(w)).length;
+    const overlap = hits / recWords.length;
+    if (hits >= 2 && overlap >= 0.4 && (!best || overlap > best.overlap)) best = { rec, overlap };
+  }
+  if (!best) return "";
+  const r = best.rec;
+  const statusNote = r.status === "failed" ? " — and it did NOT work last time, so don't just re-recommend it; say what's different now"
+    : r.status === "worked" ? " — which worked before; lean on that"
+    : r.status === "partial" ? " — which partly worked; build on the part that did" : "";
+  return `REOPENING A DECISION: this sounds like they're revisiting something you already weighed in on — you recommended "${r.text}" ${relativeDay(r.at)}${statusNote}. Do NOT restart from scratch or repeat yourself as if it's new. Reference the earlier call, hold your position UNLESS they've given you new information, and if you've genuinely changed your mind, say so plainly and why.`;
+}
+
 /**
  * Injected into every conversation so Synapse judges its own past advice: what worked, what to stop
- * forcing, and what's still awaiting a verdict.
+ * forcing, what's still awaiting a verdict, and the recent calls it must stay consistent with.
  */
 export function decisionsContextBlock(): string {
   const failed = failedStrategies().slice(0, 3);
   const won = winningStrategies().slice(0, 3);
   const open = openRecommendations(40).slice(-3); // open ~2+ days
-  if (!failed.length && !won.length && !open.length) return "";
+  const recent = recentCalls(5);
+  if (!failed.length && !won.length && !open.length && !recent.length) return "";
   const lines: string[] = ["WHAT YOU HAVE ALREADY TRIED WITH THEM (judge your own advice — this is how you get wiser, not just smarter):"];
   for (const t of failed) lines.push(`- ALREADY FAILED (${t.failed}x, never worked): "${t.text}". Do NOT suggest this again unless you first explain why THIS time will be different.`);
   for (const t of won) lines.push(`- Has worked for them (${t.worked}x): "${t.text}". Lean on what already works.`);
   for (const r of open) lines.push(`- Still unjudged: "${r.text}" (suggested earlier) — worth asking whether it actually helped, then adjust.`);
+  if (recent.length) {
+    lines.push("Recent calls you've made (stay CONSISTENT with these — if they revisit one, reference it and only change your mind with new evidence, out loud):");
+    for (const r of recent) lines.push(`- ${relativeDay(r.at)}: "${r.text}"${r.status !== "open" ? ` [${r.status}]` : ""}`);
+  }
   return lines.join(nl);
 }
 
