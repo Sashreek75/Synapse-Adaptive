@@ -11,7 +11,9 @@
     "dev": "node build.mjs && electron .",
     "typecheck": "tsc --noEmit -p .",
     "test": "node build.mjs --test && node dist/core.test.js",
-    "dist": "node build.mjs && electron-builder --win nsis --x64"
+    "dist": "node build.mjs && electron-builder",
+    "dist:win": "node build.mjs && electron-builder --win nsis --x64",
+    "dist:mac": "node build.mjs && electron-builder --mac"
   },
   "dependencies": {
     "koffi": "^2.9.0",
@@ -59,6 +61,33 @@
       "createStartMenuShortcut": true,
       "shortcutName": "Synapse"
     },
-    "publish": null
+    "publish": null,
+    "afterPack": "build/afterPack.cjs",
+    "mac": {
+      "target": [
+        {
+          "target": "dmg",
+          "arch": [
+            "universal"
+          ]
+        }
+      ],
+      "icon": "build/icon.png",
+      "category": "public.app-category.productivity",
+      "identity": null,
+      "artifactName": "Synapse-mac.dmg",
+      "files": [
+        "!node_modules/koffi/**"
+      ],
+      "extendInfo": {
+        "LSUIElement": true,
+        "NSAppleEventsUsageDescription": "Synapse checks which app is in front so it knows when you're working.",
+        "NSScreenCaptureUsageDescription": "Synapse looks at your screen only when you ask it something with the eye switched on."
+      }
+    },
+    "dmg": {
+      "title": "Synapse",
+      "artifactName": "Synapse-mac.dmg"
+    }
   }
 }

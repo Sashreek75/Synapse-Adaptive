@@ -24,7 +24,7 @@ export default function PrivacyPage() {
         </section>
         <section>
           <h2 className="text-lg font-semibold text-ink">Where it&apos;s kept</h2>
-          <p className="mt-3">On your computer, in one file in your Windows user folder (<code>%APPDATA%\Synapse\brain.json</code>). Activity is kept for 24 hours; the rest stays until you delete the file or uninstall. There are no accounts and nothing is synced.</p>
+          <p className="mt-3">On your computer, in one file: <code>%APPDATA%\Synapse\brain.json</code> on Windows, <code>~/Library/Application Support/Synapse/brain.json</code> on Mac. Activity is kept for 24 hours; the rest stays until you delete the file or uninstall. There are no accounts and nothing is synced.</p>
         </section>
         <section>
           <h2 className="text-lg font-semibold text-ink">What leaves your computer</h2>

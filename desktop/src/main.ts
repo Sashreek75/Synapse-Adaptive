@@ -9,7 +9,7 @@
  * brain, talks to the browser helper, and drives the orb window. There is no other interface
  * apart from a tray menu for the few settings that shouldn't be one impulse away.
  */
-import { app, BrowserWindow, Tray, Menu, ipcMain, screen, powerMonitor, globalShortcut, desktopCapturer, nativeImage, Notification, shell } from "electron";
+import { app, BrowserWindow, Tray, Menu, ipcMain, screen, powerMonitor, globalShortcut, desktopCapturer, nativeImage, Notification, shell, systemPreferences } from "electron";
 import path from "node:path";
 import fs from "node:fs";
 import { createSynapse, relayTransport, geminiTransport, siteName, cleanSite, type Synapse, type GateTurn } from "../../core/synapse";
@@ -20,6 +20,9 @@ declare const __RELAY_URL__: string;
 
 if (!app.requestSingleInstanceLock()) app.quit();
 app.setAppUserModelId("com.synapse.orb");
+const isMac = process.platform === "darwin";
+const SHORTCUT_LABEL = isMac ? "⌘⇧Space" : "Ctrl+Shift+Space";
+let screenPermissionMissing = false;
 
 /* ---------------- storage + core ---------------- */
 
@@ -220,6 +223,13 @@ function scheduleReachouts() {
 /* ---------------- clarity: ask ---------------- */
 
 async function captureScreen(): Promise<string | null> {
+  // macOS needs Screen Recording permission; without it the capture is just the wallpaper.
+  if (isMac && systemPreferences.getMediaAccessStatus("screen") !== "granted") {
+    screenPermissionMissing = true;
+    desktopCapturer.getSources({ types: ["screen"], thumbnailSize: { width: 1, height: 1 } }).catch(() => {}); // triggers the system prompt once
+    return null;
+  }
+  screenPermissionMissing = false;
   const prev = orb.getOpacity();
   orb.setOpacity(0);
   await new Promise((r) => setTimeout(r, 120));
@@ -239,7 +249,9 @@ async function ask(text: string, share: boolean) {
   const r = await syn.ask(text, { screenshot: shot, onboarding });
   scheduleReachouts();
   pushConfig(); // they may have added a distraction by talking
-  orb.webContents.send("orb", { type: "reply", text: r.text, sawScreen: r.sawScreen });
+  const note = share && screenPermissionMissing
+    ? "\n\n(I couldn't see your screen: allow Synapse under System Settings → Privacy & Security → Screen Recording, then reopen Synapse.)" : "";
+  orb.webContents.send("orb", { type: "reply", text: r.text + note, sawScreen: r.sawScreen });
 }
 
 function openAsk() {
@@ -254,8 +266,8 @@ function openAsk() {
 
 /* ---------------- background agent ---------------- */
 
-function sample() {
-  const fg = foreground();
+async function sample() {
+  const fg = await foreground();
   const idleSec = powerMonitor.getSystemIdleTime();
   if (!fg) return;
   if (/^synapse/i.test(fg.app) || /^electron/i.test(fg.app)) return;
@@ -271,11 +283,11 @@ function helperPath() {
 
 function buildTray() {
   const menu = Menu.buildFromTemplate([
-    { label: "Talk to Synapse          Ctrl+Shift+Space", click: openAsk },
+    { label: `Talk to Synapse          ${SHORTCUT_LABEL}`, click: openAsk },
     { type: "separator" },
     { label: bridge.connected ? "Browser helper: connected" : "Browser helper: not connected — set up…", click: () => openSettings("helper") },
     { label: "Distracting sites & limits…", click: () => openSettings("sites") },
-    { label: "Start with Windows", type: "checkbox", checked: app.getLoginItemSettings().openAtLogin, click: (i) => app.setLoginItemSettings({ openAtLogin: i.checked }) },
+    { label: isMac ? "Open at login" : "Start with Windows", type: "checkbox", checked: app.getLoginItemSettings().openAtLogin, click: (i) => app.setLoginItemSettings({ openAtLogin: i.checked }) },
     { type: "separator" },
     { label: "Quit Synapse", click: () => { syn.brain.noteAppEvent(`they quit Synapse at ${new Date().toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}`); syn.brain.flush(); app.exit(0); } },
   ]);
@@ -340,7 +352,9 @@ app.whenReady().then(() => {
   createOrb();
   wireIpc();
 
-  tray = new Tray(nativeImage.createFromPath(path.join(__dirname, "orb", "orb-32.png")));
+  if (isMac) app.dock?.hide();
+  const trayIcon = nativeImage.createFromPath(path.join(__dirname, "orb", isMac ? "orb-18.png" : "orb-32.png"));
+  tray = new Tray(trayIcon);
   tray.setToolTip("Synapse");
   tray.on("click", openAsk);
   buildTray();

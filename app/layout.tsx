@@ -7,7 +7,7 @@ const inter = Inter({ subsets: ["latin"], variable: "--font-sans", display: "swa
 const appUrl = process.env.NEXT_PUBLIC_APP_URL || "https://synapse-adaptive.vercel.app";
 const title = "Synapse — the layer between what you intend to do and what you actually do";
 const description =
-  "Synapse is a small orb at the edge of your Windows screen. It stays quiet while you work, stops you at the moment you reach for a distraction, and makes you give a real reason. Get Synapse for Windows.";
+  "Synapse is a small orb at the edge of your screen. It stays quiet while you work, stops you at the moment you reach for a distraction, and makes you give a real reason. Available for Windows and Mac.";
 
 export const metadata: Metadata = {
   metadataBase: new URL(appUrl),

@@ -1,7 +1,11 @@
 /**
- * Which window is in front — via the Win32 API (koffi FFI, no native build step).
- * Returns null on non-Windows platforms so the app still runs for development.
+ * Which window is in front.
+ *   Windows: the Win32 API through koffi (FFI, no native build step).
+ *   macOS:   System Events via osascript (the app name always; the window title once the user
+ *            grants Accessibility — without it we still know the app).
+ * Returns null anywhere else so the app still runs for development.
  */
+import { execFile } from "node:child_process";
 export interface Foreground { app: string; title: string }
 
 type Fn = (...args: unknown[]) => unknown;
@@ -34,7 +38,7 @@ function load() {
 
 const decode = (buf: Uint16Array, len: number) => String.fromCharCode(...buf.subarray(0, Math.max(0, len)));
 
-export function foreground(): Foreground | null {
+function foregroundWin(): Foreground | null {
   const a = load();
   if (!a) return null;
   try {
@@ -58,4 +62,32 @@ export function foreground(): Foreground | null {
   }
 }
 
-export const BROWSERS = /^(chrome|msedge|brave|opera|vivaldi|firefox)\.exe$/i;
+const MAC_SCRIPT = `
+tell application "System Events"
+  set p to first application process whose frontmost is true
+  set n to name of p
+  set t to ""
+  try
+    set t to name of front window of p
+  end try
+end tell
+return n & linefeed & t`;
+
+function foregroundMac(): Promise<Foreground | null> {
+  return new Promise((resolve) => {
+    execFile("osascript", ["-e", MAC_SCRIPT], { timeout: 3000 }, (err, out) => {
+      if (err) return resolve(null);
+      const [app, ...rest] = String(out).replace(/\n$/, "").split("\n");
+      resolve(app ? { app: app.trim().toLowerCase(), title: rest.join(" ").trim() } : null);
+    });
+  });
+}
+
+export async function foreground(): Promise<Foreground | null> {
+  if (process.platform === "win32") return foregroundWin();
+  if (process.platform === "darwin") return foregroundMac();
+  return null;
+}
+
+/** Browser processes whose tab the helper extension can tell us about. */
+export const BROWSERS = /^(chrome|msedge|brave|opera|vivaldi|arc)(\.exe)?$|^(google chrome|microsoft edge|brave browser|arc|opera|vivaldi)$/i;

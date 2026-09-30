@@ -76,3 +76,5 @@ a { color: inherit; }
 @media (max-width: 720px) { .lp-points { grid-template-columns: 1fr; } .lp-doc { width: 80%; } .lp-screen { height: 420px; } }
 
 .text-ink { color: var(--ink); } .text-muted { color: var(--mute); }
+
+.lp-alt { color: var(--ink); text-decoration: underline; text-underline-offset: 3px; }
