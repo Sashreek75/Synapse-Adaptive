@@ -1,0 +1,43 @@
+{
+  "name": "synapse-adaptive",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Synapse Adaptive — an AI partner in follow-through: clarity, direction, accountability, and support to reach the goals that matter.",
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "next lint",
+    "typecheck": "tsc --noEmit",
+    "users": "node scripts/count-users.mjs",
+    "waitlist": "node scripts/waitlist.mjs",
+    "eval:understanding": "tsx ai/evals/understanding.eval.ts",
+    "eval:live": "node --conditions=react-server --import tsx ai/evals/live.eval.ts",
+    "eval:gate": "node --conditions=react-server --env-file=.env.local --import tsx ai/evals/gate.eval.ts"
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "^2.108.2",
+    "@types/three": "^0.185.4",
+    "@upstash/qstash": "^2.11.3",
+    "clsx": "^2.1.1",
+    "lucide-react": "^0.408.0",
+    "next": "14.2.5",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "tailwind-merge": "^2.4.0",
+    "three": "^0.160.1",
+    "web-push": "^3.6.7",
+    "zod": "^3.23.8"
+  },
+  "devDependencies": {
+    "@types/node": "^20.14.10",
+    "@types/react": "^18.3.3",
+    "@types/react-dom": "^18.3.0",
+    "@types/web-push": "^3.6.4",
+    "autoprefixer": "^10.4.19",
+    "postcss": "^8.4.39",
+    "tailwindcss": "^3.4.6",
+    "tsx": "^4.19.2",
+    "typescript": "^5.5.3"
+  }
+}

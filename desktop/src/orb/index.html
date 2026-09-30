@@ -1,0 +1,37 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; style-src 'self'; script-src 'self'; img-src 'self' data:">
+<link rel="stylesheet" href="orb.css">
+</head>
+<body>
+  <div id="dock" class="dock">
+    <span id="chip" class="chip" hidden></span>
+    <div id="dockOrb" class="orb" style="--s:52px"><i class="bloom"></i><i class="ring"></i><i class="core"></i></div>
+  </div>
+
+  <section id="card" class="card" hidden>
+    <div class="bar"><span id="barFill"></span></div>
+    <header>
+      <div id="cardOrb" class="orb" style="--s:30px"><i class="bloom"></i><i class="ring"></i><i class="core"></i></div>
+      <div class="name">Synapse</div>
+      <button id="eye" class="icon" title="Let Synapse see your screen when you send" hidden>
+        <svg viewBox="0 0 24 24" width="16" height="16"><path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12Z" fill="none" stroke="currentColor" stroke-width="1.8"/><circle cx="12" cy="12" r="3" fill="none" stroke="currentColor" stroke-width="1.8"/><path id="eyeSlash" d="M4 4l16 16" stroke="currentColor" stroke-width="1.8"/></svg>
+      </button>
+      <div id="count" class="count" hidden></div>
+      <button id="x" class="icon" title="Close (Esc)">&times;</button>
+    </header>
+    <div id="body" class="body"></div>
+    <div id="compose" class="compose" hidden>
+      <textarea id="input" rows="1" spellcheck="true"></textarea>
+    </div>
+    <div id="actions" class="actions" hidden>
+      <button id="leave" class="btn ghost">Close it</button>
+      <button id="send" class="btn">Make my case</button>
+    </div>
+    <div id="hint" class="hint" hidden></div>
+  </section>
+<script src="orb.js"></script>
+</body>
+</html>

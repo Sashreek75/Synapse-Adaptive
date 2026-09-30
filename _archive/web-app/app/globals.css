@@ -1,0 +1,428 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Brand: deep navy · orange · warm near-white. Dark is the primary identity — a calm, intelligent
+   control room. Orange is a SIGNAL, not decoration: CTAs, active state, progress, Synapse moments.
+   Hierarchy comes from layered navy surfaces + typography + space, not from a rainbow of colors. */
+:root {
+  --font-sans: "Inter", system-ui, -apple-system, sans-serif;
+  --ink: #0e1a2b;          /* deep navy ink */
+  --muted: #556579;        /* muted blue-gray, AA on white and on the app bg */
+  --surface: #ffffff;      /* cards stay pure white so they lift off the page */
+  --surface-2: #e4e9f1;    /* app background — a soft cool tint, clearly not white, so cards have depth */
+  --line: #d6dde7;         /* borders with a bit more presence for structure */
+}
+/* The one signature theme: near-black base, deep-navy elevation, orange as the single signal.
+   The living neural-vortex background sits behind this, so surfaces are opaque enough to stay legible. */
+.dark {
+  --ink: #eef2f8;        /* warm near-white — never pure white */
+  --muted: #93a6ba;      /* muted blue-gray for secondary text */
+  --surface: #0b1b2c;    /* cards — a navy step above the black base */
+  --surface-2: #04070d;  /* app background — essentially black with a navy undertone */
+  --line: #16304a;       /* low-contrast navy hairline for borders */
+}
+* { border-color: var(--line); }
+html { scroll-behavior: smooth; -webkit-text-size-adjust: 100%; }
+body {
+  background-color: var(--surface-2); color: var(--ink); font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased; text-rendering: optimizeLegibility;
+  font-feature-settings: "cv02","cv03","cv04","ss01";
+}
+h1, h2, h3 { letter-spacing: -0.02em; }
+::selection { background: rgba(249,115,22,0.22); color: var(--ink); }
+button { -webkit-tap-highlight-color: transparent; }
+button:active, [role="button"]:active { transform: scale(0.985); }
+/* ui-ux-pro-max checklist: pointer cursor on every clickable, and a clearly-visible, on-brand focus ring. */
+button:not(:disabled), [role="button"]:not([aria-disabled="true"]), summary, label[for] { cursor: pointer; }
+button:disabled { cursor: not-allowed; }
+/* Keyboard focus must ALWAYS be visible. `!important` so it wins over the many inputs/buttons that
+   use Tailwind's `focus:outline-none` (higher specificity) — otherwise keyboard users lose the ring. */
+:focus-visible { outline: 2px solid rgba(249,115,22,0.9) !important; outline-offset: 2px; border-radius: 6px; }
+/* A visually-hidden skip link that appears on keyboard focus. */
+.skip-link { position: absolute; left: 12px; top: -60px; z-index: 100; padding: 8px 14px; border-radius: 10px;
+  background: var(--surface, #0b1b2c); color: var(--ink, #eef4fb); font-size: 14px; transition: top .15s ease; }
+.skip-link:focus { top: 12px; }
+
+/* Mobile: inputs must be >=16px or iOS Safari zooms in on focus. Also allow the
+   layout to use the *visual* viewport height and respect the home-indicator. */
+@media (max-width: 640px) {
+  input, textarea, select { font-size: 16px !important; }
+}
+.pb-safe { padding-bottom: env(safe-area-inset-bottom); }
+.h-dvh { height: 100dvh; }
+.overscroll-none { overscroll-behavior: none; }
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: 0.001ms !important; transition-duration: 0.001ms !important; scroll-behavior: auto !important; }
+}
+
+* { scrollbar-width: thin; scrollbar-color: var(--line) transparent; }
+*::-webkit-scrollbar { width: 10px; height: 10px; }
+*::-webkit-scrollbar-thumb { background: var(--line); border-radius: 999px; border: 2px solid transparent; background-clip: content-box; }
+*::-webkit-scrollbar-thumb:hover { background: var(--muted); background-clip: content-box; }
+
+.skeleton { position: relative; overflow: hidden; background: var(--line); }
+.skeleton::after { content:""; position:absolute; inset:0; transform: translateX(-100%);
+  background: linear-gradient(90deg, transparent, rgba(255,255,255,0.45), transparent); animation: shimmer 1.6s infinite; }
+@keyframes shimmer { 100% { transform: translateX(100%); } }
+
+.mesh {
+  background:
+    radial-gradient(55% 55% at 10% 6%, rgba(249,115,22,0.10), transparent 60%),
+    radial-gradient(50% 50% at 92% 0%, rgba(90,127,166,0.14), transparent 55%),
+    radial-gradient(80% 80% at 60% 120%, rgba(11,31,58,0.08), transparent 60%);
+}
+.dark .mesh {
+  background:
+    radial-gradient(55% 55% at 10% 6%, rgba(249,115,22,0.06), transparent 62%),
+    radial-gradient(50% 50% at 92% 0%, rgba(124,157,191,0.09), transparent 58%),
+    radial-gradient(80% 80% at 60% 120%, rgba(90,127,166,0.07), transparent 62%);
+}
+
+.glass { background: rgba(255,255,255,0.72); backdrop-filter: blur(14px) saturate(140%); -webkit-backdrop-filter: blur(14px) saturate(140%); }
+.dark .glass { background: rgba(6,20,31,0.72); border-color: var(--line); }
+
+/* Signature hero blend: white → cool navy-tinted → a warm orange hint, à la a premium AI landing.
+   Restrained, not a rainbow. Dark theme gets a deep-navy variant with the same single ember. */
+/* Signature hero blend: pure white at the top, easing down into the orange → mauve → periwinkle
+   sweep. Exact tri-tone à la the reference, kept soft so dark navy headings stay legible on top. */
+/* On black, the hero lets the living neural-vortex show through — just a soft orange crown at the top
+   and a fade into the app base at the bottom so the fold reads cleanly. */
+.hero-bg {
+  background:
+    radial-gradient(90% 60% at 50% -10%, rgba(249,115,22,0.12), transparent 60%),
+    linear-gradient(to bottom, transparent 0%, transparent 62%, rgba(4,7,13,0.55) 88%, var(--surface-2) 100%);
+}
+
+.sa-blob { background: radial-gradient(circle at 30% 30%, var(--blob-a), transparent 70%); will-change: transform; }
+.sa-blob-1 { --blob-a: rgba(249,115,22,0.35); animation: sa-drift1 26s ease-in-out infinite; }
+.sa-blob-2 { --blob-a: rgba(90,127,166,0.35); animation: sa-drift2 32s ease-in-out infinite; }
+.sa-blob-3 { --blob-a: rgba(11,31,58,0.22); animation: sa-drift3 38s ease-in-out infinite; }
+@keyframes sa-drift1 { 0%,100%{transform:translate(0,0) scale(1)} 50%{transform:translate(8rem,4rem) scale(1.15)} }
+@keyframes sa-drift2 { 0%,100%{transform:translate(0,0) scale(1)} 50%{transform:translate(-6rem,6rem) scale(1.1)} }
+@keyframes sa-drift3 { 0%,100%{transform:translate(0,0) scale(1)} 50%{transform:translate(-4rem,-5rem) scale(1.2)} }
+
+.sa-rise { animation: sa-rise .6s cubic-bezier(.16,1,.3,1) both; }
+.sa-rise-2 { animation: sa-rise .6s cubic-bezier(.16,1,.3,1) .08s both; }
+.sa-rise-3 { animation: sa-rise .6s cubic-bezier(.16,1,.3,1) .16s both; }
+@keyframes sa-rise { from { opacity:0; transform: translateY(14px) } to { opacity:1; transform:none } }
+.sa-card-hover { transition: box-shadow .2s ease, border-color .2s ease; }
+/* Calm, premium hover: a gentle border + shadow shift — no bouncy lift, no colored glow. */
+.sa-card-hover:hover { box-shadow: 0 10px 30px -22px rgba(0,0,0,.42); border-color: rgba(90,127,166,.35); }
+.sa-glow { position: relative; }
+.sa-glow::after { content:""; position:absolute; inset:-1px; border-radius:inherit; background:radial-gradient(60% 60% at 50% 0%, rgba(249,115,22,.28), transparent 70%); filter:blur(14px); opacity:0; transition:opacity .3s; z-index:-1; }
+.sa-glow:hover::after { opacity:.3; }
+
+/* Restrained: a calm orange gradient for the single hero accent word. No perpetual animation. */
+.sa-gradient-text {
+  background: linear-gradient(92deg, #f97316, #fbbf7a);
+  -webkit-background-clip: text; background-clip: text; color: transparent;
+}
+
+/* Elevation on dark reads best as depth + a hairline, not a heavy glow. Restrained, near-black. */
+.shadow-soft { box-shadow: 0 1px 2px rgba(0,0,0,0.18), 0 8px 24px -20px rgba(0,0,0,0.42); }
+.shadow-lift { box-shadow: 0 2px 8px rgba(0,0,0,0.24), 0 24px 48px -28px rgba(0,0,0,0.52); }
+.sa-accent { position: relative; }
+.sa-accent::before { content:""; position:absolute; left:0; top:14px; bottom:14px; width:3px; border-radius:999px; background:linear-gradient(180deg,#f97316,#5a7fa6); }
+
+@media (prefers-reduced-motion: reduce){ .sa-blob, .sa-rise, .sa-rise-2, .sa-rise-3, .sa-gradient-text { animation: none !important; } }
+
+/* ===== Liveliness pack ===== */
+/* Animated grid (hero) */
+.sa-grid {
+  background-image:
+    linear-gradient(rgba(90,127,166,.08) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(90,127,166,.08) 1px, transparent 1px);
+  background-size: 46px 46px;
+  -webkit-mask-image: radial-gradient(ellipse 75% 55% at 50% 0%, #000 35%, transparent 80%);
+  mask-image: radial-gradient(ellipse 75% 55% at 50% 0%, #000 35%, transparent 80%);
+  animation: sa-grid-pan 28s linear infinite;
+}
+.dark .sa-grid {
+  background-image:
+    linear-gradient(rgba(124,157,191,.10) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(124,157,191,.10) 1px, transparent 1px);
+}
+@keyframes sa-grid-pan { to { background-position: 46px 46px; } }
+
+/* Float */
+.sa-float { animation: sa-float 7s ease-in-out infinite; }
+.sa-float-slow { animation: sa-float 11s ease-in-out infinite; }
+@keyframes sa-float { 0%,100%{transform:translateY(0)} 50%{transform:translateY(-12px)} }
+
+/* Hover shine sweep (buttons/cards) */
+.sa-shine { position: relative; overflow: hidden; }
+.sa-shine::after {
+  content:""; position:absolute; top:0; left:-160%; height:100%; width:55%;
+  transform: skewX(-20deg); background: linear-gradient(90deg, transparent, rgba(255,255,255,.40), transparent);
+}
+.sa-shine:hover::after { animation: sa-shine .9s ease; }
+@keyframes sa-shine { to { left: 160%; } }
+
+/* Animated conic gradient border on hover */
+@property --sa-a { syntax: '<angle>'; inherits: false; initial-value: 0deg; }
+.sa-border-glow { position: relative; }
+.sa-border-glow::before {
+  content:""; position:absolute; inset:0; border-radius:inherit; padding:1.5px;
+  background: conic-gradient(from var(--sa-a,0deg), #f97316, #7c9dbf, #0b1f3a, #f97316);
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor; mask-composite: exclude;
+  opacity:.0; transition: opacity .3s; animation: sa-spin 6s linear infinite;
+}
+.sa-border-glow:hover::before, .sa-border-glow.on::before { opacity:.95; }
+@keyframes sa-spin { to { --sa-a: 360deg; } }
+
+/* Pulse ring */
+.sa-pulse { animation: sa-pulse 2.6s ease-in-out infinite; }
+@keyframes sa-pulse { 0%,100%{box-shadow:0 0 0 0 rgba(249,115,22,.35)} 50%{box-shadow:0 0 0 12px rgba(249,115,22,0)} }
+
+@media (prefers-reduced-motion: reduce){
+  .sa-grid,.sa-float,.sa-float-slow,.sa-border-glow::before,.sa-pulse { animation: none !important; }
+}
+
+/* Typing indicator */
+.sa-typing { display:inline-flex; align-items:center; }
+.sa-typing span { width:7px; height:7px; border-radius:50%; background: var(--muted); margin:0 2px; animation: sa-bounce 1.2s infinite ease-in-out; }
+.sa-typing span:nth-child(2){ animation-delay:.15s } .sa-typing span:nth-child(3){ animation-delay:.3s }
+@keyframes sa-bounce { 0%,80%,100%{ transform: translateY(0); opacity:.4 } 40%{ transform: translateY(-5px); opacity:1 } }
+@media (prefers-reduced-motion: reduce){ .sa-typing span { animation: none !important; } }
+
+/* ===== Synapse Orb =====
+   The living center of the product. A calm, breathing sphere built from layered
+   gradients — deep navy at rest, with a warm orange ember: futuristic yet calming.
+   No images, no canvas. Sizes via --orb (px). States: idle / thinking. */
+.orb { position: relative; width: var(--orb, 96px); height: var(--orb, 96px); border-radius: 9999px; isolation: isolate;
+  /* A soft outer definition so the dark sphere reads on light AND dark backgrounds. */
+  box-shadow: 0 10px 30px -12px rgba(11,31,58,.45); }
+/* A dimensional sphere: navy body, a single warm ember low-right, a soft cool highlight. Legible on
+   light or dark — a luminous object, not a glowing toy. */
+.orb-core {
+  position: absolute; inset: 0; border-radius: inherit;
+  background:
+    radial-gradient(40% 38% at 32% 26%, rgba(255,255,255,.72), rgba(255,255,255,0) 60%),
+    radial-gradient(92% 92% at 70% 82%, rgba(255,150,70,.95) 0%, rgba(249,115,22,.7) 24%, rgba(64,120,168,.7) 55%, #1c405c 82%),
+    radial-gradient(120% 120% at 50% 40%, #24557d 0%, #0a2033 100%);
+  box-shadow: inset 0 2px 4px rgba(255,255,255,.35), inset 0 -12px 30px rgba(2,9,16,.6), 0 0 22px -2px rgba(249,140,60,.5);
+  animation: orb-breathe 7.5s ease-in-out infinite;
+  will-change: transform;
+}
+.orb-sheen {
+  position: absolute; inset: 0; border-radius: inherit; mix-blend-mode: screen; opacity: .3;
+  background: conic-gradient(from 210deg, transparent, rgba(124,157,191,.34), transparent 42%, rgba(249,115,22,.18), transparent 72%);
+  -webkit-mask: radial-gradient(closest-side, transparent 58%, #000 74%, transparent 100%);
+  mask: radial-gradient(closest-side, transparent 58%, #000 74%, transparent 100%);
+  animation: orb-spin 26s linear infinite;
+}
+.orb-bloom {
+  position: absolute; inset: -26%; border-radius: inherit; z-index: -1;
+  background: radial-gradient(closest-side, rgba(130,170,210,.42), rgba(249,140,60,.18) 54%, transparent 74%);
+  filter: blur(12px); animation: orb-bloom 7.5s ease-in-out infinite;
+}
+.orb-ring {
+  position: absolute; inset: -9%; border-radius: inherit; opacity: 0;
+  border: 1px solid rgba(249,115,22,.42);
+}
+.orb[data-state="thinking"] .orb-core { animation-duration: 3.4s; }
+.orb[data-state="thinking"] .orb-sheen { animation-duration: 8s; opacity: .42; }
+.orb[data-state="thinking"] .orb-bloom { animation-duration: 3.4s; }
+.orb[data-state="thinking"] .orb-ring { animation: orb-ping 2.8s ease-out infinite; }
+@keyframes orb-breathe { 0%,100% { transform: scale(.985); } 50% { transform: scale(1.015); } }
+@keyframes orb-bloom { 0%,100% { opacity:.4; transform: scale(.99); } 50% { opacity:.62; transform: scale(1.03); } }
+@keyframes orb-spin { to { transform: rotate(360deg); } }
+@keyframes orb-ping { 0% { opacity:.55; transform: scale(.92); } 80%,100% { opacity:0; transform: scale(1.25); } }
+@media (prefers-reduced-motion: reduce){
+  .orb-core, .orb-sheen, .orb-bloom, .orb-ring { animation: none !important; }
+}
+
+/* ===== Landing motion pack ===== */
+/* Feature marquee — a slow, seamless scroll-wheel of features. Duplicate the content in markup so the
+   -50% translate loops without a seam. Pauses on hover; halts under reduced motion. */
+.sa-marquee { overflow: hidden; -webkit-mask-image: linear-gradient(90deg, transparent, #000 8%, #000 92%, transparent); mask-image: linear-gradient(90deg, transparent, #000 8%, #000 92%, transparent); }
+.sa-marquee-track { display: inline-flex; width: max-content; animation: sa-marquee 22s linear infinite; }
+.sa-marquee:hover .sa-marquee-track { animation-play-state: paused; }
+@keyframes sa-marquee { to { transform: translateX(-50%); } }
+
+/* Hero product card — a slow, gentle 3D float + rotate so it feels alive and dimensional. */
+.sa-hero3d { animation: sa-hero3d 11s ease-in-out infinite; transform-style: preserve-3d; will-change: transform; }
+@keyframes sa-hero3d {
+  0%   { transform: rotateY(-17deg) rotateX(7deg) translateY(0); }
+  50%  { transform: rotateY(-11deg) rotateX(4deg) translateY(-10px); }
+  100% { transform: rotateY(-17deg) rotateX(7deg) translateY(0); }
+}
+/* A soft colored aura behind the hero card, drifting slowly. */
+.sa-aura { animation: sa-aura 9s ease-in-out infinite; will-change: opacity, transform; }
+@keyframes sa-aura { 0%,100% { opacity:.55; transform: scale(1); } 50% { opacity:.85; transform: scale(1.06); } }
+
+/* Annotations reveal — fade + slide in, staggered by inline --d. */
+.sa-anno { opacity: 0; animation: sa-anno .7s cubic-bezier(.16,1,.3,1) forwards; animation-delay: var(--d, 0s); }
+@keyframes sa-anno { from { opacity: 0; transform: translateY(6px) scale(.96); } to { opacity: 1; transform: none; } }
+
+/* Onboarding "awaken" — the orb scales up out of a glow on first paint. */
+.sa-awaken { animation: sa-awaken 1.1s cubic-bezier(.16,1,.3,1) both; }
+@keyframes sa-awaken { 0% { opacity: 0; transform: scale(.6); filter: blur(6px); } 60% { opacity: 1; filter: blur(0); } 100% { transform: scale(1); } }
+
+/* Full-screen brand intro: wordmark reveal + expanding ring that plays once on entry, then dissolves. */
+.sa-intro-word { opacity: 0; animation: sa-intro-word .9s cubic-bezier(.16,1,.3,1) .4s forwards; }
+@keyframes sa-intro-word { from { opacity: 0; transform: translateY(10px); letter-spacing: .35em; } to { opacity: 1; transform: none; letter-spacing: -0.01em; } }
+.sa-intro-sub { opacity: 0; animation: sa-intro-word .8s cubic-bezier(.16,1,.3,1) .7s forwards; }
+.sa-intro-ring { animation: sa-intro-ring 1.7s cubic-bezier(.16,1,.3,1) forwards; }
+@keyframes sa-intro-ring { 0% { opacity: .55; transform: scale(.35); } 100% { opacity: 0; transform: scale(2.6); } }
+/* A one-shot glow burst behind the intro orb. */
+.sa-intro-burst { animation: sa-intro-burst 2s ease-out forwards; }
+@keyframes sa-intro-burst { 0% { opacity: 0; transform: scale(.5); } 30% { opacity: .9; } 100% { opacity: .25; transform: scale(1.6); } }
+
+/* Faint background robot — a slow, drifting underlying presence. Very low opacity + multiply blend so
+   the image's white field disappears and only a ghost of the figure shows. */
+.sa-robot { animation: sa-robot 26s ease-in-out infinite; will-change: transform; }
+@keyframes sa-robot {
+  0%   { transform: translateY(-50%) translateX(0) rotate(0deg); }
+  50%  { transform: translateY(-53%) translateX(-1.5%) rotate(-1.2deg); }
+  100% { transform: translateY(-50%) translateX(0) rotate(0deg); }
+}
+@media (prefers-reduced-motion: reduce){
+  .sa-robot { animation: none !important; }
+  .sa-intro-burst { animation: none !important; opacity: .3 !important; }
+}
+
+/* ===== Cinematic intro sequence ===== robot materializes → flash → transforms into the orb →
+   sparks burst → the hook line slams in. Each layer runs once (forwards) on its own delay. */
+/* Robot wrapper: rise in → hold (while it grooves) → dissolve up as the orb takes over. ~3.6s on stage. */
+.cine-robot { animation: cine-robot 3.45s ease-out forwards; will-change: transform, opacity, filter; }
+@keyframes cine-robot {
+  0%   { opacity: 0; transform: translateY(22px) scale(.82); filter: blur(8px); }
+  9%   { opacity: 1; transform: translateY(0) scale(1); filter: blur(0); }
+  84%  { opacity: 1; transform: scale(1); filter: blur(0); }
+  100% { opacity: 0; transform: translateY(-6px) scale(.9); filter: blur(11px); }
+}
+/* Inner img: an energetic ~2.5s groove — bob, sway, and scale pulses that build. */
+.cine-dance { animation: cine-dance 2.7s ease-in-out .3s both; transform-origin: 50% 92%; will-change: transform; }
+@keyframes cine-dance {
+  0%   { transform: translateY(0) rotate(0) scale(1); }
+  8%   { transform: translateY(-16px) rotate(5deg) scale(1.04); }
+  16%  { transform: translateY(0) rotate(0) scale(1); }
+  24%  { transform: translateY(-10px) rotate(-6deg) scale(1.03); }
+  32%  { transform: translateY(0) rotate(0) scale(1); }
+  44%  { transform: translateY(-8px) rotate(4deg) scale(1.05); }
+  56%  { transform: translateY(0) rotate(-4deg) scale(1); }
+  68%  { transform: translateY(-15px) rotate(7deg) scale(1.05); }
+  80%  { transform: translateY(0) rotate(0) scale(1.02); }
+  100% { transform: translateY(-6px) rotate(0) scale(1.04); }
+}
+/* Scan line sweeping over the robot during power-up. */
+.cine-scan { opacity: 0; animation: cine-scan 1.2s ease-in-out .5s 2 both; }
+@keyframes cine-scan { 0% { opacity: 0; transform: translateY(-150px); } 15% { opacity: .85; } 85% { opacity: .85; } 100% { opacity: 0; transform: translateY(150px); } }
+/* Tilted words that flash in and out (overshoot in, quick out). Rotation set per-word via a wrapper. */
+.cine-flashword { opacity: 0; animation: cine-flashword .85s cubic-bezier(.34,1.56,.64,1) both; }
+@keyframes cine-flashword { 0% { opacity: 0; transform: translateY(24px) scale(.7); } 30% { opacity: 1; transform: translateY(0) scale(1); } 68% { opacity: 1; } 100% { opacity: 0; transform: translateY(-18px) scale(1.1); } }
+/* Rising particle field. */
+.cine-particle { opacity: 0; animation: cine-particle 3.6s ease-out infinite; }
+@keyframes cine-particle { 0% { opacity: 0; transform: translateY(0) scale(1); } 12% { opacity: .8; } 100% { opacity: 0; transform: translateY(-72vh) scale(.35); } }
+
+/* ===== CSS robot — jointed, so each limb moves on its own ===== */
+.rob-arm-l,.rob-arm-r,.rob-fore-l,.rob-fore-r,.rob-leg-l,.rob-leg-r,.rob-shin-l,.rob-shin-r,.rob-head { transform-box: fill-box; }
+/* One shared ~0.9s beat so the whole body grooves in time. Arms pump in opposition (with an elbow
+   whip via a phase offset), the knees spring-bounce IN SYNC, and the hips shift weight the SAME way
+   (a sway, never a scissor-splay) — that was the "weird leg" bug. Head bobs down on the beat. */
+.rob-arm-l  { transform-origin: 50% 4%; animation: rob-arm-l .9s ease-in-out infinite; }
+.rob-arm-r  { transform-origin: 50% 4%; animation: rob-arm-r .9s ease-in-out infinite; }
+.rob-fore-l { transform-origin: 50% 4%; animation: rob-fore-l .9s ease-in-out -.14s infinite; }
+.rob-fore-r { transform-origin: 50% 4%; animation: rob-fore-r .9s ease-in-out -.14s infinite; }
+.rob-leg-l  { transform-origin: 50% 4%; animation: rob-leg .9s ease-in-out infinite; }
+.rob-leg-r  { transform-origin: 50% 4%; animation: rob-leg .9s ease-in-out infinite; }
+.rob-shin-l { transform-origin: 50% 4%; animation: rob-shin .9s ease-in-out infinite; }
+.rob-shin-r { transform-origin: 50% 4%; animation: rob-shin .9s ease-in-out infinite; }
+.rob-head   { transform-origin: 50% 96%; animation: rob-head .9s ease-in-out infinite; }
+.rob-eye, .rob-core { transform-box: fill-box; transform-origin: 50% 50%; }
+.rob-eye    { animation: rob-blink 3.6s ease-in-out infinite; }
+.rob-core   { animation: rob-core 1.2s ease-in-out infinite; }
+@keyframes rob-core  { 0%,100% { filter: brightness(1); transform: scale(1); } 50% { filter: brightness(1.55); transform: scale(1.18); } }
+@keyframes rob-arm-l { 0%,100% { transform: rotate(28deg); } 50% { transform: rotate(-46deg); } }
+@keyframes rob-arm-r { 0%,100% { transform: rotate(-46deg); } 50% { transform: rotate(28deg); } }
+@keyframes rob-fore-l{ 0%,100% { transform: rotate(-48deg); } 50% { transform: rotate(-2deg); } }
+@keyframes rob-fore-r{ 0%,100% { transform: rotate(-2deg); } 50% { transform: rotate(-48deg); } }
+@keyframes rob-leg   { 0%,100% { transform: rotate(5deg); } 50% { transform: rotate(-5deg); } }
+@keyframes rob-shin  { 0%,100% { transform: rotate(2deg); } 50% { transform: rotate(18deg); } }
+@keyframes rob-head  { 0%,100% { transform: rotate(-5deg) translateY(-1px); } 50% { transform: rotate(5deg) translateY(3px); } }
+@keyframes rob-blink { 0%,90%,100% { transform: scaleY(1); } 95% { transform: scaleY(.12); } }
+@media (prefers-reduced-motion: reduce){
+  .rob-arm-l,.rob-arm-r,.rob-fore-l,.rob-fore-r,.rob-leg-l,.rob-leg-r,.rob-shin-l,.rob-shin-r,.rob-head,.rob-eye { animation: none !important; }
+}
+
+/* Transform phase */
+/* Full-screen white flash at the moment of transformation. */
+.cine-screenflash { opacity: 0; background: #ffffff; animation: cine-screenflash 0.9s ease-out 3.05s forwards; }
+@keyframes cine-screenflash { 0% { opacity: 0; } 18% { opacity: .85; } 100% { opacity: 0; } }
+/* Spinning light rays behind the forming orb. */
+.cine-rays { opacity: 0; background: conic-gradient(from 0deg, transparent, rgba(255,190,120,.5), transparent 12%, transparent 30%, rgba(180,210,255,.4), transparent 42%, transparent 60%, rgba(255,190,120,.45), transparent 72%, transparent 90%); animation: cine-rays 2.6s linear 3.2s both; }
+@keyframes cine-rays { 0% { opacity: 0; transform: rotate(0deg) scale(.4); } 20% { opacity: .8; } 100% { opacity: 0; transform: rotate(150deg) scale(1.3); } }
+/* Powder particles: the robot crumbles — bits scatter up and out, then fade. */
+.cine-poof { opacity: 0; animation: cine-poof 1s ease-out 2.95s forwards; }
+@keyframes cine-poof { 0% { opacity: 0; transform: translate(0,0) scale(1); } 12% { opacity: 1; } 100% { opacity: 0; transform: translate(var(--px,0), var(--py,-120px)) scale(.2); } }
+/* Reform particles: motes converge inward to the center as the orb takes shape. */
+.cine-converge { opacity: 0; animation: cine-converge 0.85s cubic-bezier(.5,0,.2,1) 3.35s forwards; }
+@keyframes cine-converge { 0% { opacity: 0; transform: translate(var(--fx,0), var(--fy,0)) scale(1); } 20% { opacity: 1; } 100% { opacity: 0; transform: translate(0,0) scale(.2); } }
+
+.cine-flash { opacity: 0; animation: cine-flash 1.2s ease-out 3.15s forwards; }
+@keyframes cine-flash { 0% { opacity: 0; transform: scale(.3); } 22% { opacity: 1; } 100% { opacity: 0; transform: scale(2.8); } }
+.cine-orb { animation: cine-orb 1.7s cubic-bezier(.34,1.56,.64,1) 3.2s both; will-change: transform, opacity; }
+@keyframes cine-orb { 0% { opacity: 0; transform: scale(0); } 55% { opacity: 1; transform: scale(1.16); } 76% { transform: scale(.95); } 100% { transform: scale(1); } }
+/* The lock-in glyph settles into the orb core once it has formed. */
+.cine-lock { opacity: 0; animation: cine-lock 1.1s cubic-bezier(.16,1,.3,1) 3.75s both; }
+@keyframes cine-lock { 0% { opacity: 0; transform: scale(.4); filter: blur(4px); } 60% { opacity: .95; } 100% { opacity: .9; transform: scale(1); filter: blur(0); } }
+.cine-ring { opacity: 0; animation: cine-ring 1.5s ease-out forwards; will-change: transform, opacity; }
+@keyframes cine-ring { 0% { opacity: .85; transform: scale(.2); } 100% { opacity: 0; transform: scale(3.4); } }
+.cine-spark-wrap { position: absolute; left: 50%; top: 50%; }
+.cine-spark { display: block; opacity: 0; animation: cine-spark 1.2s ease-out 3.1s forwards; }
+@keyframes cine-spark { 0% { opacity: 0; transform: translateY(-6px) scale(1.2); } 16% { opacity: 1; } 100% { opacity: 0; transform: translateY(-170px) scale(.3); } }
+
+/* Final hook line */
+.cine-word { opacity: 0; animation: cine-word 1s cubic-bezier(.16,1,.3,1) 3.95s both; }
+@keyframes cine-word { 0% { opacity: 0; transform: translateY(18px); letter-spacing: .42em; filter: blur(6px); } 100% { opacity: 1; transform: none; letter-spacing: -0.02em; filter: blur(0); } }
+.cine-eyebrow { opacity: 0; animation: cine-word .8s cubic-bezier(.16,1,.3,1) 3.75s both; }
+.cine-sub { opacity: 0; animation: cine-word .8s cubic-bezier(.16,1,.3,1) 4.35s both; }
+
+@media (prefers-reduced-motion: reduce){
+  .cine-robot, .cine-dance, .cine-scan, .cine-flashword, .cine-particle { animation: none !important; }
+  .cine-robot, .cine-scan, .cine-flashword, .cine-particle { opacity: 0 !important; }
+  .cine-flash, .cine-ring, .cine-spark, .cine-screenflash, .cine-rays, .cine-poof, .cine-converge { animation: none !important; opacity: 0 !important; }
+  .cine-orb, .cine-word, .cine-eyebrow, .cine-sub, .cine-lock { animation: none !important; opacity: 1 !important; transform: none !important; }
+}
+
+@media (prefers-reduced-motion: reduce){
+  .sa-marquee-track { animation: none !important; }
+  .sa-hero3d { animation: none !important; transform: rotateY(-14deg) rotateX(6deg) !important; }
+  .sa-aura, .sa-anno, .sa-awaken { animation: none !important; opacity: 1 !important; }
+}
+
+/* ── Scroll-FX: object-level landing animations ─────────────────────────────
+   Reveal state is gated behind `.js-anim` (added by <ScrollFX/> on mount), so
+   if JS never runs the page still shows everything — no blank sections. */
+.js-anim [data-anim]{
+  opacity:0; transform:translateY(22px);
+  transition:opacity .65s cubic-bezier(.16,1,.3,1), transform .65s cubic-bezier(.16,1,.3,1);
+  will-change:opacity, transform;
+}
+.js-anim [data-anim="left"]{ transform:translateX(-26px); }
+.js-anim [data-anim="right"]{ transform:translateX(26px); }
+.js-anim [data-anim="scale"]{ transform:scale(.9); }
+.js-anim [data-anim="blur"]{ filter:blur(8px); transition:opacity .7s ease, transform .7s ease, filter .7s ease; }
+.js-anim [data-anim].sa-in{ opacity:1; transform:none; filter:none; }
+
+/* parallax containers get their translate driven by JS via --sy */
+[data-parallax]{ will-change:transform; transform:translate3d(0, var(--sy, 0px), 0); }
+
+/* gentle continuous float for logos / pictures / orbs */
+.sa-floaty{ animation:sa-floaty 8s ease-in-out infinite; }
+.sa-floaty-slow{ animation:sa-floaty 12s ease-in-out infinite; }
+@keyframes sa-floaty{ 0%,100%{ transform:translateY(0) } 50%{ transform:translateY(-10px) } }
+
+/* a soft pop for icons/badges when their card reveals */
+.js-anim [data-pop]{ opacity:0; transform:scale(.6) rotate(-8deg); transition:opacity .5s ease, transform .55s cubic-bezier(.34,1.56,.64,1); }
+.js-anim [data-pop].sa-in{ opacity:1; transform:none; }
+
+@media (prefers-reduced-motion: reduce){
+  .js-anim [data-anim], .js-anim [data-pop]{ opacity:1 !important; transform:none !important; filter:none !important; }
+  .sa-floaty, .sa-floaty-slow{ animation:none !important; }
+  [data-parallax]{ transform:none !important; }
+}

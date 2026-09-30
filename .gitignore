@@ -26,3 +26,8 @@ next-env.d.ts
 .transfer_canary.txt
 .DS_Store
 *.log
+
+# synapse desktop
+desktop/dist/
+desktop/release/
+_to_delete/

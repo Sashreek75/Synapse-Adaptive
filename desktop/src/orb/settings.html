@@ -1,0 +1,51 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; style-src 'self' 'unsafe-inline'; script-src 'self'">
+<title>Synapse</title>
+<style>
+  * { box-sizing: border-box; }
+  body { margin: 0; background: #07111d; color: #e8eef6; font: 14px/1.5 "Segoe UI", system-ui, sans-serif; padding: 22px; }
+  h1 { font-size: 17px; margin: 0 0 4px; } h2 { font-size: 14px; margin: 0 0 4px; }
+  p { color: #8aa0b8; margin: 0 0 12px; font-size: 13px; }
+  section { background: #0b1726; border: 1px solid rgba(124,157,191,.18); border-radius: 14px; padding: 16px; margin-bottom: 14px; }
+  textarea, input { width: 100%; background: #0f2034; color: #e8eef6; border: 1px solid rgba(124,157,191,.25); border-radius: 9px; padding: 9px 11px; font: inherit; outline: none; }
+  textarea { height: 150px; resize: none; }
+  .row { display: flex; gap: 10px; margin-top: 10px; } .row label { flex: 1; font-size: 12.5px; color: #8aa0b8; }
+  button { border: 0; border-radius: 9px; padding: 9px 14px; font: 600 13px "Segoe UI", sans-serif; background: #f97316; color: #fff; cursor: pointer; }
+  button.ghost { background: rgba(255,255,255,.08); color: #c8d6e5; }
+  ol { margin: 6px 0 12px; padding-left: 20px; color: #c8d6e5; font-size: 13px; } li { margin: 4px 0; }
+  code { background: #0f2034; padding: 1px 5px; border-radius: 5px; font-size: 12px; }
+  .ok { color: #7bd88f; } .bad { color: #f59a4a; } #saved { color: #8aa0b8; font-size: 12.5px; margin-left: 10px; }
+</style>
+</head>
+<body>
+  <section id="helper">
+    <h2>Browser helper <span id="hstatus"></span></h2>
+    <p>Synapse needs a tiny helper in Chrome or Edge to see which site you're on. It has no interface; the orb does all the talking.</p>
+    <ol>
+      <li>Open <code>chrome://extensions</code> (or <code>edge://extensions</code>).</li>
+      <li>Turn on <b>Developer mode</b>.</li>
+      <li>Click <b>Load unpacked</b> and choose the folder below.</li>
+    </ol>
+    <button class="ghost" id="openFolder">Show the helper folder</button>
+  </section>
+  <section id="sites">
+    <h2>Distracting sites</h2>
+    <p>One per line. You can add sites by telling the orb, but removing one happens only here, on purpose.</p>
+    <textarea id="list"></textarea>
+    <div class="row">
+      <label>Seconds to make your case<input id="secs" type="number" min="5" max="120"></label>
+      <label>Longest pass (minutes)<input id="max" type="number" min="1" max="120"></label>
+    </div>
+    <div class="row" style="align-items:center"><button id="save">Save</button><span id="saved"></span></div>
+  </section>
+  <section>
+    <h2>What Synapse thinks you're working toward</h2>
+    <p id="goals">—</p>
+    <p style="margin:0">To change these, tell the orb.</p>
+  </section>
+<script src="settings.js"></script>
+</body>
+</html>

@@ -1,0 +1,14 @@
+{
+  "manifest_version": 3,
+  "name": "Synapse Helper",
+  "version": "0.1.0",
+  "description": "Lets the Synapse app on your computer see which site you're on and hold or close distracting tabs. Has no interface of its own.",
+  "key": "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAwi8LPzIRUxkMQjM6N0x4hC9xS3QGgWECGuiMbJ1NSNHazxaY3RMIYyKA2/fJ5hynz2Odf3fLZ61eLZxwGTAhW5TU6HLiqMAIDbY1QMaHpoBlxfyJKfipHrMY5HQVLzmtCljlJi3syqiHiIzcuyZ3qcFz5SS4WH3uxc9yBBif9qEGoN85wCUWOJcnjmH3BqECdCGMAqWqjY9/6Vmg0FiFKCEz0hgKKUOYszRkFsWjImLNPvXL9Ap2Q67QAjMfPQpvJ+BppA9AkyXZf4ktuKUTFtHHSt9VHpLj0J3vTirif6C6+ttXHHIiDxo0Kv5+yu/WpWaMRT5pWly4FH4Bj0SfZQIDAQAB",
+  "icons": { "16": "icons/orb-16.png", "48": "icons/orb-48.png", "128": "icons/orb-128.png" },
+  "background": { "service_worker": "background.js" },
+  "permissions": ["tabs", "storage"],
+  "host_permissions": ["http://*/*", "https://*/*"],
+  "content_scripts": [
+    { "matches": ["http://*/*", "https://*/*"], "js": ["veil.js"], "run_at": "document_start", "all_frames": false }
+  ]
+}

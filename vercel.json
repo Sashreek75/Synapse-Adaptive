@@ -1,5 +1,1 @@
-{
-  "crons": [
-    { "path": "/api/cron/reachouts", "schedule": "0 9 * * *" }
-  ]
-}
+{}
