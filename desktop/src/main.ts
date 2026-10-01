@@ -14,7 +14,7 @@ import path from "node:path";
 import fs from "node:fs";
 import { createSynapse, relayTransport, geminiTransport, siteName, cleanSite, type Synapse, type GateTurn } from "../../core/synapse";
 import { Bridge, type TabInfo } from "./bridge";
-import { foreground, BROWSERS } from "./foreground";
+import { foreground, BROWSERS, bringToFront, nativeHandle, closeBrowserTab, type Foreground } from "./foreground";
 
 declare const __RELAY_URL__: string;
 
@@ -43,7 +43,17 @@ type Mode = "dock" | "peek" | "card";
 let mode: Mode = "dock";
 let cardSize = { w: 380, h: 220 };
 
-interface Gate { site: string; transcript: GateTurn[]; judging: boolean }
+/**
+ * A gate can be started two ways:
+ *   "helper" — the browser helper told us the exact tab (we can veil it and close it precisely)
+ *   "window" — no helper; we recognised the site from the browser's window title (Windows) or
+ *              AppleScript URL (Mac), and close it by sending the browser Ctrl+W / AppleScript.
+ */
+interface Gate {
+  site: string; transcript: GateTurn[]; judging: boolean;
+  via: "helper" | "window"; target?: Foreground;
+  budgetMs: number; resumedAt: number; backstop?: NodeJS.Timeout;
+}
 let gate: Gate | null = null;
 const passTimers = new Map<string, NodeJS.Timeout>();
 const reachTimers = new Map<string, NodeJS.Timeout>();
@@ -87,9 +97,11 @@ function createOrb() {
   screen.on("display-metrics-changed", () => layout());
 }
 
-function openCard() {
+function openCard(takeFocus = true) {
   layout("card");
+  if (!takeFocus) { orb.showInactive(); orb.moveTop(); return; }
   orb.show(); orb.moveTop(); orb.focus();
+  if (process.platform === "win32") bringToFront(nativeHandle(orb.getNativeWindowHandle()));
 }
 function closeCard() { if (!gate) layout("dock"); }
 
@@ -120,7 +132,7 @@ function expirePass(site: string, early = false) {
   pushConfig();
   const focus = syn.brain.currentFocus();
   notice(early ? `Done with ${siteName(site)}. Good.` : `That's your time on ${siteName(site)}.${focus ? ` Back to ${focus.text}.` : " Back to it."}`, 4000);
-  setTimeout(() => bridge.closeSite(site), early ? 600 : 3000);
+  setTimeout(() => closeSite(site), early ? 600 : 3000);
   layout();
 }
 
@@ -139,6 +151,7 @@ function onTab(t: TabInfo) {
   if (!site) {
     // They left for something else while being asked — that's walking away, and it counts.
     if (gate && looking && !gate.judging) {
+      clearTimeout(gate.backstop);
       syn.brain.logGate({ site: gate.site, kind: "walked_away" });
       const name = siteName(gate.site);
       gate = null;
@@ -148,11 +161,14 @@ function onTab(t: TabInfo) {
   }
   if (syn.brain.activePass(site)) { bridge.release([t.tabId]); return; }
   bridge.hold([t.tabId]);
-  if (looking && !gate) startGate(site, t.title);
+  if (looking && !gate) startGate(site, t.title, "helper");
 }
 
-function startGate(site: string, pageTitle?: string) {
-  gate = { site, transcript: [], judging: false };
+function startGate(site: string, pageTitle: string | undefined, via: Gate["via"], target?: Foreground) {
+  // Main owns a backstop deadline (the orb's own clock normally fires first). It allows a short
+  // grace for the card to appear, and pauses while Synapse is thinking.
+  gate = { site, transcript: [], judging: false, via, target, budgetMs: (syn.brain.s.settings.windowSeconds + 3) * 1000, resumedAt: Date.now() };
+  armBackstop();
   syn.brain.logGate({ site, kind: "opened", text: pageTitle?.slice(0, 120) });
   const opener = syn.gateOpener(site);
   gate.transcript.push({ role: "synapse", text: opener });
@@ -160,16 +176,41 @@ function startGate(site: string, pageTitle?: string) {
   orb.webContents.send("orb", { type: "gate", site, name: siteName(site), opener, seconds: syn.brain.s.settings.windowSeconds });
 }
 
+function armBackstop() {
+  if (!gate) return;
+  const g = gate;
+  clearTimeout(g.backstop);
+  g.resumedAt = Date.now();
+  g.backstop = setTimeout(() => { if (gate === g && !g.judging) { orb.webContents.send("orb", { type: "timeout" }); gateTimeout(); } }, Math.max(0, g.budgetMs));
+}
+function pauseBackstop() {
+  if (!gate) return;
+  clearTimeout(gate.backstop);
+  gate.budgetMs -= Date.now() - gate.resumedAt;
+}
+
+/** Close every tab showing `site`: precisely through the helper, or the front tab via the OS. */
+async function closeSite(site: string, target?: Foreground) {
+  bridge.closeSite(site);
+  if (!helperSeesBrowser()) {
+    const fg = target ?? await foreground();
+    if (fg && BROWSERS.test(fg.app)) await closeBrowserTab(fg, (now) => siteOf(now) === site);
+  }
+}
+
 async function argue(text: string) {
   if (!gate || gate.judging) return;
   const g = gate;
   g.judging = true;
+  pauseBackstop();
   const pageTitle = [...bridge.tabs.values()].find((t) => tabsOf(g.site).includes(t.tabId))?.title;
   const v = await syn.judge({ site: g.site, argument: text, transcript: g.transcript, pageTitle });
   g.transcript.push({ role: "user", text }, { role: "synapse", text: v.reply });
   g.judging = false;
   if (gate !== g) return; // they walked away while I was thinking
   orb.webContents.send("orb", { type: "verdict", ...v });
+  if (v.decision === "deny" || v.decision === "ask") armBackstop();
+  if (v.decision === "allow" || v.decision === "crisis") clearTimeout(g.backstop);
   if (v.decision === "allow") {
     gate = null;
     schedulePass(g.site);
@@ -184,26 +225,28 @@ async function argue(text: string) {
 
 function gateTimeout() {
   if (!gate) return;
-  const site = gate.site;
+  const { site, target } = gate;
+  clearTimeout(gate.backstop);
   syn.brain.logGate({ site, kind: "timeout" });
   gate = null;
-  bridge.closeSite(site);
+  closeSite(site, target);
   notice(`Time's up. Closed ${siteName(site)}.`, 2500);
 }
 
 function gateLeave() {
   if (!gate) return;
-  const site = gate.site;
+  const { site, target } = gate;
+  clearTimeout(gate.backstop);
   syn.brain.logGate({ site, kind: "walked_away" });
   gate = null;
-  bridge.closeSite(site);
+  closeSite(site, target);
   notice("Good call.", 1800);
 }
 
 /* ---------------- notices + check-ins ---------------- */
 
 function notice(text: string, ms = 4000) {
-  openCard();
+  openCard(false);
   orb.webContents.send("orb", { type: "notice", text, ms });
 }
 
@@ -266,13 +309,53 @@ function openAsk() {
 
 /* ---------------- background agent ---------------- */
 
-async function sample() {
-  const fg = await foreground();
-  const idleSec = powerMonitor.getSystemIdleTime();
-  if (!fg) return;
-  if (/^synapse/i.test(fg.app) || /^electron/i.test(fg.app)) return;
-  const tab = BROWSERS.test(fg.app) ? bridge.activeTab() : null;
-  syn.brain.observe({ app: fg.app, title: tab?.title || fg.title, url: tab?.url, idleSec });
+/** True when the browser helper is connected AND it's the browser in front — then its precise
+ *  tab events drive the gate and the window-title fallback stays out of the way. */
+function helperSeesBrowser() { return bridge.connected && bridge.browserFocused; }
+
+function siteOf(fg: Foreground): string | null {
+  if (fg.url) { try { return syn.brain.matchDistraction(new URL(fg.url).hostname); } catch { return null; } }
+  return syn.brain.matchTitle(fg.title);
+}
+
+let watching = false;
+let lastObserve = 0;
+
+/**
+ * THE WATCHER — runs every ~0.6s (Windows) / 1.2s (Mac). Reads the window in front straight from
+ * the OS, feeds the brain's activity log every 5s, and — when the helper isn't covering this
+ * browser — recognises distracting sites itself and starts the gate.
+ */
+async function watch() {
+  if (watching) return;
+  watching = true;
+  try {
+    const fg = await foreground();
+    if (!fg || /synapse|electron/i.test(fg.app)) return;
+    const isBrowser = BROWSERS.test(fg.app);
+    const tab = isBrowser && helperSeesBrowser() ? bridge.activeTab() : null;
+
+    if (Date.now() - lastObserve >= 5000) {
+      lastObserve = Date.now();
+      syn.brain.observe({ app: fg.app, title: tab?.title || fg.title, url: tab?.url || fg.url, idleSec: powerMonitor.getSystemIdleTime() });
+    }
+    if (!isBrowser || helperSeesBrowser()) return;
+
+    const site = siteOf(fg);
+    if (gate?.via === "window" && !gate.judging && site !== gate.site) {
+      // Same browser, different page now — they switched away on their own.
+      clearTimeout(gate.backstop);
+      syn.brain.logGate({ site: gate.site, kind: "walked_away" });
+      const name = siteName(gate.site);
+      gate = null;
+      notice(`Good call. ${name} can wait.`, 2500);
+      return;
+    }
+    if (!site || gate || syn.brain.activePass(site)) return;
+    startGate(site, fg.title, "window", fg);
+  } finally {
+    watching = false;
+  }
 }
 
 /* ---------------- tray + settings ---------------- */
@@ -365,8 +448,8 @@ app.whenReady().then(() => {
 
   for (const site of Object.keys(syn.brain.s.passes)) schedulePass(site);
   scheduleReachouts();
-  setInterval(sample, 5000);
-  setInterval(() => { if (mode !== "card") orb.webContents.send("orb", { type: "mode", mode, pass: passView() }); }, 1000);
+  setInterval(watch, isMac ? 1200 : 600);
+  setInterval(() => { if (mode !== "card" && soonestPass()) orb.webContents.send("orb", { type: "mode", mode, pass: passView() }); }, 1000);
 
   globalShortcut.register("CommandOrControl+Shift+Space", openAsk);
   if (app.isPackaged && !syn.brain.s.profile.onboardedAt) app.setLoginItemSettings({ openAtLogin: true });

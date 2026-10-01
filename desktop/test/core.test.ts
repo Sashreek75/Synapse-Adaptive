@@ -16,6 +16,56 @@ let passed = 0;
 async function t(name: string, fn: () => Promise<void> | void) { await fn(); passed++; console.log("  ✓", name); }
 
 (async () => {
+  await t("window titles reveal the site without the browser helper", () => {
+    const cases: [string, string | null][] = [
+      ["Lofi hip hop radio - YouTube - Google Chrome", "youtube.com"],
+      ["(3) YouTube - Google Chrome", "youtube.com"],
+      ["YouTube - Personal - Microsoft\u200B Edge", "youtube.com"],
+      ["Some video - YouTube and 2 more pages - Personal - Microsoft\u200B Edge", "youtube.com"],
+      ["r/learnprogramming - Google Chrome", "reddit.com"],
+      ["Reddit - Dive into anything - Google Chrome", "reddit.com"],
+      ["Someone on X: \"hello\" / X - Google Chrome", "x.com"],
+      ["Home / X - Google Chrome", "x.com"],
+      ["Instagram - Google Chrome", "instagram.com"],
+      ["TikTok - Make Your Day - Google Chrome", "tiktok.com"],
+      ["Netflix - Google Chrome", "netflix.com"],
+      ["Research paper - Google Docs - Google Chrome", null],
+      ["youtube tutorial - Google Search - Google Chrome", null],
+      ["My essay about YouTube culture - Google Docs - Google Chrome", null],
+      ["GitHub - Sashreek75/Synapse-Adaptive - Google Chrome", null],
+      ["Jane (@jane) • Instagram photos and videos - Google Chrome", "instagram.com"],
+      ["Jane on Instagram: \"beach day\" - Google Chrome", "instagram.com"],
+      ["(20+) Facebook - Google Chrome", "facebook.com"],
+      ["funny cat | TikTok - Google Chrome", "tiktok.com"],
+      ["Pinterest - Google Chrome", "pinterest.com"],
+      ["Snapchat - Google Chrome", "snapchat.com"],
+      ["Discord | #general | Study Group - Google Chrome", "discord.com"],
+      ["shroud - Twitch - Google Chrome", "twitch.tv"],
+      ["Home - Netflix - Google Chrome", "netflix.com"],
+      ["Watch The Bear | Hulu - Google Chrome", "hulu.com"],
+      ["Watch Bluey | Disney+ - Google Chrome", "disneyplus.com"],
+      ["Watch One Piece - Crunchyroll - Google Chrome", "crunchyroll.com"],
+      ["Prime Video: The Boys - Google Chrome", "primevideo.com"],
+      ["Blox Fruits - Roblox - Google Chrome", "roblox.com"],
+      ["Play Chess Online for Free with Friends & Family - Chess.com - Google Chrome", "chess.com"],
+      ["Coolmath Games - Free Online Games for Kids - Google Chrome", "coolmathgames.com"],
+      ["Poki - Free Online Games - Play Now! - Google Chrome", "poki.com"],
+      ["Amazon.com. Spend less. Smile more. - Google Chrome", "amazon.com"],
+      ["Amazon.com: Apple AirPods Pro - Google Chrome", "amazon.com"],
+      ["Electronics, Cars, Fashion, Collectibles & More | eBay - Google Chrome", "ebay.com"],
+      ["Breaking News, Latest News and Videos | CNN - Google Chrome", "cnn.com"],
+      ["The New York Times - Breaking News, US News - Google Chrome", "nytimes.com"],
+      ["ESPN - Serving Sports Fans. Anytime. Anywhere. - Google Chrome", "espn.com"],
+      ["Hacker News - Google Chrome", "news.ycombinator.com"],
+      ["Elden Ring on Steam - Google Chrome", "store.steampowered.com"],
+      ["What is Amazon S3? - Amazon Simple Storage Service - Google Chrome", null],
+      ["Max Verstappen - Wikipedia - Google Chrome", null],
+      ["AP Statistics Unit 1 - Khan Academy - Google Chrome", null],
+      ["Inbox (3) - you@gmail.com - Gmail - Google Chrome", null],
+    ];
+    for (const [title, want] of cases) assert.equal(b.matchTitle(title), want, title);
+  });
+
   await t("activity builds a work streak and an inferred focus", () => {
     for (let i = 0; i < 12 * 40; i++) { b.observe({ app: "chrome.exe", title: "Research paper draft - Google Docs - Google Chrome", url: "https://docs.google.com/document/d/1", idleSec: 2 }); clock += 5000; }
     assert.equal(b.workStreakMinutes(), 40);
@@ -89,6 +139,14 @@ async function t(name: string, fn: () => Promise<void> | void) { await fn(); pas
     calls.length = 0;
     const v = await syn.judge({ site: "youtube.com", argument: "i want to kill myself", transcript: [] });
     assert.equal(v.decision, "crisis"); assert.equal(calls.length, 0);
+  });
+
+  await t("older installs get the expanded distraction list merged in", () => {
+    const old = { version: 1, installId: "abc12345", settings: { distractions: ["youtube.com", "mysite.com"], windowSeconds: 15, maxMinutes: 30, shareScreen: true } };
+    const upgraded = createSynapse({ storage: { load: () => JSON.stringify(old), save: () => {} }, now, callModel: async () => null }).brain;
+    assert.ok(upgraded.s.settings.distractions.includes("mysite.com"));
+    assert.ok(upgraded.s.settings.distractions.includes("roblox.com"));
+    assert.ok(upgraded.s.settings.distractions.length > 50);
   });
 
   await t("state survives a restart", () => {

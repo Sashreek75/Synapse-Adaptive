@@ -1,13 +1,13 @@
 # Synapse
 
-Synapse is a Windows app. Its only interface is a small orb at the edge of your screen. It stays
+Synapse is a desktop app for Windows and Mac. Its only interface is a small orb at the edge of your screen. It stays
 quiet while you work, stops you when you open a distracting site and makes you give a real reason,
 and when you click it, it helps you think using what it can see you're doing.
 
 The website in this repo is **not** Synapse. It explains Synapse and hands out the installer.
 
 ```
-desktop/          The Windows app (Electron): orb window, background agent, tray, installer config
+desktop/          The desktop app (Electron, Windows + Mac): orb window, background agent, tray, installers
 core/             The Synapse brain: one state, one context builder, the gate, the conversation
 browser-helper/   Chrome/Edge extension with no UI: reports the current tab, veils/closes tabs on command
 app/              The website: landing page, privacy, terms, and /api/relay
@@ -34,3 +34,9 @@ Agent ───┘                          └── Memory
 - **Memory.** The model writes back with hidden tags (`[[goal:…]]`, `[[focus:…]]`, `[[reachout:…]]`…)
   that `Brain.ingest()` applies. Distractions can be added by talking to the orb; removing one only
   happens in the tray settings, on purpose.
+
+## Shipping a version
+
+Installers are built by `.github/workflows/release.yml` on GitHub's Windows and Mac machines and
+attached to a GitHub release. The website's `/download` route sends each visitor to the latest one
+for their OS (`SynapseSetup.exe` or `Synapse-mac.dmg`). Push a tag like `v0.1.1` to publish.

@@ -186,6 +186,7 @@ S.on((m) => {
   if (m.type === "mode") { if (m.mode !== "card" && view !== "dock") { card.hidden = true; dock.hidden = false; view = "dock"; } if (view === "dock") renderDock(m.pass); }
   else if (m.type === "gate") openGate(m);
   else if (m.type === "verdict") onVerdict(m);
+  else if (m.type === "timeout") { stopClock(); lockGate(); }
   else if (m.type === "ask") openAsk(m);
   else if (m.type === "reply") onReply(m);
   else if (m.type === "notice") showNotice(m);

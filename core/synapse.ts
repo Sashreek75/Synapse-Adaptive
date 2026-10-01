@@ -49,7 +49,7 @@ export function offlineJudge(argument: string, maxMinutes: number, passesToday: 
   if (!dur) return { decision: "ask", minutes: null, reply: "How many minutes, exactly?" };
   const asked = parseInt(dur[1], 10);
   const m = Math.max(1, Math.min(cap, asked));
-  return { decision: "allow", minutes: m, reply: `${m} minutes${m < asked ? ` (offline limit is ${cap})` : ""}. Clock's running.` };
+  return { decision: "allow", minutes: m, reply: `${m} minute${m === 1 ? "" : "s"}${m < asked ? ` (offline limit is ${cap})` : ""}. Clock's running.` };
 }
 
 export function createSynapse(opts: { storage: Storage; callModel: CallModel; now?: () => number }) {

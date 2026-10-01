@@ -9,8 +9,8 @@ html, body { background: transparent; overflow: hidden; height: 100%; font-famil
     radial-gradient(92% 92% at 70% 82%, rgba(255,150,70,.95) 0%, rgba(249,115,22,.7) 24%, rgba(64,120,168,.7) 55%, #1c405c 82%),
     radial-gradient(120% 120% at 50% 40%, #24557d 0%, #0a2033 100%);
   box-shadow: inset 0 2px 4px rgba(255,255,255,.35), inset 0 -10px 24px rgba(2,9,16,.6), 0 0 18px -2px rgba(249,140,60,.55);
-  animation: breathe 7.5s ease-in-out infinite; }
-.orb .bloom { inset: -22%; z-index: -1; filter: blur(9px); background: radial-gradient(closest-side, rgba(130,170,210,.42), rgba(249,140,60,.2) 54%, transparent 74%); animation: bloom 7.5s ease-in-out infinite; }
+  animation: breathe 7.5s ease-in-out infinite; will-change: transform; }
+.orb .bloom { inset: -30%; z-index: -1; background: radial-gradient(closest-side, rgba(130,170,210,.34), rgba(249,140,60,.16) 50%, transparent 72%); animation: bloom 7.5s ease-in-out infinite; will-change: opacity; }
 .orb .ring { inset: -8%; opacity: 0; border: 1.5px solid rgba(249,115,22,.6); }
 .orb[data-state="thinking"] .core, .orb[data-state="thinking"] .bloom { animation-duration: 2.2s; }
 .orb[data-state="thinking"] .ring { animation: ping 1.8s ease-out infinite; }

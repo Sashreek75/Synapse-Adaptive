@@ -23,6 +23,7 @@ export interface Settings {
   windowSeconds: number;
   maxMinutes: number;
   shareScreen: boolean;
+  defaultsVersion?: number;
 }
 
 export interface BrainState {
@@ -50,7 +51,8 @@ export interface BrainState {
 
 export interface Storage { load(): string | null; save(json: string): void }
 
-export const DEFAULT_DISTRACTIONS = ["youtube.com", "reddit.com", "x.com", "twitter.com", "instagram.com", "tiktok.com", "facebook.com", "netflix.com", "twitch.tv"];
+import { DEFAULT_DISTRACTIONS, DEFAULTS_VERSION, catalogEntry } from "./distractions";
+export { DEFAULT_DISTRACTIONS, DISTRACTION_CATALOG } from "./distractions";
 
 const IDLE_BREAK_SEC = 5 * 60;          // idle this long = the work streak resets
 const SEGMENT_GAP_MS = 20_000;          // samples further apart than this start a new segment
@@ -63,7 +65,7 @@ function fresh(): BrainState {
     version: 1,
     installId: rid(),
     profile: {},
-    settings: { distractions: [...DEFAULT_DISTRACTIONS], windowSeconds: 15, maxMinutes: 30, shareScreen: true },
+    settings: { distractions: [...DEFAULT_DISTRACTIONS], windowSeconds: 15, maxMinutes: 30, shareScreen: true, defaultsVersion: DEFAULTS_VERSION },
     goals: [],
     memory: { principles: [], mindshifts: [], observations: [], calls: [] },
     reachouts: [],
@@ -76,7 +78,7 @@ function fresh(): BrainState {
 }
 
 const NAMES: Record<string, string> = { youtube: "YouTube", tiktok: "TikTok", x: "X", twitter: "Twitter", reddit: "Reddit", instagram: "Instagram", facebook: "Facebook", netflix: "Netflix", twitch: "Twitch", discord: "Discord", pinterest: "Pinterest" };
-export function siteName(site: string) { const n = site.split(".")[0]; return NAMES[n] || n.charAt(0).toUpperCase() + n.slice(1); }
+export function siteName(site: string) { const c = catalogEntry(site); if (c) return c.names[0]; const n = site.split(".")[0]; return NAMES[n] || n.charAt(0).toUpperCase() + n.slice(1); }
 
 export function cleanSite(input: string): string {
   let s = input.trim().toLowerCase();
@@ -87,6 +89,36 @@ export function cleanSite(input: string): string {
 /** "Research paper - Google Docs - Google Chrome" → "Research paper - Google Docs" */
 export function cleanTitle(title: string): string {
   return title.replace(/\s+[-–—]\s+(Google Chrome|Microsoft\u200B? Edge|Mozilla Firefox|Brave|Opera|Vivaldi)$/i, "").replace(/^\(\d+\)\s*/, "").trim().slice(0, 120);
+}
+
+
+/** Remove the browser's own name (and Edge's profile name) from the end of a window title. */
+export function stripBrowserSuffix(title: string): string {
+  return title
+    .replace(/\s+[-–—]\s+(Google Chrome|Mozilla Firefox|Brave|Opera|Vivaldi|Arc|Chromium)(\s+[-–—].*)?$/i, "")
+    .replace(/\s+[-–—]\s+Microsoft\u200B?\s?Edge.*$/i, "")
+    .replace(/\s+[-–—]\s+(Personal|Work|Profile \d+|InPrivate)$/i, "")
+    .replace(/\s+and \d+ more pages?$/i, "")
+    .trim();
+}
+
+const esc = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+const SEP = "[-–—|:•·]";
+
+/** Does this page title look like it belongs to `site`? */
+export function titleShowsSite(t: string, site: string): boolean {
+  if (site === "x.com" || site === "twitter.com") return /\/\s*X$/.test(t) || /^X$/.test(t) || /\bon X:/.test(t) || /\/\s*Twitter$/.test(t) || /^Twitter$/.test(t) || /\bon Twitter:/.test(t);
+  if (site === "reddit.com" && (/(^|\s|:)r\/\w+/.test(t) || /\breddit\b/i.test(t))) return true;
+  if (site === "store.steampowered.com" && /(\bon Steam|Welcome to Steam)$/.test(t)) return true;
+  const domain = esc(site);
+  if (new RegExp(`(^|\\s)${domain}(\\W|$)`, "i").test(t)) return true;          // "youtube.com", "Amazon.com: …"
+  const names = catalogEntry(site)?.names ?? [siteName(site)];
+  return names.some((raw) => {
+    const name = esc(raw);
+    return new RegExp(`(^|${SEP}\\s*)${name}\\s*$`, "i").test(t)               // "Video title - YouTube"
+      || new RegExp(`^${name}(\\s*$|\\s*${SEP})`, "i").test(t)                 // "TikTok - Make Your Day", "Netflix"
+      || new RegExp(`\\bon ${name}:`, "i").test(t);                                // "Someone on Instagram: \"…\""
+  });
 }
 
 const dayStart = (t: number) => { const d = new Date(t); d.setHours(0, 0, 0, 0); return d.getTime(); };
@@ -104,6 +136,11 @@ export class Brain {
     this.s = loaded && loaded.version === 1
       ? { ...base, ...loaded, settings: { ...base.settings, ...loaded.settings }, memory: { ...base.memory, ...loaded.memory } }
       : base;
+    // Older installs: merge in sites added to the default list since they installed.
+    if (loaded && (loaded.settings?.defaultsVersion ?? 1) < DEFAULTS_VERSION) {
+      this.s.settings.distractions = [...new Set([...this.s.settings.distractions, ...DEFAULT_DISTRACTIONS])];
+      this.s.settings.defaultsVersion = DEFAULTS_VERSION;
+    }
   }
 
   onChange(fn: () => void) { this.listeners.add(fn); return () => this.listeners.delete(fn); }
@@ -134,6 +171,18 @@ export class Brain {
   matchDistraction(hostname: string): string | null {
     const h = (hostname || "").toLowerCase().replace(/^www\./, "");
     return this.s.settings.distractions.find((d) => h === d || h.endsWith("." + d)) ?? null;
+  }
+
+  /**
+   * Which distracting site a browser WINDOW TITLE shows, for when the browser helper isn't
+   * installed. Browsers put the page title in the window title ("Lofi beats - YouTube - Google
+   * Chrome"), and sites end their titles with their own name, so we match on that suffix.
+   */
+  matchTitle(windowTitle: string): string | null {
+    const t = stripBrowserSuffix(windowTitle).replace(/^\(\d+\+?\)\s*/, "").trim();
+    if (!t || /[-–—|]\s*(Google Search|Bing|DuckDuckGo|Search|Google Docs|Google Slides|Google Sheets)\s*$/i.test(t)) return null;
+    for (const d of this.s.settings.distractions) if (titleShowsSite(t, d)) return d;
+    return null;
   }
 
   /** One sample from the background agent: the foreground window, and how long the user has been idle. */
