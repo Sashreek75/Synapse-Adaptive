@@ -28,16 +28,15 @@ new ResizeObserver(() => { if (!card.hidden) { const r = card.getBoundingClientR
 /* ---------- dock ---------- */
 /* The docked orb sits half-tucked past the screen edge and slides out on hover — all in CSS, so
  * it's smooth. The rest of this small window is click-through, so it never blocks what's behind. */
-dockOrb.addEventListener("mouseenter", () => { dock.classList.add("peek"); S.ignoreMouse(false); });
-dock.addEventListener("mouseleave", () => { dock.classList.remove("peek"); if (view === "dock") S.ignoreMouse(true); });
-chip.addEventListener("mouseenter", () => S.ignoreMouse(false));
+dock.addEventListener("mouseenter", () => S.peek(true));
+dock.addEventListener("mouseleave", () => S.peek(false));
 dock.addEventListener("click", () => S.openAsk());
 function setUnread(on) { unread = on; dockOrb.classList.toggle("unread", on); }
 
 function renderDock(p) {
   pass = p;
   chip.hidden = !p;
-  dock.classList.toggle("tucked", !p);
+
   if (p) {
     const left = p.expiresAt - Date.now();
     chip.textContent = `${p.name} ${fmt(left)}`;
@@ -50,7 +49,6 @@ function showCard(kind) {
   view = kind;
   clearTimeout(noticeTimer); clearTimeout(hideTimer);
   card.classList.remove("leaving");
-  S.ignoreMouse(false);
   dock.hidden = true;
   card.hidden = false;
   body.innerHTML = "";
@@ -71,7 +69,7 @@ function hideCard() {
     card.hidden = true; card.classList.remove("leaving");
     dock.hidden = false; dock.classList.add("arrive");
     setTimeout(() => dock.classList.remove("arrive"), 400);
-    S.close(); S.ignoreMouse(true);
+    S.close();
   }, 170);
 }
 
@@ -150,6 +148,13 @@ function onVerdict(v) {
     say(rich(v.reply));
     actions.hidden = false; $("leave").hidden = true; sendBtn.textContent = "Okay";
     sendBtn.onclick = () => { sendBtn.onclick = null; $("leave").hidden = false; hideCard(); };
+  } else if (v.decision === "deny") {
+    // Not convinced: the tab is closing now, independent of the clock.
+    stopClock(); lockGate();
+    compose.hidden = actions.hidden = count.hidden = true;
+    barFill.style.width = "100%";
+    say(esc(v.reply));
+    hint.hidden = false; hint.textContent = "Not convinced — closing the tab.";
   } else {
     say(esc(v.reply));
     if (v.source === "offline") say("I can't reach my full reasoning right now, so I'm being extra strict.", "muted");
@@ -209,7 +214,7 @@ function onReply(m) {
 /* ---------- notice ---------- */
 function showNotice(m) {
   // Don't wipe out a conversation (or a gate) you're in the middle of — tuck the notice into it.
-  if (view === "ask" || view === "gate") { say(esc(m.text), "muted"); return; }
+  if (view === "ask") { say(esc(m.text), "muted"); return; }
   showCard("notice");
   say(esc(m.text));
   noticeTimer = setTimeout(hideCard, m.ms || 4000);
@@ -231,6 +236,7 @@ S.on((m) => {
   else if (m.type === "gate") openGate(m);
   else if (m.type === "verdict") onVerdict(m);
   else if (m.type === "timeout") { stopClock(); lockGate(); }
+  else if (m.type === "close-card") { if (view === "gate") hideCard(); }
   else if (m.type === "ask") openAsk(m);
   else if (m.type === "reply") onReply(m);
   else if (m.type === "notice") showNotice(m);

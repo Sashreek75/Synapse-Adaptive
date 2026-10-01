@@ -66,10 +66,14 @@ interface Gate {
   typingSince?: number; typingUsedMs: number;
 }
 let gate: Gate | null = null;
+/** After a gate ends with "close the tab", don't reopen a gate for that site while it closes. */
+const cooldown = new Map<string, number>();
+function coolingDown(site: string) { return (cooldown.get(site) ?? 0) > Date.now(); }
 const passTimers = new Map<string, NodeJS.Timeout>();
 const reachTimers = new Map<string, NodeJS.Timeout>();
 
 const ORB_BOX = 76;       // window size when docked
+const DOCK_HIDE = 30;     // px of the docked orb tucked past the screen edge
 
 /* ---------------- orb window ---------------- */
 
@@ -85,12 +89,27 @@ function layout(next: Mode = mode) {
     const y = Math.max(wa.y + 8, Math.min(orbY() + ORB_BOX / 2 - h + 40, wa.y + wa.height - h - 8));
     orb.setBounds({ x: wa.x + wa.width - w - 8, y, width: w, height: h });
   } else {
-    // The orb tucks itself past the edge with CSS (smooth); the window just hugs the screen edge.
     const w = hasPass ? ORB_BOX + 104 : ORB_BOX;
-    orb.setBounds({ x: wa.x + wa.width - w, y: orbY() - ORB_BOX / 2, width: w, height: ORB_BOX });
-    orb.setIgnoreMouseEvents(true, { forward: true });
+    const tucked = mode === "dock" && !hasPass ? DOCK_HIDE : 0;
+    orb.setBounds({ x: wa.x + wa.width - w + tucked, y: orbY() - ORB_BOX / 2, width: w, height: ORB_BOX });
   }
   orb.webContents.send("orb", { type: "mode", mode, pass: passView() });
+}
+
+/** Slide the docked orb out of (or back into) the screen edge in a few quick steps. */
+let slideTimer: NodeJS.Timeout | null = null;
+function slidePeek(out: boolean) {
+  if (soonestPass()) return;               // with a pass the orb is already fully out
+  mode = out ? "peek" : "dock";
+  const wa = workArea();
+  const target = wa.x + wa.width - ORB_BOX + (out ? 0 : DOCK_HIDE);
+  if (slideTimer) clearInterval(slideTimer);
+  slideTimer = setInterval(() => {
+    const [x, y] = orb.getPosition();
+    const next = Math.abs(target - x) <= 4 ? target : Math.round(x + (target - x) * 0.45);
+    orb.setPosition(next, y);
+    if (next === target && slideTimer) { clearInterval(slideTimer); slideTimer = null; }
+  }, 16);
 }
 
 function createOrb() {
@@ -103,14 +122,13 @@ function createOrb() {
   orb.setAlwaysOnTop(true, "screen-saver");
   orb.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
   orb.loadFile(path.join(__dirname, "orb", "index.html"));
-  orb.once("ready-to-show", () => { layout("dock"); orb.showInactive(); orb.setIgnoreMouseEvents(true, { forward: true }); });
+  orb.once("ready-to-show", () => { layout("dock"); orb.showInactive(); });
   orb.on("blur", () => { if (mode === "card" && !gate) orb.webContents.send("orb", { type: "blur" }); });
   screen.on("display-metrics-changed", () => layout());
 }
 
 function openCard(takeFocus = true) {
   layout("card");
-  orb.setIgnoreMouseEvents(false);
   if (!takeFocus) { orb.showInactive(); orb.moveTop(); return; }
   orb.show(); orb.moveTop(); orb.focus();
   if (process.platform === "win32") bringToFront(nativeHandle(orb.getNativeWindowHandle()));
@@ -173,7 +191,7 @@ function onTab(t: TabInfo) {
   }
   if (syn.brain.activePass(site)) { bridge.release([t.tabId]); return; }
   bridge.hold([t.tabId]);
-  if (looking && !gate) startGate(site, t.title, "helper");
+  if (looking && !gate && !coolingDown(site)) startGate(site, t.title, "helper");
 }
 
 function startGate(site: string, pageTitle: string | undefined, via: Gate["via"], target?: Foreground) {
@@ -214,12 +232,15 @@ function gateTyping(on: boolean) {
 
 /** Close every tab showing `site`: precisely through the helper, or the front tab via the OS. */
 async function closeSite(site: string, target?: Foreground) {
+  cooldown.set(site, Date.now() + 6000);
   if (bridge.connected) { bridge.closeSite(site); log(`close ${site}: asked the browser helper`); }
   // The helper only covers the browser it's installed in, so always also handle the window we saw.
   const fg = target ?? await foreground();
   if (!fg || !BROWSERS.test(fg.app)) { if (!bridge.connected) log(`close ${site}: no browser window to close (front app: ${fg?.app ?? "unknown"})`); return; }
   const result = await closeBrowserTab(fg, (now) => siteOf(now) === site, (m) => log(`${site} ${m}`));
   log(`close ${site}: ${result} (${fg.app})`);
+  // Closed: a moment's grace for the browser to settle. Not closed: wait a bit before asking again.
+  cooldown.set(site, Date.now() + (result === "closed" || result === "gone" ? 1500 : 5000));
   if (result === "minimized") notice(`I couldn't close the ${siteName(site)} tab, so I hid the window.`, 3500);
 }
 
@@ -241,8 +262,18 @@ async function argue(text: string) {
   g.judging = false;
   if (gate !== g) return; // they walked away while I was thinking
   orb.webContents.send("orb", { type: "verdict", ...v });
-  if (v.decision === "deny" || v.decision === "ask") armBackstop();
-  if (v.decision === "allow" || v.decision === "crisis") clearTimeout(g.backstop);
+  if (v.decision === "ask") armBackstop();
+  else clearTimeout(g.backstop);
+  if (v.decision === "deny") {
+    // Not convinced = the tab closes now, whatever the clock says. The reply stays up a moment
+    // so they can read why.
+    gate = null;
+    cooldown.set(g.site, Date.now() + 8000);
+    log(`gate deny: closing ${g.site}`);
+    setTimeout(() => closeSite(g.site, g.target), 1600);
+    setTimeout(() => { if (!gate && mode === "card") orb.webContents.send("orb", { type: "close-card" }); }, 3200);
+    return;
+  }
   if (v.decision === "allow") {
     gate = null;
     schedulePass(g.site);
@@ -279,6 +310,7 @@ function gateLeave() {
 /* ---------------- notices + check-ins ---------------- */
 
 function notice(text: string, ms = 4000) {
+  if (gate) { log(`notice skipped during a gate: ${text}`); return; }   // never cover an active gate
   openCard(false);
   orb.webContents.send("orb", { type: "notice", text, ms });
 }
@@ -404,7 +436,7 @@ async function watch() {
       notice(`Good call. ${name} can wait.`, 2500);
       return;
     }
-    if (!site || gate || syn.brain.activePass(site)) return;
+    if (!site || gate || syn.brain.activePass(site) || coolingDown(site)) return;
     startGate(site, fg.title, "window", fg);
   } finally {
     watching = false;
@@ -445,8 +477,8 @@ function openSettings(section: "sites" | "helper") {
 /* ---------------- IPC ---------------- */
 
 function wireIpc() {
-  ipcMain.on("orb:peek", () => { /* peeking is pure CSS now */ });
-  ipcMain.on("orb:ignore-mouse", (_e, on: boolean) => { if (mode !== "card") orb.setIgnoreMouseEvents(!!on, { forward: true }); });
+  ipcMain.on("orb:peek", (_e, on: boolean) => { if (mode !== "card") slidePeek(!!on); });
+  ipcMain.on("orb:ignore-mouse", () => { /* no-op: click-through used a system mouse hook that caused lag */ });
   ipcMain.on("orb:size", (_e, s: { w: number; h: number }) => { cardSize = { w: Math.min(420, Math.max(260, s.w)), h: Math.min(560, Math.max(80, s.h)) }; if (mode === "card") layout("card"); });
   ipcMain.on("orb:open-ask", () => openAsk());
   ipcMain.on("orb:close", () => closeCard());

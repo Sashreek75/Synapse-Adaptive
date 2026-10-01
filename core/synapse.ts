@@ -45,7 +45,7 @@ export function offlineJudge(argument: string, maxMinutes: number, passesToday: 
   const dur = a.match(/(\d{1,3})\s*(m\b|min|mins|minute|minutes)/);
   const cap = Math.min(15, maxMinutes);
   if (passesToday >= 3) return { decision: "deny", minutes: null, reply: "I can't reach my brain right now, and you've had 3 passes today. Not this time." };
-  if (words < 10 || !reason) return { decision: "deny", minutes: null, reply: "I'm offline, so I need it spelled out: what you've been doing, and why you need this." };
+  if (words < 10 || !reason) return { decision: "deny", minutes: null, reply: "I can't reach my full reasoning right now, and that isn't specific enough. Closing it." };
   if (!dur) return { decision: "ask", minutes: null, reply: "How many minutes, exactly?" };
   const asked = parseInt(dur[1], 10);
   const m = Math.max(1, Math.min(cap, asked));
