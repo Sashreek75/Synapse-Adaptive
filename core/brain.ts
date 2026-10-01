@@ -17,6 +17,7 @@ export interface GateEvent { ts: number; site: string; kind: GateKind; minutes?:
 export interface Turn { ts: number; role: "user" | "synapse"; text: string; surface: "ask" | "gate" | "onboarding" }
 export interface Segment { app: string; title: string; site?: string; start: number; end: number }
 export interface Reachout { id: string; at: number; text: string }
+export interface PassChange { site: string; minutes: number }
 
 export interface Settings {
   distractions: string[];
@@ -33,6 +34,8 @@ export interface BrainState {
   settings: Settings;
   goals: Goal[];
   focus?: { text: string; setAt: number };
+  /** They told us they're done working ("done studying, gn"). Synapse treats them as off the clock. */
+  offClock?: { since: number; said: string };
   memory: {
     principles: { text: string; ts: number }[];
     mindshifts: { text: string; ts: number }[];
@@ -54,7 +57,9 @@ export interface Storage { load(): string | null; save(json: string): void }
 import { DEFAULT_DISTRACTIONS, DEFAULTS_VERSION, catalogEntry } from "./distractions";
 export { DEFAULT_DISTRACTIONS, DISTRACTION_CATALOG } from "./distractions";
 
-const IDLE_BREAK_SEC = 5 * 60;          // idle this long = the work streak resets
+const IDLE_BREAK_SEC = 5 * 60;
+const FOCUS_IDLE_RESET_SEC = 30 * 60;   // away this long and "what they're working on" is stale
+const OFF_CLOCK_MS = 10 * 3600_000;          // idle this long = the work streak resets
 const SEGMENT_GAP_MS = 20_000;          // samples further apart than this start a new segment
 const KEEP_ACTIVITY_MS = 24 * 3600_000;
 
@@ -91,6 +96,22 @@ export function cleanTitle(title: string): string {
   return title.replace(/\s+[-–—]\s+(Google Chrome|Microsoft\u200B? Edge|Mozilla Firefox|Brave|Opera|Vivaldi)$/i, "").replace(/^\(\d+\)\s*/, "").trim().slice(0, 120);
 }
 
+
+/**
+ * Did they just say they're done working? ("done studying, gn", "calling it a night",
+ * "I'm finished for today", "going to bed"). A plain break ("quick break") is NOT this.
+ */
+export function saysDoneWorking(text: string): boolean {
+  const t = text.toLowerCase();
+  if (/\b(quick|short|small|\d+[- ]?min(ute)?s?)\s+break\b/.test(t)) return false;
+  return /\b(done|finished|through|wrapping up|wrapped up|stopping|calling it)\b[^.!?]{0,30}\b(studying|study|working|work|homework|hw|school ?work|coding|for (the|to)(day|night|nite)|for today|for tonight|for the day|for the night)\b/.test(t)
+    || /\bcalling it (a )?(night|day)\b/.test(t)
+    || /\b(i'?m|im|i am) (done|finished)( for (now|today|tonight|the day|the night))?\s*[,.!]*\s*(gn|good ?night|bye)?\s*$/.test(t)
+    || /(^\s*gn\b|\bgn[\s!.]*$)/.test(t)
+    || /\b(good ?night|nighty? ?night)\b/.test(t)
+    || /\b(going|heading|off) to (bed|sleep)\b/.test(t)
+    || /\bday'?s (done|over)\b/.test(t);
+}
 
 /** Remove the browser's own name (and Edge's profile name) from the end of a window title. */
 export function stripBrowserSuffix(title: string): string {
@@ -188,9 +209,15 @@ export class Brain {
   /** One sample from the background agent: the foreground window, and how long the user has been idle. */
   observe(sample: { app: string; title: string; url?: string; idleSec: number }) {
     const t = this.now();
-    if (sample.idleSec >= IDLE_BREAK_SEC) { this.s.workStreakStart = undefined; this.touch(); return; }
+    if (sample.idleSec >= IDLE_BREAK_SEC) {
+      this.s.workStreakStart = undefined;
+      // Away from the computer for a long stretch: whatever they said they were doing is over.
+      if (sample.idleSec >= FOCUS_IDLE_RESET_SEC && this.s.focus) this.s.focus = undefined;
+      this.touch(); return;
+    }
     let site: string | undefined;
     if (sample.url) { try { site = this.matchDistraction(new URL(sample.url).hostname) ?? undefined; } catch { /* ignore */ } }
+    else site = this.matchTitle(sample.title || "") ?? undefined;
     const title = cleanTitle(sample.title || "");
     const last = this.s.activity[this.s.activity.length - 1];
     if (last && last.app === sample.app && last.title === title && t - last.end < SEGMENT_GAP_MS) last.end = t;
@@ -223,13 +250,46 @@ export class Brain {
 
   /** What they're working on: what they SAID (for 3h), else what the screen suggests. */
   currentFocus(): { text: string; source: "stated" | "inferred" } | null {
+    if (this.offClock()) return null;
     const f = this.s.focus;
     if (f && this.now() - f.setAt < 3 * 3600_000) return { text: f.text, source: "stated" };
     const top = this.recentWindows(30, 3).find((w) => !w.distraction && w.minutes >= 5 && !/^(explorer|searchhost|shellexperiencehost|lockapp)/i.test(w.label));
     return top ? { text: top.label.replace(/\s*\([^)]*\)$/, ""), source: "inferred" } : null;
   }
 
+  /** Off the clock until they start something new, or ~10 hours pass (the next day). */
+  offClock(): { since: number; said: string } | null {
+    const o = this.s.offClock;
+    if (!o) return null;
+    if (this.now() - o.since > OFF_CLOCK_MS) { this.s.offClock = undefined; return null; }
+    return o;
+  }
+
+  /** They said they're done working. Clears what they were "working on" and says so in context. */
+  endWork(said: string) {
+    this.s.focus = undefined;
+    this.s.workStreakStart = undefined;
+    this.s.offClock = { since: this.now(), said: said.slice(0, 160) };
+    this.touch();
+  }
+
+  /** They're back at it ("ok starting my essay"). */
+  startWork(text: string) {
+    this.s.offClock = undefined;
+    this.s.focus = { text: text.slice(0, 160), setAt: this.now() };
+    this.touch();
+  }
+
   /* ---------------- the gate ---------------- */
+
+  /** "youtube", "YouTube", "youtube.com", "https://youtube.com/…" → "youtube.com" (only listed sites). */
+  resolveSite(name: string): string | null {
+    const c = cleanSite(name);
+    const direct = this.matchDistraction(c);
+    if (direct) return direct;
+    const n = name.trim().toLowerCase();
+    return this.s.settings.distractions.find((d) => siteName(d).toLowerCase() === n || d.split(".")[0] === n) ?? null;
+  }
 
   activePass(site: string): Pass | null {
     const p = this.s.passes[site];
@@ -271,9 +331,10 @@ export class Brain {
   noteAppEvent(text: string) { this.s.appEvents.push({ ts: this.now(), text }); this.touch(); }
 
   /** Read the hidden tags the model appended, apply them to state, and return the clean reply. */
-  ingest(raw: string): { text: string; reachouts: Reachout[] } {
+  ingest(raw: string): { text: string; reachouts: Reachout[]; passChanges: PassChange[] } {
     const t = this.now();
     const reachouts: Reachout[] = [];
+    const passChanges: PassChange[] = [];
     for (const m of raw.matchAll(/\[\[\s*([a-z-]+)\s*:\s*([\s\S]*?)\]\]/gi)) {
       const kind = m[1].toLowerCase();
       const parts = m[2].split("|").map((x) => x.trim());
@@ -285,7 +346,8 @@ export class Brain {
       } else if (kind === "goal-done") {
         const g = this.s.goals.find((g) => !g.doneAt && (g.title.toLowerCase().includes(a.toLowerCase()) || a.toLowerCase().includes(g.title.toLowerCase())));
         if (g) g.doneAt = t;
-      } else if (kind === "focus") this.s.focus = { text: a.slice(0, 160), setAt: t };
+      } else if (kind === "focus") this.startWork(a);
+      else if (kind === "done-working") this.endWork(a);
       else if (kind === "distraction") { const d = cleanSite(a); if (d.includes(".") && !this.s.settings.distractions.includes(d)) this.s.settings.distractions.push(d); }
       else if (kind === "reachout") {
         const n = parseInt(a, 10);
@@ -294,10 +356,27 @@ export class Brain {
       else if (kind === "mindshift") this.s.memory.mindshifts.push({ text: a, ts: t });
       else if (kind === "observe") this.s.memory.observations.push({ key: a, text: parts[1] ?? a, ts: t });
       else if (kind === "rec") this.s.memory.calls.push({ text: a, ts: t });
+      else if (kind === "pass") {
+        // [[pass: site | minutes from now]] — change (or end, with 0) a timed pass from the conversation.
+        const site = this.resolveSite(a);
+        const n = parseInt(parts[1] ?? "", 10);
+        if (!site || Number.isNaN(n) || n < 0) continue;
+        if (n === 0) { if (this.s.passes[site]) { this.endPass(site, "ended_early"); passChanges.push({ site, minutes: 0 }); } continue; }
+        const minutes = Math.min(n, this.s.settings.maxMinutes);
+        const existing = this.activePass(site);
+        if (existing) {
+          const before = existing.minutes;
+          existing.expiresAt = t + minutes * 60_000;
+          existing.minutes = Math.round((existing.expiresAt - existing.grantedAt) / 60_000);
+          this.logGate({ site, kind: "pass", minutes: Math.max(0, existing.minutes - before), text: `pass changed: ${minutes} min from now` });
+        }
+        else this.grantPass(site, minutes, "granted in conversation");
+        passChanges.push({ site, minutes });
+      }
     }
     this.touch();
     const text = raw.replace(/\[\[[\s\S]*?\]\]/g, "").replace(/\n{3,}/g, "\n\n").trim();
-    return { text, reachouts };
+    return { text, reachouts, passChanges };
   }
 
   /* ---------------- the ONE context builder ---------------- */
@@ -317,6 +396,8 @@ export class Brain {
       ? `Goals:\n${goals.map((g) => `- ${g.title}${g.deadline ? ` (due ${g.deadline})` : ""}`).join("\n")}`
       : "Goals: none captured yet.");
 
+    const off = this.offClock();
+    if (off) lines.push(`OFF THE CLOCK: at ${new Date(off.since).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })} they said they were done working ("${off.said}"). Don't treat them as mid-task; they're winding down unless they say otherwise.`);
     const focus = this.currentFocus();
     if (focus) lines.push(focus.source === "stated"
       ? `WORKING ON (they told you, ${mins(t - (this.s.focus?.setAt ?? t))} min ago): ${focus.text}`
@@ -331,7 +412,8 @@ export class Brain {
     lines.push(`DISTRACTION GATE TODAY: ${d.passes} passes (${d.minutes} min), ${d.denials} denied or timed out, ${d.walkedAway} times they walked away on their own.` +
       (d.reasons.length ? `\nReasons that got them in today:\n- ${d.reasons.slice(-5).join("\n- ")}` : ""));
     const live = Object.values(this.s.passes).filter((p) => p.expiresAt > t);
-    if (live.length) lines.push(`ACTIVE PASS: ${live.map((p) => `${siteName(p.site)}, ${Math.ceil((p.expiresAt - t) / 60_000)} min left`).join("; ")}`);
+    if (live.length) lines.push(`ACTIVE PASS: ${live.map((p) => `${siteName(p.site)} (${p.site}), ${Math.ceil((p.expiresAt - t) / 60_000)} min left of ${p.minutes}`).join("; ")}`);
+    lines.push(`PASS LIMIT: the longest pass they've allowed is ${this.s.settings.maxMinutes} min.`);
 
     const mem = this.s.memory;
     const memLines = [

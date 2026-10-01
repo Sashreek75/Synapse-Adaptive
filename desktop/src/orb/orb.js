@@ -18,18 +18,26 @@ let pass = null;
 let share = true;
 let busy = false;
 let noticeTimer = null;
+let draft = "";            // what you'd typed to Synapse but not sent — kept when the card closes
+let unread = false;        // a reply arrived while the card was closed
+let hideTimer = null;
 
 /* ---------- sizing: the window hugs the card ---------- */
 new ResizeObserver(() => { if (!card.hidden) { const r = card.getBoundingClientRect(); S.size(Math.ceil(r.width), Math.ceil(r.height)); } }).observe(card);
 
 /* ---------- dock ---------- */
-dock.addEventListener("mouseenter", () => S.peek(true));
-dock.addEventListener("mouseleave", () => S.peek(false));
+/* The docked orb sits half-tucked past the screen edge and slides out on hover — all in CSS, so
+ * it's smooth. The rest of this small window is click-through, so it never blocks what's behind. */
+dockOrb.addEventListener("mouseenter", () => { dock.classList.add("peek"); S.ignoreMouse(false); });
+dock.addEventListener("mouseleave", () => { dock.classList.remove("peek"); if (view === "dock") S.ignoreMouse(true); });
+chip.addEventListener("mouseenter", () => S.ignoreMouse(false));
 dock.addEventListener("click", () => S.openAsk());
+function setUnread(on) { unread = on; dockOrb.classList.toggle("unread", on); }
 
 function renderDock(p) {
   pass = p;
   chip.hidden = !p;
+  dock.classList.toggle("tucked", !p);
   if (p) {
     const left = p.expiresAt - Date.now();
     chip.textContent = `${p.name} ${fmt(left)}`;
@@ -38,8 +46,11 @@ function renderDock(p) {
 }
 
 function showCard(kind) {
+  if (view === "ask" && kind !== "ask" && input.value.trim()) draft = input.value;
   view = kind;
-  clearTimeout(noticeTimer);
+  clearTimeout(noticeTimer); clearTimeout(hideTimer);
+  card.classList.remove("leaving");
+  S.ignoreMouse(false);
   dock.hidden = true;
   card.hidden = false;
   body.innerHTML = "";
@@ -50,10 +61,18 @@ function showCard(kind) {
 }
 function hideCard() {
   stopClock();
+  if (view === "ask") draft = input.value;
   view = "dock";
-  card.hidden = true;
-  dock.hidden = false;
-  S.close();
+  // Ease out, then shrink the window back to the orb.
+  card.classList.add("leaving");
+  clearTimeout(hideTimer);
+  hideTimer = setTimeout(() => {
+    if (view !== "dock") return;          // something reopened it meanwhile
+    card.hidden = true; card.classList.remove("leaving");
+    dock.hidden = false; dock.classList.add("arrive");
+    setTimeout(() => dock.classList.remove("arrive"), 400);
+    S.close(); S.ignoreMouse(true);
+  }, 170);
 }
 
 function say(html, cls = "say") { const d = document.createElement("div"); d.className = cls; d.innerHTML = html; body.appendChild(d); body.scrollTop = body.scrollHeight; return d; }
@@ -62,6 +81,11 @@ input.addEventListener("input", autoGrow);
 
 /* ---------- gate ---------- */
 let clock = null, total = 0, remaining = 0, last = 0, started = false, paused = false, startTimer = null;
+// Typing holds the clock: while you're actively writing your case (a key in the last 2.5s), the
+// countdown waits. It's capped at 45s per gate so "typing" can't become a way to stall forever.
+const TYPE_HOLD = 2500, TYPE_CAP = 45_000;
+let lastKey = 0, typingUsed = 0, typingHeld = false;
+function setTypingHeld(on) { if (on === typingHeld) return; typingHeld = on; count.classList.toggle("held", on); S.gateTyping(on); }
 
 function startClock() {
   if (started) return;
@@ -69,6 +93,9 @@ function startClock() {
   clock = setInterval(() => {
     const t = performance.now(), dt = t - last; last = t;
     if (paused) return;
+    const typing = view === "gate" && t - lastKey < TYPE_HOLD && typingUsed < TYPE_CAP && input.value.trim().length > 0;
+    setTypingHeld(typing);
+    if (typing) { typingUsed += dt; return; }
     remaining -= dt;
     count.textContent = Math.max(0, Math.ceil(remaining / 1000));
     barFill.style.width = `${100 * (1 - Math.max(0, remaining) / total)}%`;
@@ -76,29 +103,30 @@ function startClock() {
     if (remaining <= 0) { stopClock(); lockGate(); say("Time's up.", "say"); S.timeout(); }
   }, 100);
 }
-function stopClock() { clearInterval(clock); clearTimeout(startTimer); clock = null; started = false; }
+function stopClock() { clearInterval(clock); clearTimeout(startTimer); clock = null; started = false; if (typingHeld) setTypingHeld(false); }
 function lockGate() { input.disabled = true; sendBtn.disabled = true; }
 
 function openGate(m) {
   showCard("gate");
   total = remaining = (m.seconds || 15) * 1000;
-  paused = false; started = false;
+  paused = false; started = false; lastKey = 0; typingUsed = 0; typingHeld = false; count.classList.remove("held");
   count.hidden = false; count.textContent = m.seconds || 15;
   say(esc(m.opener));
   compose.hidden = actions.hidden = hint.hidden = false;
   input.disabled = false; sendBtn.disabled = false; sendBtn.textContent = "Make my case";
   input.placeholder = `Why do you need ${m.name}, and for how long?`;
-  hint.textContent = "Enter to send · the clock stops while I think";
+  hint.textContent = "The clock pauses while you type and while I think · Enter to send";
   setTimeout(() => input.focus(), 30);
   // The clock starts when you start answering — or after a moment regardless.
   startTimer = setTimeout(startClock, 2500);
 }
 input.addEventListener("focus", () => { if (view === "gate") startClock(); });
+input.addEventListener("input", () => { if (view === "gate") { lastKey = performance.now(); startClock(); } });
 
 function argue() {
   const text = input.value.trim();
   if (!text || busy || view !== "gate" || input.disabled) return;
-  busy = true; paused = true;
+  busy = true; paused = true; lastKey = 0; setTypingHeld(false);
   say(esc(text), "me");
   input.value = ""; autoGrow();
   sendBtn.disabled = true; sendBtn.textContent = "Thinking…";
@@ -133,30 +161,44 @@ function onVerdict(v) {
 function setEye(on) { share = on; eye.classList.toggle("on", on); eye.title = on ? "Synapse will look at your screen when you send (click to turn off)" : "Synapse won't look at your screen (click to turn on)"; }
 eye.addEventListener("click", () => { setEye(!share); S.setShare(share); });
 
+function renderTurn(t) {
+  if (t.role === "user") say(esc(t.text), "me");
+  else say(rich(t.text));
+}
+
+/** Reopening the orb shows the conversation so far (and a reply that arrived while it was closed). */
 function openAsk(m) {
   showCard("ask");
+  setUnread(false);
   eye.hidden = false; setEye(m.share);
-  if (m.prompt) say(esc(m.prompt));
+  const history = m.history || [];
+  if (!history.length && m.prompt) say(esc(m.prompt));
+  history.forEach(renderTurn);
+  busy = !!m.pending;
+  if (busy) { say("thinking…", "muted pending"); cardOrb.dataset.state = "thinking"; }
   compose.hidden = false; hint.hidden = false;
-  input.disabled = false;
-  input.placeholder = m.onboarding ? "The goals and deadlines on your plate…" : "What's on your mind?";
-  hint.textContent = "Enter to send · Esc to close";
-  setTimeout(() => input.focus(), 30);
+  input.disabled = busy;
+  input.value = draft; draft = ""; autoGrow();
+  input.placeholder = m.onboarding ? "The goals and deadlines on your plate…" : history.length ? "Reply…" : "What's on your mind?";
+  hint.textContent = busy ? "Still thinking — you can close this and I'll keep going" : "Enter to send · Esc to close";
+  setTimeout(() => { input.focus(); body.scrollTop = body.scrollHeight; }, 30);
 }
 
 async function sendAsk() {
   const text = input.value.trim();
   if (!text || busy) return;
   busy = true;
-  body.innerHTML = "";
   say(esc(text), "me");
+  say("thinking…", "muted pending");
   input.value = ""; autoGrow(); input.disabled = true;
   cardOrb.dataset.state = "thinking";
-  hint.textContent = share ? "Looking at your screen…" : "Thinking…";
+  hint.textContent = (share ? "Looking at your screen… " : "Thinking… ") + "you can close this and check back";
   await S.ask(text, share);
 }
 function onReply(m) {
   busy = false;
+  if (view !== "ask") { setUnread(true); return; }   // shown next time you open the orb
+  body.querySelectorAll(".pending").forEach((n) => n.remove());
   cardOrb.dataset.state = "";
   say(rich(m.text));
   if (m.sawScreen) say("looked at your screen", "muted");
@@ -166,6 +208,8 @@ function onReply(m) {
 
 /* ---------- notice ---------- */
 function showNotice(m) {
+  // Don't wipe out a conversation (or a gate) you're in the middle of — tuck the notice into it.
+  if (view === "ask" || view === "gate") { say(esc(m.text), "muted"); return; }
   showCard("notice");
   say(esc(m.text));
   noticeTimer = setTimeout(hideCard, m.ms || 4000);
@@ -190,5 +234,5 @@ S.on((m) => {
   else if (m.type === "ask") openAsk(m);
   else if (m.type === "reply") onReply(m);
   else if (m.type === "notice") showNotice(m);
-  else if (m.type === "blur") { if (view === "ask" && !busy && !input.value.trim()) hideCard(); }
+  else if (m.type === "blur") { if (view === "ask") hideCard(); }
 });

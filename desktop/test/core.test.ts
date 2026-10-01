@@ -1,6 +1,6 @@
 /* Core tests with a scripted model — no network. `npm test` */
 import assert from "node:assert/strict";
-import { createSynapse, type ModelCall } from "../../core/synapse";
+import { createSynapse, saysDoneWorking, type ModelCall } from "../../core/synapse";
 
 let clock = new Date("2026-09-30T14:00:00").getTime();
 const now = () => clock;
@@ -147,6 +147,57 @@ async function t(name: string, fn: () => Promise<void> | void) { await fn(); pas
     assert.ok(upgraded.s.settings.distractions.includes("mysite.com"));
     assert.ok(upgraded.s.settings.distractions.includes("roblox.com"));
     assert.ok(upgraded.s.settings.distractions.length > 50);
+  });
+
+  await t("knows 'done for the day' from 'quick break'", () => {
+    for (const yes of ["I'm done studying, gn", "done with homework for tonight", "ok calling it a night", "gn", "goodnight synapse", "im done for today", "finished working for the day!", "heading to bed", "I'm done, gn"])
+      assert.equal(saysDoneWorking(yes), true, yes);
+    for (const no of ["I need a quick break", "10 minute break then back to it", "I'm done with question 3, what's next?", "I'm working on my essay", "is this done right?", "the gn in this formula"])
+      assert.equal(saysDoneWorking(no), false, no);
+  });
+
+  await t("saying you're done takes you off the clock everywhere", async () => {
+    script = (c) => c.system?.startsWith("You are the comprehension layer")
+      ? '{"intent":"statement","responseMode":"ACKNOWLEDGE","explicitClaims":["done studying"],"explicitRequests":[],"askedForAdvice":false,"askedToDecide":false,"askedForPlan":false,"constraints":[],"temporal":[],"unknowns":[],"contradictions":[]}'
+      : "Good work today. Sleep well.";
+    await syn.ask("I'm done studying, gn");
+    assert.equal(b.currentFocus(), null);
+    assert.match(syn.gateOpener("youtube.com"), /You said you were done for today/);
+    assert.match(b.context({ purpose: "gate" }), /OFF THE CLOCK/);
+    assert.doesNotMatch(b.context({ purpose: "gate" }), /WORKING ON/);
+    // ...until they start something again
+    script = (c) => c.system?.startsWith("You are the comprehension layer") ? null : "Let's go.\n[[focus: the stats homework]]";
+    await syn.ask("ok actually starting my stats homework");
+    assert.equal(b.offClock(), null);
+    assert.equal(b.currentFocus()?.text, "the stats homework");
+  });
+
+  await t("a long time away from the computer clears a stale focus", () => {
+    b.observe({ app: "chrome.exe", title: "x", idleSec: 31 * 60 });
+    assert.notEqual(b.currentFocus()?.source, "stated");
+  });
+
+  await t("the orb can change a pass when you ask", async () => {
+    const yt = b.grantPass("youtube.com", 10, "break");
+    const comp = '{"intent":"question","responseMode":"ANSWER","explicitClaims":[],"explicitRequests":["change pass"],"askedForAdvice":false,"askedToDecide":false,"askedForPlan":false,"constraints":[],"temporal":[],"unknowns":[],"contradictions":[]}';
+    let reply = "Done — 20 minutes from now.\n[[pass: YouTube | 20]]";
+    script = (c) => c.system?.startsWith("You are the comprehension layer") ? comp : reply;
+    let r = await syn.ask("can you change my youtube timer from 10 to 20 min, the lecture is longer than I thought");
+    assert.equal(r.text, "Done — 20 minutes from now.");
+    assert.deepEqual(r.passChanges, [{ site: "youtube.com", minutes: 20 }]);
+    assert.equal(Math.round((b.activePass("youtube.com")!.expiresAt - clock) / 60_000), 20);
+    assert.ok(yt);
+    reply = "Capped at your limit.\n[[pass: youtube.com | 90]]";
+    r = await syn.ask("make it 90");
+    assert.equal(Math.round((b.activePass("youtube.com")!.expiresAt - clock) / 60_000), 30);
+    reply = "Ended.\n[[pass: youtube.com | 0]]";
+    r = await syn.ask("actually end it, I'm good");
+    assert.equal(b.activePass("youtube.com"), null);
+    reply = "No.\n[[pass: notlisted.com | 20]]";
+    r = await syn.ask("x");
+    assert.deepEqual(r.passChanges, []);
+    assert.match(b.context({ purpose: "ask" }), /PASS LIMIT: the longest pass they've allowed is 30 min/);
+    b.grantPass("youtube.com", 10, "for the restart test");
   });
 
   await t("state survives a restart", () => {

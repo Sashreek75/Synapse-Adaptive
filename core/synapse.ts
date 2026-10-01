@@ -10,7 +10,7 @@
  * Every path reads brain.context() and writes back into the brain. Nothing keeps its own copy.
  */
 import { z } from "zod";
-import { Brain, siteName, type Storage, type Pass, type Reachout } from "./brain";
+import { Brain, siteName, saysDoneWorking, type Storage, type Pass, type Reachout, type PassChange } from "./brain";
 import { extractJson, type CallModel } from "./model";
 import { ORB_SYSTEM, COMPREHENSION_SYSTEM, GATE_SYSTEM, SCREEN_SYSTEM, ONBOARDING_DIRECTIVE } from "./prompts";
 import { comprehensionSchema, type Comprehension } from "./schemas";
@@ -63,6 +63,7 @@ export function createSynapse(opts: { storage: Storage; callModel: CallModel; no
     const focus = brain.currentFocus();
     const streak = brain.workStreakMinutes();
     const today = brain.today();
+    if (brain.offClock()) return `You said you were done for today. ${name} now — what's the plan?`;
     if (focus?.source === "stated") return `Hold on. You're working on ${focus.text}. Why ${name}?`;
     if (focus) return `Hold on. You're in the middle of ${focus.text}. Why ${name}?`;
     if (streak >= 20) return `Hold on — you've been at it for ${streak} minutes. Why ${name}?`;
@@ -73,6 +74,7 @@ export function createSynapse(opts: { storage: Storage; callModel: CallModel; no
   async function judge(input: { site: string; argument: string; transcript: GateTurn[]; pageTitle?: string }): Promise<Verdict> {
     const { site, argument } = input;
     brain.addTurn("user", `[${siteName(site)}] ${argument}`, "gate");
+    if (saysDoneWorking(argument)) brain.endWork(argument);
     if (preGate(argument).triggered) return { decision: "crisis", minutes: null, reply: CRISIS_RESPONSE, source: "model" };
 
     const max = brain.s.settings.maxMinutes;
@@ -129,13 +131,15 @@ export function createSynapse(opts: { storage: Storage; callModel: CallModel; no
   }
 
   /** The clarity conversation. `screenshot` is a base64 JPEG of their screen, only when they allowed it. */
-  async function ask(message: string, o: { screenshot?: string | null; onboarding?: boolean } = {}): Promise<{ text: string; reachouts: Reachout[]; sawScreen: boolean }> {
+  async function ask(message: string, o: { screenshot?: string | null; onboarding?: boolean } = {}): Promise<{ text: string; reachouts: Reachout[]; passChanges: PassChange[]; sawScreen: boolean }> {
     const surface = o.onboarding ? "onboarding" : "ask";
-    if (preGate(message).triggered) { brain.addTurn("user", message, surface); brain.addTurn("synapse", CRISIS_RESPONSE, surface); return { text: CRISIS_RESPONSE, reachouts: [], sawScreen: false }; }
+    if (preGate(message).triggered) { brain.addTurn("user", message, surface); brain.addTurn("synapse", CRISIS_RESPONSE, surface); return { text: CRISIS_RESPONSE, reachouts: [], passChanges: [], sawScreen: false }; }
 
+    if (saysDoneWorking(message)) brain.endWork(message);
+    const context0 = brain.context({ purpose: "ask", screen: null });
+    brain.addTurn("user", message, surface);   // recorded right away, so reopening the orb shows it
     const screen = o.screenshot ? await describeScreen(o.screenshot, message) : null;
-    const context = brain.context({ purpose: "ask", screen });
-    brain.addTurn("user", message, surface);
+    const context = screen ? brain.context({ purpose: "ask", screen }).replace(/\nThem: [^\n]*$/, "") : context0;
 
     const c = await comprehend(message, context);
     const brief = buildTurnBrief(c);
@@ -146,7 +150,7 @@ export function createSynapse(opts: { storage: Storage; callModel: CallModel; no
     if (!raw || !postGate(raw).ok) {
       const text = "I couldn't think that through just now. Ask me again in a moment.";
       brain.addTurn("synapse", text, surface);
-      return { text, reachouts: [], sawScreen: !!screen };
+      return { text, reachouts: [], passChanges: [], sawScreen: !!screen };
     }
     // Grounding guard — one repair, then a minimal acknowledgement for low-intent turns.
     const visible = raw.replace(/\[\[[\s\S]*?\]\]/g, "");
@@ -156,10 +160,10 @@ export function createSynapse(opts: { storage: Storage; callModel: CallModel; no
       if (repaired && postGate(repaired).ok && checkGrounding(message, repaired.replace(/\[\[[\s\S]*?\]\]/g, ""), c).ok) raw = repaired;
       else if (c.responseMode === "ACKNOWLEDGE" || c.responseMode === "REFLECT") raw = minimalAcknowledgement(c);
     }
-    const { text, reachouts } = brain.ingest(raw);
+    const { text, reachouts, passChanges } = brain.ingest(raw);
     if (o.onboarding) brain.s.profile.onboardedAt = now();
     brain.addTurn("synapse", text, surface);
-    return { text, reachouts, sawScreen: !!screen };
+    return { text, reachouts, passChanges, sawScreen: !!screen };
   }
 
   return { brain, gateOpener, judge, ask };

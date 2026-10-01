@@ -37,6 +37,12 @@ function win() {
       setFg: user32.func("bool __stdcall SetForegroundWindow(intptr_t hWnd)"),
       isWin: user32.func("bool __stdcall IsWindow(intptr_t hWnd)"),
       key: user32.func("void __stdcall keybd_event(uint8_t bVk, uint8_t bScan, uint32_t dwFlags, uintptr_t dwExtraInfo)"),
+      threadOf: user32.func("uint32_t __stdcall GetWindowThreadProcessId(intptr_t hWnd, intptr_t lpdwProcessId)"),
+      attach: user32.func("bool __stdcall AttachThreadInput(uint32_t idAttach, uint32_t idAttachTo, bool fAttach)"),
+      toTop: user32.func("bool __stdcall BringWindowToTop(intptr_t hWnd)"),
+      show: user32.func("bool __stdcall ShowWindow(intptr_t hWnd, int nCmdShow)"),
+      iconic: user32.func("bool __stdcall IsIconic(intptr_t hWnd)"),
+      myThread: kernel32.func("uint32_t __stdcall GetCurrentThreadId()"),
       open: kernel32.func("intptr_t __stdcall OpenProcess(uint32_t dwDesiredAccess, bool bInheritHandle, uint32_t dwProcessId)"),
       image: kernel32.func("bool __stdcall QueryFullProcessImageNameW(intptr_t hProcess, uint32_t dwFlags, _Out_ uint16_t* lpExeName, _Inout_ uint32_t* lpdwSize)"),
       close: kernel32.func("bool __stdcall CloseHandle(intptr_t hObject)"),
@@ -142,53 +148,84 @@ export async function foreground(): Promise<Foreground | null> {
 /** Browser processes whose current site we can read (title on Windows, URL on Mac). */
 export const BROWSERS = /^(chrome|msedge|brave|opera|vivaldi|arc|firefox)(\.exe)?$|^(google chrome|microsoft edge|brave browser|arc|opera|vivaldi|safari|firefox|chromium)$/i;
 
-/** Bring a window to the front. Windows blocks background apps from doing this unless a key
- *  event just happened, so we tap Alt first — the standard, harmless workaround. */
+/**
+ * Bring a window to the front. Windows refuses this to background apps ("foreground lock"),
+ * so we use the two standard workarounds together: attach to the foreground window's input
+ * thread, and tap Alt. Restores the window first if it's minimised.
+ */
 export function bringToFront(hwnd: number): boolean {
   const a = win();
   if (!a || !hwnd || !a.isWin(hwnd)) return false;
-  a.key(0x12, 0, 0, 0);       // Alt down
-  const ok = a.setFg(hwnd);
-  a.key(0x12, 0, 2, 0);       // Alt up
-  return !!ok;
+  try {
+    if (a.iconic(hwnd)) a.show(hwnd, 9 /* SW_RESTORE */);
+    const fgThread = a.threadOf(Number(a.fg()), 0);
+    const me = a.myThread();
+    const attached = fgThread && fgThread !== me ? a.attach(me, fgThread, true) : false;
+    a.key(0x12, 0, 0, 0);       // Alt down
+    a.setFg(hwnd);
+    a.toTop(hwnd);
+    a.key(0x12, 0, 2, 0);       // Alt up
+    if (attached) a.attach(me, fgThread, false);
+  } catch { /* fall through to the check */ }
+  return Number(a.fg()) === hwnd;
+}
+
+export function minimize(hwnd?: number) {
+  const a = win();
+  if (a && hwnd && a.isWin(hwnd)) a.show(hwnd, 6 /* SW_MINIMIZE */);
 }
 
 export function nativeHandle(buf: Buffer): number {
   return buf.length >= 8 ? Number(buf.readBigUInt64LE(0)) : buf.readUInt32LE(0);
 }
 
+export type CloseResult = "closed" | "gone" | "minimized" | "failed";
+const wait = (ms: number) => new Promise((r) => setTimeout(r, ms));
+
 /**
- * Close the browser tab that's showing the distraction, without the helper extension.
- * Windows: bring the browser forward, re-check its title still shows that site, then Ctrl+W.
- * macOS: ask the browser via AppleScript to close its active tab.
- * `stillThere(title)` guards against closing the wrong tab if the user switched in the meantime.
+ * Close the browser tab that's showing the distraction, without the browser helper.
+ * Windows: bring the browser forward, confirm it's still showing that site, press Ctrl+W, then
+ * confirm the site is gone. Retries a few times; if Windows won't let us, minimises the window
+ * so the distraction is at least out of sight.
+ * macOS: ask the browser through AppleScript to close its active tab.
+ * `stillThere` guards against closing the wrong tab if the user switched in the meantime.
  */
-export async function closeBrowserTab(target: Foreground, stillThere: (fg: Foreground) => boolean): Promise<boolean> {
+export async function closeBrowserTab(target: Foreground, stillThere: (fg: Foreground) => boolean, log: (m: string) => void = () => {}): Promise<CloseResult> {
   if (FAKE) {
     const now = fakeFg();
-    if (!now || !stillThere(now)) return false;
+    if (!now || !stillThere(now)) return "gone";
     require("node:fs").appendFileSync(FAKE + ".closed", `${now.title}\n`);
-    return true;
+    return "closed";
   }
   if (process.platform === "win32") {
     const a = win();
-    if (!a || !target.hwnd || !a.isWin(target.hwnd)) return false;
-    bringToFront(target.hwnd);
-    await new Promise((r) => setTimeout(r, 150));
-    const now = foregroundWin();
-    if (!now || now.hwnd !== target.hwnd || !stillThere(now)) return false;
-    a.key(0x11, 0, 0, 0); a.key(0x57, 0, 0, 0);     // Ctrl down, W down
-    a.key(0x57, 0, 2, 0); a.key(0x11, 0, 2, 0);     // W up, Ctrl up
-    return true;
+    if (!a || !target.hwnd || !a.isWin(target.hwnd)) { log("close: browser window no longer exists"); return "gone"; }
+    if (!stillThere({ ...target, title: titleOf(target.hwnd) })) { log("close: site no longer showing"); return "gone"; }
+    for (let attempt = 1; attempt <= 3; attempt++) {
+      const front = bringToFront(target.hwnd);
+      await wait(180);
+      const now = foregroundWin();
+      if (!front || !now || now.hwnd !== target.hwnd) { log(`close: attempt ${attempt} couldn't bring the browser forward`); continue; }
+      if (!stillThere(now)) return "gone";
+      a.key(0x11, 0, 0, 0); a.key(0x57, 0, 0, 0);     // Ctrl down, W down
+      a.key(0x57, 0, 2, 0); a.key(0x11, 0, 2, 0);     // W up, Ctrl up
+      await wait(350);
+      if (!a.isWin(target.hwnd)) return "closed";      // that was the last tab
+      if (!stillThere({ ...target, title: titleOf(target.hwnd) })) return "closed";
+      log(`close: attempt ${attempt} sent Ctrl+W but the site is still showing ("${titleOf(target.hwnd).slice(0, 80)}")`);
+    }
+    minimize(target.hwnd);
+    log("close: gave up and minimised the browser");
+    return "minimized";
   }
   if (process.platform === "darwin") {
     const now = await foregroundMac();
     const app = now && now.app === target.app ? now.appName ?? null : null;
-    if (!now || !app || !stillThere(now)) return false;
+    if (!now || !app || !stillThere(now)) return "gone";
     const script = /^safari$/i.test(app)
       ? `tell application "Safari" to close current tab of front window`
       : `tell application "${app}" to close active tab of front window`;
-    return (await osa(script)) !== null;
+    return (await osa(script)) !== null ? "closed" : "failed";
   }
-  return false;
+  return "failed";
 }

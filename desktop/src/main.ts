@@ -14,7 +14,7 @@ import path from "node:path";
 import fs from "node:fs";
 import { createSynapse, relayTransport, geminiTransport, siteName, cleanSite, type Synapse, type GateTurn } from "../../core/synapse";
 import { Bridge, type TabInfo } from "./bridge";
-import { foreground, BROWSERS, bringToFront, nativeHandle, closeBrowserTab, type Foreground } from "./foreground";
+import { foreground, BROWSERS, bringToFront, nativeHandle, closeBrowserTab, minimize, type Foreground } from "./foreground";
 
 declare const __RELAY_URL__: string;
 
@@ -32,6 +32,16 @@ const storage = {
   load: () => { try { return fs.readFileSync(brainFile, "utf8"); } catch { return null; } },
   save: (json: string) => { fs.mkdirSync(dataDir, { recursive: true }); const tmp = brainFile + ".tmp"; fs.writeFileSync(tmp, json); fs.renameSync(tmp, brainFile); },
 };
+
+/** Diagnostics: one plain-text log next to the brain, so "it didn't close my tab" can be traced. */
+const logFile = path.join(dataDir, "synapse.log");
+function log(msg: string) {
+  try {
+    fs.mkdirSync(dataDir, { recursive: true });
+    if (fs.existsSync(logFile) && fs.statSync(logFile).size > 2_000_000) fs.renameSync(logFile, logFile + ".old");
+    fs.appendFileSync(logFile, `${new Date().toISOString()}  ${msg}\n`);
+  } catch { /* never let logging break anything */ }
+}
 
 let syn: Synapse;
 const bridge = new Bridge();
@@ -52,14 +62,14 @@ let cardSize = { w: 380, h: 220 };
 interface Gate {
   site: string; transcript: GateTurn[]; judging: boolean;
   via: "helper" | "window"; target?: Foreground;
-  budgetMs: number; resumedAt: number; backstop?: NodeJS.Timeout;
+  budgetMs: number; resumedAt: number; backstop?: NodeJS.Timeout; running: boolean;
+  typingSince?: number; typingUsedMs: number;
 }
 let gate: Gate | null = null;
 const passTimers = new Map<string, NodeJS.Timeout>();
 const reachTimers = new Map<string, NodeJS.Timeout>();
 
 const ORB_BOX = 76;       // window size when docked
-const DOCK_HIDE = 30;     // px of the docked window tucked past the screen edge
 
 /* ---------------- orb window ---------------- */
 
@@ -75,9 +85,10 @@ function layout(next: Mode = mode) {
     const y = Math.max(wa.y + 8, Math.min(orbY() + ORB_BOX / 2 - h + 40, wa.y + wa.height - h - 8));
     orb.setBounds({ x: wa.x + wa.width - w - 8, y, width: w, height: h });
   } else {
+    // The orb tucks itself past the edge with CSS (smooth); the window just hugs the screen edge.
     const w = hasPass ? ORB_BOX + 104 : ORB_BOX;
-    const tucked = mode === "dock" && !hasPass ? DOCK_HIDE : 0;
-    orb.setBounds({ x: wa.x + wa.width - w + tucked, y: orbY() - ORB_BOX / 2, width: w, height: ORB_BOX });
+    orb.setBounds({ x: wa.x + wa.width - w, y: orbY() - ORB_BOX / 2, width: w, height: ORB_BOX });
+    orb.setIgnoreMouseEvents(true, { forward: true });
   }
   orb.webContents.send("orb", { type: "mode", mode, pass: passView() });
 }
@@ -92,13 +103,14 @@ function createOrb() {
   orb.setAlwaysOnTop(true, "screen-saver");
   orb.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
   orb.loadFile(path.join(__dirname, "orb", "index.html"));
-  orb.once("ready-to-show", () => { layout("dock"); orb.showInactive(); });
+  orb.once("ready-to-show", () => { layout("dock"); orb.showInactive(); orb.setIgnoreMouseEvents(true, { forward: true }); });
   orb.on("blur", () => { if (mode === "card" && !gate) orb.webContents.send("orb", { type: "blur" }); });
   screen.on("display-metrics-changed", () => layout());
 }
 
 function openCard(takeFocus = true) {
   layout("card");
+  orb.setIgnoreMouseEvents(false);
   if (!takeFocus) { orb.showInactive(); orb.moveTop(); return; }
   orb.show(); orb.moveTop(); orb.focus();
   if (process.platform === "win32") bringToFront(nativeHandle(orb.getNativeWindowHandle()));
@@ -165,9 +177,10 @@ function onTab(t: TabInfo) {
 }
 
 function startGate(site: string, pageTitle: string | undefined, via: Gate["via"], target?: Foreground) {
+  log(`gate open: ${site} via ${via}${pageTitle ? ` — "${pageTitle.slice(0, 80)}"` : ""}`);
   // Main owns a backstop deadline (the orb's own clock normally fires first). It allows a short
   // grace for the card to appear, and pauses while Synapse is thinking.
-  gate = { site, transcript: [], judging: false, via, target, budgetMs: (syn.brain.s.settings.windowSeconds + 3) * 1000, resumedAt: Date.now() };
+  gate = { site, transcript: [], judging: false, via, target, budgetMs: (syn.brain.s.settings.windowSeconds + 3) * 1000, resumedAt: Date.now(), running: false, typingUsedMs: 0 };
   armBackstop();
   syn.brain.logGate({ site, kind: "opened", text: pageTitle?.slice(0, 120) });
   const opener = syn.gateOpener(site);
@@ -181,30 +194,49 @@ function armBackstop() {
   const g = gate;
   clearTimeout(g.backstop);
   g.resumedAt = Date.now();
+  g.running = true;
   g.backstop = setTimeout(() => { if (gate === g && !g.judging) { orb.webContents.send("orb", { type: "timeout" }); gateTimeout(); } }, Math.max(0, g.budgetMs));
 }
 function pauseBackstop() {
-  if (!gate) return;
+  if (!gate || !gate.running) return;
   clearTimeout(gate.backstop);
+  gate.running = false;
   gate.budgetMs -= Date.now() - gate.resumedAt;
+}
+
+/** The orb tells us while they're actively typing their case; the backstop waits too (capped). */
+function gateTyping(on: boolean) {
+  const g = gate;
+  if (!g || g.judging) return;
+  if (on && g.typingSince == null && g.typingUsedMs < 50_000) { g.typingSince = Date.now(); pauseBackstop(); }
+  else if (!on && g.typingSince != null) { g.typingUsedMs += Date.now() - g.typingSince; g.typingSince = undefined; armBackstop(); }
 }
 
 /** Close every tab showing `site`: precisely through the helper, or the front tab via the OS. */
 async function closeSite(site: string, target?: Foreground) {
-  bridge.closeSite(site);
-  if (!helperSeesBrowser()) {
-    const fg = target ?? await foreground();
-    if (fg && BROWSERS.test(fg.app)) await closeBrowserTab(fg, (now) => siteOf(now) === site);
-  }
+  if (bridge.connected) { bridge.closeSite(site); log(`close ${site}: asked the browser helper`); }
+  // The helper only covers the browser it's installed in, so always also handle the window we saw.
+  const fg = target ?? await foreground();
+  if (!fg || !BROWSERS.test(fg.app)) { if (!bridge.connected) log(`close ${site}: no browser window to close (front app: ${fg?.app ?? "unknown"})`); return; }
+  const result = await closeBrowserTab(fg, (now) => siteOf(now) === site, (m) => log(`${site} ${m}`));
+  log(`close ${site}: ${result} (${fg.app})`);
+  if (result === "minimized") notice(`I couldn't close the ${siteName(site)} tab, so I hid the window.`, 3500);
 }
 
 async function argue(text: string) {
   if (!gate || gate.judging) return;
   const g = gate;
+  if (g.typingSince != null) { g.typingUsedMs += Date.now() - g.typingSince; g.typingSince = undefined; }
   g.judging = true;
   pauseBackstop();
   const pageTitle = [...bridge.tabs.values()].find((t) => tabsOf(g.site).includes(t.tabId))?.title;
-  const v = await syn.judge({ site: g.site, argument: text, transcript: g.transcript, pageTitle });
+  let v: Awaited<ReturnType<Synapse["judge"]>>;
+  try { v = await syn.judge({ site: g.site, argument: text, transcript: g.transcript, pageTitle }); }
+  catch (e) {
+    log(`gate judge failed: ${String(e).slice(0, 200)}`);
+    v = { decision: "deny", minutes: null, reply: "I couldn't think that through. Try once more, briefly.", source: "offline" };
+  }
+  log(`gate verdict: ${g.site} ${v.decision}${v.minutes ? ` ${v.minutes}m` : ""} (${v.source})`);
   g.transcript.push({ role: "user", text }, { role: "synapse", text: v.reply });
   g.judging = false;
   if (gate !== g) return; // they walked away while I was thinking
@@ -228,6 +260,7 @@ function gateTimeout() {
   const { site, target } = gate;
   clearTimeout(gate.backstop);
   syn.brain.logGate({ site, kind: "timeout" });
+  log(`gate timeout: ${site}`);
   gate = null;
   closeSite(site, target);
   notice(`Time's up. Closed ${siteName(site)}.`, 2500);
@@ -286,11 +319,28 @@ async function captureScreen(): Promise<string | null> {
   } catch { return null; } finally { orb.setOpacity(prev || 1); }
 }
 
+let askPending = false;
+
 async function ask(text: string, share: boolean) {
   const onboarding = !syn.brain.s.profile.onboardedAt;
-  const shot = share ? await captureScreen() : null;
-  const r = await syn.ask(text, { screenshot: shot, onboarding });
+  askPending = true;
+  let r: { text: string; sawScreen: boolean; passChanges?: { site: string; minutes: number }[] };
+  try {
+    const shot = share ? await captureScreen() : null;
+    r = await syn.ask(text, { screenshot: shot, onboarding });
+  } catch (e) {
+    log(`ask failed: ${String(e).slice(0, 200)}`);
+    r = { text: "Something went wrong on my side. Ask me again in a moment.", sawScreen: false };
+    syn.brain.addTurn("synapse", r.text, "ask");
+  } finally { askPending = false; }
   scheduleReachouts();
+  // They may have changed a pass by talking ("make it 20 minutes").
+  for (const c of (r as { passChanges?: { site: string; minutes: number }[] }).passChanges ?? []) {
+    log(`pass changed in conversation: ${c.site} → ${c.minutes} min from now`);
+    if (c.minutes > 0) { schedulePass(c.site); bridge.release(tabsOf(c.site)); }
+    else { clearTimeout(passTimers.get(c.site)); passTimers.delete(c.site); setTimeout(() => closeSite(c.site), 600); }
+  }
+  layout();
   pushConfig(); // they may have added a distraction by talking
   const note = share && screenPermissionMissing
     ? "\n\n(I couldn't see your screen: allow Synapse under System Settings → Privacy & Security → Screen Recording, then reopen Synapse.)" : "";
@@ -301,8 +351,11 @@ function openAsk() {
   if (gate) { openCard(); return; }
   openCard();
   const onboarding = !syn.brain.s.profile.onboardedAt;
+  // The conversation survives closing the orb: send back the recent exchange (last 12 hours).
+  const since = Date.now() - 12 * 3600_000;
+  const history = syn.brain.s.turns.filter((t) => t.ts >= since && t.surface !== "gate").slice(-12).map((t) => ({ role: t.role, text: t.text }));
   orb.webContents.send("orb", {
-    type: "ask", onboarding, share: syn.brain.s.settings.shareScreen,
+    type: "ask", onboarding, share: syn.brain.s.settings.shareScreen, history, pending: askPending,
     prompt: onboarding ? "I'm Synapse. I'll sit here at the edge of your screen. What are you working toward right now?" : null,
   });
 }
@@ -370,6 +423,7 @@ function buildTray() {
     { type: "separator" },
     { label: bridge.connected ? "Browser helper: connected" : "Browser helper: not connected — set up…", click: () => openSettings("helper") },
     { label: "Distracting sites & limits…", click: () => openSettings("sites") },
+    { label: "Open diagnostics log", click: () => { log("log opened"); shell.openPath(logFile); } },
     { label: isMac ? "Open at login" : "Start with Windows", type: "checkbox", checked: app.getLoginItemSettings().openAtLogin, click: (i) => app.setLoginItemSettings({ openAtLogin: i.checked }) },
     { type: "separator" },
     { label: "Quit Synapse", click: () => { syn.brain.noteAppEvent(`they quit Synapse at ${new Date().toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}`); syn.brain.flush(); app.exit(0); } },
@@ -391,7 +445,8 @@ function openSettings(section: "sites" | "helper") {
 /* ---------------- IPC ---------------- */
 
 function wireIpc() {
-  ipcMain.on("orb:peek", (_e, on: boolean) => { if (mode !== "card") layout(on ? "peek" : "dock"); });
+  ipcMain.on("orb:peek", () => { /* peeking is pure CSS now */ });
+  ipcMain.on("orb:ignore-mouse", (_e, on: boolean) => { if (mode !== "card") orb.setIgnoreMouseEvents(!!on, { forward: true }); });
   ipcMain.on("orb:size", (_e, s: { w: number; h: number }) => { cardSize = { w: Math.min(420, Math.max(260, s.w)), h: Math.min(560, Math.max(80, s.h)) }; if (mode === "card") layout("card"); });
   ipcMain.on("orb:open-ask", () => openAsk());
   ipcMain.on("orb:close", () => closeCard());
@@ -399,6 +454,7 @@ function wireIpc() {
   ipcMain.on("orb:set-share", (_e, on: boolean) => { syn.brain.s.settings.shareScreen = !!on; syn.brain.touch(); });
   ipcMain.on("gate:argue", (_e, text: string) => argue(String(text).slice(0, 1200)));
   ipcMain.on("gate:timeout", () => gateTimeout());
+  ipcMain.on("gate:typing", (_e, on: boolean) => gateTyping(!!on));
   ipcMain.on("gate:leave", () => gateLeave());
   ipcMain.on("pass:end", () => { const p = soonestPass(); if (p) expirePass(p.site, true); });
 
