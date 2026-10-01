@@ -52,6 +52,8 @@ jobs:
 
   release:
     needs: build
+    # Publish whatever built successfully — a failing Mac build shouldn't block the Windows installer.
+    if: ${{ !cancelled() }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/download-artifact@v4
@@ -64,6 +66,7 @@ jobs:
           name: Synapse ${{ github.event.inputs.tag || github.ref_name }}
           target_commitish: ${{ github.sha }}
           make_latest: true
+          fail_on_unmatched_files: false
           files: |
             out/SynapseSetup.exe
             out/Synapse-mac-arm64.dmg
