@@ -27,7 +27,7 @@ jobs:
             artifact: desktop/release/SynapseSetup.exe
           - os: macos-latest
             dist: dist:mac
-            artifact: desktop/release/Synapse-mac.dmg
+            artifact: desktop/release/Synapse-mac-*.dmg
     runs-on: ${{ matrix.os }}
     defaults:
       run:
@@ -66,4 +66,5 @@ jobs:
           make_latest: true
           files: |
             out/SynapseSetup.exe
-            out/Synapse-mac.dmg
+            out/Synapse-mac-arm64.dmg
+            out/Synapse-mac-x64.dmg

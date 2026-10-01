@@ -32,7 +32,7 @@ export default function Home() {
         <p className="lp-eyebrow">SYNAPSE</p>
         <h1>The layer between what you intend to do and what you actually do.</h1>
         <a href={`/download?os=${primary.os}`} className="lp-cta">{primary.icon}{primary.label}</a>
-        <p className="lp-fine">Also for <a href={`/download?os=${other.os}`} className="lp-alt">{other.label}</a> · free while in beta</p>
+        <p className="lp-fine">Also for <a href={`/download?os=${other.os}`} className="lp-alt">{other.label}</a>{mac ? <> · <a href="/download?os=mac-intel" className="lp-alt">Intel Mac</a></> : null} · free while in beta</p>
       </section>
 
       <section className="lp-demo" aria-label="How Synapse intervenes">
