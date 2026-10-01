@@ -36,6 +36,8 @@ export interface BrainState {
   focus?: { text: string; setAt: number };
   /** They told us they're done working ("done studying, gn"). Synapse treats them as off the clock. */
   offClock?: { since: number; said: string };
+  /** They asked Synapse to leave them alone for a while. No gates, no watching, no check-ins. */
+  pausedUntil?: number;
   memory: {
     principles: { text: string; ts: number }[];
     mindshifts: { text: string; ts: number }[];
@@ -58,6 +60,11 @@ import { DEFAULT_DISTRACTIONS, DEFAULTS_VERSION, catalogEntry } from "./distract
 export { DEFAULT_DISTRACTIONS, DISTRACTION_CATALOG } from "./distractions";
 
 const IDLE_BREAK_SEC = 5 * 60;
+const SAMPLE_MS = 5000;                 // each activity sample stands for ~5s
+const BREAK_GAP_MS = 5 * 60_000;        // this long away (or on distractions) = a real break
+const SESSION_GAP_MS = 10 * 60_000;     // this long = a new work session
+/** Not work, not distraction: the OS itself. */
+const SYSTEM_APPS = /^(lockapp|explorer|searchhost|searchapp|shellexperiencehost|startmenuexperiencehost|applicationframehost|textinputhost|synapse|electron)(\.exe)?$/i;
 const FOCUS_IDLE_RESET_SEC = 30 * 60;   // away this long and "what they're working on" is stale
 const OFF_CLOCK_MS = 10 * 3600_000;          // idle this long = the work streak resets
 const SEGMENT_GAP_MS = 20_000;          // samples further apart than this start a new segment
@@ -129,7 +136,7 @@ const SEP = "[-–—|:•·]";
 /** Does this page title look like it belongs to `site`? */
 export function titleShowsSite(t: string, site: string): boolean {
   if (site === "x.com" || site === "twitter.com") return /\/\s*X$/.test(t) || /^X$/.test(t) || /\bon X:/.test(t) || /\/\s*Twitter$/.test(t) || /^Twitter$/.test(t) || /\bon Twitter:/.test(t);
-  if (site === "reddit.com" && (/(^|\s|:)r\/\w+/.test(t) || /\breddit\b/i.test(t))) return true;
+  if (site === "reddit.com" && (/(^|[-–—|:•·]\s*)r\/\w+(\s|$)/.test(t) || /\bon Reddit$/i.test(t))) return true;
   if (site === "store.steampowered.com" && /(\bon Steam|Welcome to Steam)$/.test(t)) return true;
   const domain = esc(site);
   if (new RegExp(`(^|\\s)${domain}(\\W|$)`, "i").test(t)) return true;          // "youtube.com", "Amazon.com: …"
@@ -141,6 +148,14 @@ export function titleShowsSite(t: string, site: string): boolean {
       || new RegExp(`\\bon ${name}:`, "i").test(t);                                // "Someone on Instagram: \"…\""
   });
 }
+
+const NEUTRAL_SUFFIX = new RegExp(`[-–—|:•·]\\s*(${[
+  "Google Search", "Bing", "DuckDuckGo", "Search", "Google Docs", "Google Slides", "Google Sheets", "Google Drive", "Google Scholar",
+  "Wikipedia", "Stack Overflow", "Stack Exchange", "GitHub", "GitLab", "MDN Web Docs", "W3Schools", "GeeksforGeeks", "Medium",
+  "Quora", "Khan Academy", "Quizlet", "Canvas", "Classroom", "Google Classroom", "Schoology", "Notion", "Gmail", "Outlook",
+  "ChatGPT", "Claude", "Gemini", "Desmos", "Coursera", "edX", "Overleaf", "Replit", "LeetCode", "Codecademy", "College Board",
+].join("|")})\\s*$`, "i");
+const WORK_SUBDOMAIN = /^(developers?|dev|docs|api|status|aws|help|support|business|ads|studio|creators?|partner|press|careers|investor|engineering)\./;
 
 const dayStart = (t: number) => { const d = new Date(t); d.setHours(0, 0, 0, 0); return d.getTime(); };
 const mins = (ms: number) => Math.round(ms / 60_000);
@@ -191,6 +206,9 @@ export class Brain {
 
   matchDistraction(hostname: string): string | null {
     const h = (hostname || "").toLowerCase().replace(/^www\./, "");
+    // Work-facing parts of distracting companies are not distractions: aws.amazon.com,
+    // developers.facebook.com, studio.youtube.com, docs.…, dev.epicgames.com …
+    if (WORK_SUBDOMAIN.test(h)) return null;
     return this.s.settings.distractions.find((d) => h === d || h.endsWith("." + d)) ?? null;
   }
 
@@ -201,7 +219,10 @@ export class Brain {
    */
   matchTitle(windowTitle: string): string | null {
     const t = stripBrowserSuffix(windowTitle).replace(/^\(\d+\+?\)\s*/, "").trim();
-    if (!t || /[-–—|]\s*(Google Search|Bing|DuckDuckGo|Search|Google Docs|Google Slides|Google Sheets)\s*$/i.test(t)) return null;
+    if (!t) return null;
+    // A page whose title ENDS with a non-distraction site is that site, whatever it mentions:
+    // "YouTube - Wikipedia", "How to scrape Reddit - Stack Overflow", "Instagram - Google Search".
+    if (NEUTRAL_SUFFIX.test(t)) return null;
     for (const d of this.s.settings.distractions) if (titleShowsSite(t, d)) return d;
     return null;
   }
@@ -229,8 +250,47 @@ export class Brain {
     this.touch();
   }
 
-  workStreakMinutes(): number {
-    return this.s.workStreakStart ? mins(this.now() - this.s.workStreakStart) : 0;
+  /** Kept for compatibility: minutes of work since their last real break. */
+  workStreakMinutes(): number { return this.workStats().sinceBreakMin; }
+
+  /**
+   * How much they've actually worked, measured from the activity log — not from a streak that
+   * any tab switch could reset. A visit to a distracting site doesn't erase the work before it;
+   * only a real break does (≥ 5 min away from the computer, or ≥ 5 min on distractions).
+   * A new SESSION starts after ≥ 10 min away / on distractions.
+   */
+  workStats() {
+    const now = this.now();
+    const from = dayStart(now);
+    // The OS itself and empty browser tabs are neither work nor distraction.
+    const segs = this.s.activity.filter((a) => a.end >= from && !SYSTEM_APPS.test(a.app) && !/^(New Tab|Untitled|Task Switching)?$/i.test(a.title.trim())).sort((a, b) => a.start - b.start);
+    let workToday = 0, distractToday = 0;
+    let sessionStart: number | null = null, sessionWork = 0, sessionDistract = 0;
+    let sinceBreak = 0, distractRun = 0, prevEnd = 0;
+    for (const a of segs) {
+      const start = Math.max(a.start, from);
+      const dur = Math.min(a.end - start + SAMPLE_MS, a.end - start + SAMPLE_MS);
+      const gap = prevEnd ? start - prevEnd - SAMPLE_MS : Infinity;
+      if (gap >= SESSION_GAP_MS) { sessionStart = start; sessionWork = 0; sessionDistract = 0; sinceBreak = 0; distractRun = 0; }
+      else if (gap >= BREAK_GAP_MS) sinceBreak = 0;
+      if (a.site) {
+        distractToday += dur; sessionDistract += dur; distractRun += dur;
+        if (distractRun >= SESSION_GAP_MS) { sessionStart = a.end; sessionWork = 0; sessionDistract = 0; sinceBreak = 0; }
+        else if (distractRun >= BREAK_GAP_MS) sinceBreak = 0;
+      } else {
+        distractRun = 0;
+        workToday += dur; sessionWork += dur; sinceBreak += dur;
+      }
+      prevEnd = a.end;
+    }
+    // Away right now? Then the current session/streak is over.
+    if (prevEnd && now - prevEnd >= SESSION_GAP_MS) { sessionStart = null; sessionWork = 0; sessionDistract = 0; sinceBreak = 0; }
+    else if (prevEnd && now - prevEnd >= BREAK_GAP_MS) sinceBreak = 0;
+    return {
+      todayMin: mins(workToday), distractTodayMin: mins(distractToday),
+      sessionStart, sessionMin: mins(sessionWork), sessionDistractMin: mins(sessionDistract),
+      sinceBreakMin: mins(sinceBreak),
+    };
   }
 
   /** Where the last N minutes actually went, grouped by window, excluding Synapse itself. */
@@ -238,7 +298,7 @@ export class Brain {
     const from = this.now() - windowMin * 60_000;
     const agg = new Map<string, { ms: number; distraction: boolean }>();
     for (const a of this.s.activity) {
-      if (a.end < from || /synapse/i.test(a.app)) continue;
+      if (a.end < from || SYSTEM_APPS.test(a.app)) continue;
       const label = a.title ? `${a.title} (${a.app.replace(/\.exe$/i, "")})` : a.app.replace(/\.exe$/i, "");
       const ms = a.end - Math.max(a.start, from) + 5000; // each sample stands for ~5s
       const cur = agg.get(label) ?? { ms: 0, distraction: !!a.site };
@@ -252,9 +312,30 @@ export class Brain {
   currentFocus(): { text: string; source: "stated" | "inferred" } | null {
     if (this.offClock()) return null;
     const f = this.s.focus;
-    if (f && this.now() - f.setAt < 3 * 3600_000) return { text: f.text, source: "stated" };
-    const top = this.recentWindows(30, 3).find((w) => !w.distraction && w.minutes >= 5 && !/^(explorer|searchhost|shellexperiencehost|lockapp)/i.test(w.label));
+    if (f && this.now() - f.setAt < 2 * 3600_000) return { text: f.text, source: "stated" };
+    const top = this.recentWindows(30, 5).find((w) => !w.distraction && w.minutes >= 5
+      && !/\((lockapp|explorer|searchhost|shellexperiencehost|applicationframehost)\)$/i.test(w.label)
+      && !/^(New Tab|Untitled|Inbox|Gmail|Task Switching)\b/i.test(w.label));
     return top ? { text: top.label.replace(/\s*\([^)]*\)$/, ""), source: "inferred" } : null;
+  }
+
+  paused(): number | null {
+    const u = this.s.pausedUntil;
+    if (!u) return null;
+    if (u <= this.now()) { this.s.pausedUntil = undefined; this.noteAppEvent("pause ended"); return null; }
+    return u;
+  }
+  pause(minutes: number) {
+    this.s.pausedUntil = this.now() + Math.max(1, Math.min(16 * 60, Math.round(minutes))) * 60_000;
+    this.noteAppEvent(`they paused Synapse until ${new Date(this.s.pausedUntil).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}`);
+    this.touch();
+    return this.s.pausedUntil;
+  }
+  resume() {
+    if (!this.s.pausedUntil) return;
+    this.s.pausedUntil = undefined;
+    this.noteAppEvent("they turned Synapse back on");
+    this.touch();
   }
 
   /** Off the clock until they start something new, or ~10 hours pass (the next day). */
@@ -396,6 +477,8 @@ export class Brain {
       ? `Goals:\n${goals.map((g) => `- ${g.title}${g.deadline ? ` (due ${g.deadline})` : ""}`).join("\n")}`
       : "Goals: none captured yet.");
 
+    const pausedUntil = this.paused();
+    if (pausedUntil) lines.push(`PAUSED: they turned Synapse off until ${new Date(pausedUntil).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })} to relax. Don't push work on them.`);
     const off = this.offClock();
     if (off) lines.push(`OFF THE CLOCK: at ${new Date(off.since).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })} they said they were done working ("${off.said}"). Don't treat them as mid-task; they're winding down unless they say otherwise.`);
     const focus = this.currentFocus();
@@ -403,9 +486,13 @@ export class Brain {
       ? `WORKING ON (they told you, ${mins(t - (this.s.focus?.setAt ?? t))} min ago): ${focus.text}`
       : `WORKING ON (inferred from their screen, not stated): ${focus.text}`);
 
-    const streak = this.workStreakMinutes();
+    const w = this.workStats();
+    const hm = (m: number) => (m >= 60 ? `${Math.floor(m / 60)}h ${m % 60}m` : `${m} min`);
     const windows = this.recentWindows(60, 5);
-    lines.push(`COMPUTER ACTIVITY: ${streak ? `actively working for ${streak} min without a break` : "no continuous work streak right now"}.` +
+    lines.push(`WORK TIME (measured on this computer; distraction sites and time away don't count; it can't see work done off the computer): ` +
+      `today ${hm(w.todayMin)} of work, ${hm(w.distractTodayMin)} on distraction sites. ` +
+      (w.sessionStart ? `This session (since ${new Date(w.sessionStart).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}): ${hm(w.sessionMin)} of work. Since their last real break: ${hm(w.sinceBreakMin)}.` : "No work session in progress right now.") +
+      ` Use these numbers exactly; never round them up or invent others.` +
       (windows.length ? `\nLast hour, by time:\n${windows.map((w) => `- ${w.label}: ${w.minutes} min${w.distraction ? " [distraction]" : ""}`).join("\n")}` : "\nNo activity recorded in the last hour."));
 
     const d = this.today();

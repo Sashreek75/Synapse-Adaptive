@@ -51,6 +51,7 @@ let tray: Tray;
 
 type Mode = "dock" | "peek" | "card";
 let mode: Mode = "dock";
+let slideTimer: NodeJS.Timeout | null = null;
 let cardSize = { w: 380, h: 220 };
 
 /**
@@ -69,6 +70,19 @@ let gate: Gate | null = null;
 /** After a gate ends with "close the tab", don't reopen a gate for that site while it closes. */
 const cooldown = new Map<string, number>();
 function coolingDown(site: string) { return (cooldown.get(site) ?? 0) > Date.now(); }
+/** A tab for this site showed up while we were still closing the last one: look again once the
+ *  cooldown is over, so it never sits under the veil with no card. */
+const recheckTimers = new Map<string, NodeJS.Timeout>();
+function recheckAfterCooldown(site: string) {
+  clearTimeout(recheckTimers.get(site));
+  const wait = Math.max(50, (cooldown.get(site) ?? 0) - Date.now() + 50);
+  recheckTimers.set(site, setTimeout(() => {
+    recheckTimers.delete(site);
+    const t = bridge.activeTab();
+    if (t) onTab(t);
+    else if (!helperSeesBrowser()) watch();
+  }, wait));
+}
 const passTimers = new Map<string, NodeJS.Timeout>();
 const reachTimers = new Map<string, NodeJS.Timeout>();
 
@@ -81,9 +95,10 @@ function workArea() { return screen.getPrimaryDisplay().workArea; }
 function orbY() { const wa = workArea(); return Math.round(wa.y + wa.height * 0.62); }
 
 function layout(next: Mode = mode) {
+  if (next === "card" && slideTimer) { clearInterval(slideTimer); slideTimer = null; }
   mode = next;
   const wa = workArea();
-  const hasPass = !!soonestPass();
+  const hasPass = chipShown();
   if (mode === "card") {
     const w = cardSize.w + 24, h = cardSize.h + 24;
     const y = Math.max(wa.y + 8, Math.min(orbY() + ORB_BOX / 2 - h + 40, wa.y + wa.height - h - 8));
@@ -97,19 +112,34 @@ function layout(next: Mode = mode) {
 }
 
 /** Slide the docked orb out of (or back into) the screen edge in a few quick steps. */
-let slideTimer: NodeJS.Timeout | null = null;
 function slidePeek(out: boolean) {
-  if (soonestPass()) return;               // with a pass the orb is already fully out
+  if (chipShown()) return;                 // with a pass/pause chip the orb is already fully out
   mode = out ? "peek" : "dock";
   const wa = workArea();
   const target = wa.x + wa.width - ORB_BOX + (out ? 0 : DOCK_HIDE);
   if (slideTimer) clearInterval(slideTimer);
   slideTimer = setInterval(() => {
+    if (mode === "card") { if (slideTimer) clearInterval(slideTimer); slideTimer = null; return; }
     const [x, y] = orb.getPosition();
     const next = Math.abs(target - x) <= 4 ? target : Math.round(x + (target - x) * 0.45);
     orb.setPosition(next, y);
     if (next === target && slideTimer) { clearInterval(slideTimer); slideTimer = null; }
   }, 16);
+}
+
+/**
+ * The orb is a fixed-size UI, not a web page: Ctrl+minus / Ctrl+scroll used to zoom it (and the
+ * zoom was remembered), shrinking it until it was unreadable. Lock it at 100% for good.
+ */
+function lockZoom(win: BrowserWindow) {
+  const wc = win.webContents;
+  const reset = () => { wc.setZoomFactor(1); wc.setVisualZoomLevelLimits(1, 1).catch(() => {}); };
+  wc.on("did-finish-load", reset);
+  wc.on("zoom-changed", reset);
+  wc.on("before-input-event", (e, input) => {
+    if ((input.control || input.meta) && ["-", "=", "+", "0", "Minus", "Equal", "Plus"].includes(input.key)) e.preventDefault();
+  });
+  reset();
 }
 
 function createOrb() {
@@ -122,18 +152,26 @@ function createOrb() {
   orb.setAlwaysOnTop(true, "screen-saver");
   orb.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
   orb.loadFile(path.join(__dirname, "orb", "index.html"));
+  lockZoom(orb);
   orb.once("ready-to-show", () => { layout("dock"); orb.showInactive(); });
   orb.on("blur", () => { if (mode === "card" && !gate) orb.webContents.send("orb", { type: "blur" }); });
   screen.on("display-metrics-changed", () => layout());
 }
 
+function resizeHidden(fn: () => void) {
+  orb.setOpacity(0);
+  fn();
+  setTimeout(() => orb.setOpacity(1), 24);
+}
+
 function openCard(takeFocus = true) {
-  layout("card");
+  if (mode !== "card") resizeHidden(() => layout("card"));
+  else layout("card");
   if (!takeFocus) { orb.showInactive(); orb.moveTop(); return; }
   orb.show(); orb.moveTop(); orb.focus();
   if (process.platform === "win32") bringToFront(nativeHandle(orb.getNativeWindowHandle()));
 }
-function closeCard() { if (!gate) layout("dock"); }
+function closeCard() { if (!gate && mode === "card") resizeHidden(() => layout("dock")); }
 
 /* ---------------- passes ---------------- */
 
@@ -141,12 +179,52 @@ function soonestPass() {
   const now = Date.now();
   return Object.values(syn.brain.s.passes).filter((p) => p.expiresAt > now).sort((a, b) => a.expiresAt - b.expiresAt)[0] ?? null;
 }
-function passView() { const p = soonestPass(); return p ? { name: siteName(p.site), expiresAt: p.expiresAt } : null; }
+function passView() {
+  const until = syn.brain.paused();
+  if (until) return { name: "Paused", expiresAt: until, paused: true };
+  const p = soonestPass(); return p ? { name: siteName(p.site), expiresAt: p.expiresAt } : null;
+}
+function chipShown() { return !!soonestPass() || !!syn.brain.paused(); }
 
 function pushConfig() {
   const passes: Record<string, number> = {};
   for (const p of Object.values(syn.brain.s.passes)) passes[p.site] = p.expiresAt;
-  bridge.config(syn.brain.s.settings.distractions, passes);
+  // While paused the helper has nothing to veil.
+  bridge.config(syn.brain.paused() ? [] : syn.brain.s.settings.distractions, passes);
+}
+
+/* ---------------- pause: "leave me alone for a bit" ---------------- */
+
+let pauseTimer: NodeJS.Timeout | null = null;
+function schedulePause() {
+  if (pauseTimer) clearTimeout(pauseTimer);
+  pauseTimer = null;
+  const until = syn.brain.paused();
+  if (until) pauseTimer = setTimeout(() => { syn.brain.paused(); onPauseChanged(false); notice("I'm back on.", 2500); }, Math.max(0, until - Date.now()) + 200);
+}
+/** Called after pausing or resuming from anywhere (tray, the orb, or the pause running out). */
+function onPauseChanged(announce = true) {
+  const until = syn.brain.paused();
+  if (until && gate) { endGate(); bridge.release([...bridge.tabs.keys()]); }
+  log(until ? `paused until ${new Date(until).toISOString()}` : "resumed");
+  schedulePause();
+  pushConfig();
+  buildTray();
+  layout();
+  if (announce && mode !== "card") orb.webContents.send("orb", { type: "mode", mode, pass: passView() });
+}
+function pauseFor(minutes: number) {
+  const until = syn.brain.pause(minutes);
+  onPauseChanged();
+  notice(`I'm off until ${new Date(until).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}. Relax.`, 2500);
+}
+function resumeNow() { syn.brain.resume(); onPauseChanged(); notice("I'm back on.", 2000); }
+
+/** Every way a gate ends goes through here, so the orb always learns the gate is over. */
+function endGate() {
+  if (gate) clearTimeout(gate.backstop);
+  gate = null;
+  orb?.webContents.send("orb", { type: "gate-ended" });
 }
 
 function schedulePass(site: string) {
@@ -173,6 +251,7 @@ function tabsOf(site: string) {
 }
 
 function onTab(t: TabInfo) {
+  if (syn.brain.paused()) { bridge.release([t.tabId]); return; }
   let host = "";
   try { host = new URL(t.url).hostname; } catch { return; }
   const site = syn.brain.matchDistraction(host);
@@ -184,17 +263,21 @@ function onTab(t: TabInfo) {
       clearTimeout(gate.backstop);
       syn.brain.logGate({ site: gate.site, kind: "walked_away" });
       const name = siteName(gate.site);
-      gate = null;
+      endGate();
       notice(`Good call. ${name} can wait.`, 2500);
     }
     return;
   }
   if (syn.brain.activePass(site)) { bridge.release([t.tabId]); return; }
   bridge.hold([t.tabId]);
-  if (looking && !gate && !coolingDown(site)) startGate(site, t.title, "helper");
+  if (looking && !gate) {
+    if (!coolingDown(site)) startGate(site, t.title, "helper");
+    else recheckAfterCooldown(site);
+  }
 }
 
 function startGate(site: string, pageTitle: string | undefined, via: Gate["via"], target?: Foreground) {
+  if (syn.brain.paused()) return;
   log(`gate open: ${site} via ${via}${pageTitle ? ` — "${pageTitle.slice(0, 80)}"` : ""}`);
   // Main owns a backstop deadline (the orb's own clock normally fires first). It allows a short
   // grace for the card to appear, and pauses while Synapse is thinking.
@@ -236,7 +319,11 @@ async function closeSite(site: string, target?: Foreground) {
   if (bridge.connected) { bridge.closeSite(site); log(`close ${site}: asked the browser helper`); }
   // The helper only covers the browser it's installed in, so always also handle the window we saw.
   const fg = target ?? await foreground();
-  if (!fg || !BROWSERS.test(fg.app)) { if (!bridge.connected) log(`close ${site}: no browser window to close (front app: ${fg?.app ?? "unknown"})`); return; }
+  if (!fg || !BROWSERS.test(fg.app)) {
+    if (bridge.connected) cooldown.set(site, Date.now() + 1500);   // the helper closes tabs reliably
+    else log(`close ${site}: no browser window to close (front app: ${fg?.app ?? "unknown"})`);
+    return;
+  }
   const result = await closeBrowserTab(fg, (now) => siteOf(now) === site, (m) => log(`${site} ${m}`));
   log(`close ${site}: ${result} (${fg.app})`);
   // Closed: a moment's grace for the browser to settle. Not closed: wait a bit before asking again.
@@ -255,7 +342,7 @@ async function argue(text: string) {
   try { v = await syn.judge({ site: g.site, argument: text, transcript: g.transcript, pageTitle }); }
   catch (e) {
     log(`gate judge failed: ${String(e).slice(0, 200)}`);
-    v = { decision: "deny", minutes: null, reply: "I couldn't think that through. Try once more, briefly.", source: "offline" };
+    v = { decision: "ask", minutes: null, reply: "I couldn't think that through — say it once more, briefly.", source: "offline" };
   }
   log(`gate verdict: ${g.site} ${v.decision}${v.minutes ? ` ${v.minutes}m` : ""} (${v.source})`);
   g.transcript.push({ role: "user", text }, { role: "synapse", text: v.reply });
@@ -322,6 +409,7 @@ function scheduleReachouts() {
       reachTimers.delete(r.id);
       syn.brain.s.reachouts = syn.brain.s.reachouts.filter((x) => x.id !== r.id);
       syn.brain.addTurn("synapse", r.text, "ask");
+      if (syn.brain.paused()) { reachTimers.delete(r.id); syn.brain.s.reachouts.push({ ...r, at: (syn.brain.paused() ?? Date.now()) + 60_000 }); scheduleReachouts(); return; }
       if (!gate) notice(r.text, 9000);
       if (Notification.isSupported()) new Notification({ title: "Synapse", body: r.text, silent: true }).show();
     }, Math.max(1000, r.at - Date.now())));
@@ -356,7 +444,7 @@ let askPending = false;
 async function ask(text: string, share: boolean) {
   const onboarding = !syn.brain.s.profile.onboardedAt;
   askPending = true;
-  let r: { text: string; sawScreen: boolean; passChanges?: { site: string; minutes: number }[] };
+  let r: { text: string; sawScreen: boolean; passChanges?: { site: string; minutes: number }[]; pauseChanged?: boolean };
   try {
     const shot = share ? await captureScreen() : null;
     r = await syn.ask(text, { screenshot: shot, onboarding });
@@ -372,6 +460,7 @@ async function ask(text: string, share: boolean) {
     if (c.minutes > 0) { schedulePass(c.site); bridge.release(tabsOf(c.site)); }
     else { clearTimeout(passTimers.get(c.site)); passTimers.delete(c.site); setTimeout(() => closeSite(c.site), 600); }
   }
+  if ((r as { pauseChanged?: boolean }).pauseChanged) onPauseChanged();
   layout();
   pushConfig(); // they may have added a distraction by talking
   const note = share && screenPermissionMissing
@@ -415,6 +504,7 @@ async function watch() {
   if (watching) return;
   watching = true;
   try {
+    if (syn.brain.paused()) return;          // paused: not watching, not gating, not logging
     const fg = await foreground();
     if (!fg || /synapse|electron/i.test(fg.app)) return;
     const isBrowser = BROWSERS.test(fg.app);
@@ -432,11 +522,12 @@ async function watch() {
       clearTimeout(gate.backstop);
       syn.brain.logGate({ site: gate.site, kind: "walked_away" });
       const name = siteName(gate.site);
-      gate = null;
+      endGate();
       notice(`Good call. ${name} can wait.`, 2500);
       return;
     }
-    if (!site || gate || syn.brain.activePass(site) || coolingDown(site)) return;
+    if (site && !gate && coolingDown(site) && !syn.brain.activePass(site)) { recheckAfterCooldown(site); return; }
+    if (!site || gate || syn.brain.activePass(site)) return;
     startGate(site, fg.title, "window", fg);
   } finally {
     watching = false;
@@ -454,6 +545,14 @@ function buildTray() {
     { label: `Talk to Synapse          ${SHORTCUT_LABEL}`, click: openAsk },
     { type: "separator" },
     { label: bridge.connected ? "Browser helper: connected" : "Browser helper: not connected — set up…", click: () => openSettings("helper") },
+    syn.brain.paused()
+      ? { label: `Paused until ${new Date(syn.brain.paused()!).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })} — resume now`, click: resumeNow }
+      : { label: "Pause Synapse", submenu: [
+          { label: "30 minutes", click: () => pauseFor(30) },
+          { label: "1 hour", click: () => pauseFor(60) },
+          { label: "2 hours", click: () => pauseFor(120) },
+          { label: "Until tomorrow morning", click: () => { const d = new Date(); d.setDate(d.getDate() + (d.getHours() >= 6 ? 1 : 0)); d.setHours(6, 0, 0, 0); pauseFor((d.getTime() - Date.now()) / 60_000); } },
+        ] },
     { label: "Distracting sites & limits…", click: () => openSettings("sites") },
     { label: "Open diagnostics log", click: () => { log("log opened"); shell.openPath(logFile); } },
     { label: isMac ? "Open at login" : "Start with Windows", type: "checkbox", checked: app.getLoginItemSettings().openAtLogin, click: (i) => app.setLoginItemSettings({ openAtLogin: i.checked }) },
@@ -471,6 +570,7 @@ function openSettings(section: "sites" | "helper") {
     webPreferences: { preload: path.join(__dirname, "preload.js"), contextIsolation: true, sandbox: true },
   });
   settingsWin.loadFile(path.join(__dirname, "orb", "settings.html"), { hash: section });
+  lockZoom(settingsWin);
   settingsWin.on("closed", () => { settingsWin = null; });
 }
 
@@ -520,6 +620,7 @@ app.whenReady().then(() => {
   });
   installIdHolder.id = syn.brain.s.installId;
 
+  Menu.setApplicationMenu(null);   // no hidden menu shortcuts (zoom, reload, devtools) on the orb
   createOrb();
   wireIpc();
 
@@ -537,7 +638,10 @@ app.whenReady().then(() => {
   for (const site of Object.keys(syn.brain.s.passes)) schedulePass(site);
   scheduleReachouts();
   setInterval(watch, isMac ? 1200 : 600);
-  setInterval(() => { if (mode !== "card" && soonestPass()) orb.webContents.send("orb", { type: "mode", mode, pass: passView() }); }, 1000);
+  setInterval(() => { if (mode !== "card" && chipShown()) orb.webContents.send("orb", { type: "mode", mode, pass: passView() }); }, 1000);
+  // Safety net: if the orb is still showing a gate that no longer exists, close it.
+  setInterval(() => { if (!gate && mode === "card") orb.webContents.send("orb", { type: "gate-ended" }); }, 4000);
+  schedulePause();
 
   globalShortcut.register("CommandOrControl+Shift+Space", openAsk);
   if (app.isPackaged && !syn.brain.s.profile.onboardedAt) app.setLoginItemSettings({ openAtLogin: true });

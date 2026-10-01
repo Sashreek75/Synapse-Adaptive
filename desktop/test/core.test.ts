@@ -1,6 +1,6 @@
 /* Core tests with a scripted model — no network. `npm test` */
 import assert from "node:assert/strict";
-import { createSynapse, saysDoneWorking, type ModelCall } from "../../core/synapse";
+import { createSynapse, saysDoneWorking, parsePauseCommand, Brain, type ModelCall } from "../../core/synapse";
 
 let clock = new Date("2026-09-30T14:00:00").getTime();
 const now = () => clock;
@@ -62,6 +62,8 @@ async function t(name: string, fn: () => Promise<void> | void) { await fn(); pas
       ["Max Verstappen - Wikipedia - Google Chrome", null],
       ["AP Statistics Unit 1 - Khan Academy - Google Chrome", null],
       ["Inbox (3) - you@gmail.com - Gmail - Google Chrome", null],
+      ["DEADSHOT .io - Google Chrome", "deadshot.io"],
+      ["Krunker - Google Chrome", "krunker.io"],
     ];
     for (const [title, want] of cases) assert.equal(b.matchTitle(title), want, title);
   });
@@ -78,12 +80,11 @@ async function t(name: string, fn: () => Promise<void> | void) { await fn(); pas
     assert.match(syn.gateOpener("youtube.com"), /Hold on\. You're in the middle of Research paper draft - Google Docs\. Why YouTube\?/);
   });
 
-  await t("a distraction visit breaks the streak", () => {
+  await t("a quick distraction visit does NOT erase the work before it", () => {
     b.observe({ app: "chrome.exe", title: "YouTube", url: "https://www.youtube.com/", idleSec: 1 });
-    assert.equal(b.workStreakMinutes(), 0);
     clock += 5000;
     b.observe({ app: "winword.exe", title: "Essay.docx - Word", idleSec: 1 });
-    assert.equal(b.workStreakMinutes(), 0);
+    assert.ok(b.workStreakMinutes() >= 40, `streak ${b.workStreakMinutes()}`);
   });
 
   await t("judge sees the evidence, and code caps the minutes", async () => {
@@ -200,7 +201,75 @@ async function t(name: string, fn: () => Promise<void> | void) { await fn(); pas
     b.grantPass("youtube.com", 10, "for the restart test");
   });
 
+  await t("work time survives a quick distraction and resets only on a real break", () => {
+    let c = new Date("2026-10-01T14:00:00").getTime();
+    const w = new Brain({ load: () => null, save: () => {} }, () => c);
+    const tick = (app: string, title: string, secs: number, url?: string) => { for (let i = 0; i < secs / 5; i++) { w.observe({ app, title, url, idleSec: 1 }); c += 5000; } };
+    tick("code.exe", "lab.java - Visual Studio Code", 30 * 60);
+    tick("chrome.exe", "Lofi - YouTube - Google Chrome", 15);          // a gate pops, tab closes
+    tick("code.exe", "lab.java - Visual Studio Code", 25 * 60);
+    let s1 = w.workStats();
+    assert.ok(s1.sinceBreakMin >= 54 && s1.sinceBreakMin <= 56, `since break ${s1.sinceBreakMin}`);
+    assert.equal(s1.sessionMin, s1.sinceBreakMin);
+    assert.equal(s1.distractTodayMin, 0);
+    // locked the screen for 6 minutes -> a real break, same session
+    w.observe({ app: "lockapp.exe", title: "Windows Default Lock Screen", idleSec: 400 }); c += 6 * 60_000;
+    tick("code.exe", "lab.java - Visual Studio Code", 10 * 60);
+    s1 = w.workStats();
+    assert.ok(s1.sinceBreakMin >= 9 && s1.sinceBreakMin <= 11, `since break after lock ${s1.sinceBreakMin}`);
+    assert.ok(s1.sessionMin >= 64, `session ${s1.sessionMin}`);
+    assert.ok(s1.todayMin >= 64);
+    // away 20 minutes -> new session, today keeps counting
+    c += 20 * 60_000;
+    tick("code.exe", "lab.java - Visual Studio Code", 5 * 60);
+    s1 = w.workStats();
+    assert.ok(s1.sessionMin >= 4 && s1.sessionMin <= 6, `new session ${s1.sessionMin}`);
+    assert.ok(s1.todayMin >= 69);
+    assert.match(w.context({ purpose: "gate" }), /WORK TIME .*today 1h \d+m of work/);
+    // 6 minutes on YouTube = a break; lock screen / explorer never count as work
+    tick("chrome.exe", "Lofi - YouTube - Google Chrome", 6 * 60);
+    assert.equal(w.workStats().sinceBreakMin, 0);
+  });
+
+  await t("pause commands are understood without asking the AI", () => {
+    const at = new Date("2026-10-01T20:00:00").getTime();
+    assert.deepEqual(parsePauseCommand("pause for an hour", at), { pause: 60 });
+    assert.deepEqual(parsePauseCommand("/pause 30", at), { pause: 30 });
+    assert.deepEqual(parsePauseCommand("leave me alone for 2 hours", at), { pause: 120 });
+    assert.deepEqual(parsePauseCommand("chill mode for 45 min", at), { pause: 45 });
+    assert.deepEqual(parsePauseCommand("turn off until tomorrow", at), { pause: 600 });
+    assert.deepEqual(parsePauseCommand("pause", at), { pause: 60 });
+    assert.deepEqual(parsePauseCommand("resume", at), { resume: true });
+    assert.deepEqual(parsePauseCommand("I'm back", at), { resume: true });
+    for (const no of ["should I pause my essay and do math?", "what's a good break length?", "i paused the video", "the off-by-one bug"]) assert.equal(parsePauseCommand(no, at), null, no);
+  });
+
+  await t("pausing from the orb switches Synapse off, and resume turns it back on", async () => {
+    calls.length = 0;
+    const r = await syn.ask("pause for 30 minutes");
+    assert.equal(calls.length, 0);
+    assert.match(r.text, /I'm off until/);
+    assert.ok(b.paused());
+    assert.match(b.context({ purpose: "ask" }), /PAUSED/);
+    clock += 31 * 60_000;
+    assert.equal(b.paused(), null);
+    await syn.ask("pause");
+    await syn.ask("resume");
+    assert.equal(b.paused(), null);
+  });
+
+  await t("never flags a page that's only ABOUT a distracting site", () => {
+    for (const title of ["YouTube - Wikipedia - Google Chrome", "How do I use the Reddit API? - Stack Overflow - Google Chrome", "Instagram - Google Search - Google Chrome",
+      "netflix/zuul: an edge service - GitHub - Google Chrome", "Twitch API Reference - Twitch Developers - Google Chrome", "Channel content - YouTube Studio - Google Chrome",
+      "HW 12 - Classroom - Google Chrome", "Inbox (2) - me@gmail.com - Gmail - Google Chrome"])
+      assert.equal(b.matchTitle(title), null, title);
+    for (const host of ["aws.amazon.com", "docs.aws.amazon.com", "developers.facebook.com", "studio.youtube.com", "dev.epicgames.com", "developer.x.com"]) assert.equal(b.matchDistraction(host), null, host);
+    assert.equal(b.matchDistraction("www.youtube.com"), "youtube.com");
+    assert.equal(b.matchDistraction("m.youtube.com"), "youtube.com");
+  });
+
   await t("state survives a restart", () => {
+    if (!b.activePass("youtube.com")) b.grantPass("youtube.com", 10, "restart test");
     b.flush();
     const again = createSynapse({ storage, now, callModel: async () => null });
     assert.ok(again.brain.s.goals.length >= 1);

@@ -52,6 +52,33 @@ export function offlineJudge(argument: string, maxMinutes: number, passesToday: 
   return { decision: "allow", minutes: m, reply: `${m} minute${m === 1 ? "" : "s"}${m < asked ? ` (offline limit is ${cap})` : ""}. Clock's running.` };
 }
 
+/**
+ * "pause for an hour", "/pause 30", "leave me alone till tomorrow", "chill mode", "turn off for 2h"
+ * → { pause: minutes }.  "resume", "I'm back", "turn back on" → { resume: true }.
+ * Deterministic on purpose: switching Synapse off must work instantly, every time, with no AI call.
+ */
+export function parsePauseCommand(text: string, now = Date.now()): { pause?: number; resume?: true } | null {
+  const t = text.toLowerCase().trim().replace(/[.!]+$/, "");
+  if (/^\/?(resume|unpause|un-pause|wake up|i'?m back|im back|back to work|turn (back )?on|start (watching|blocking) again)\b/.test(t)) return { resume: true };
+  const intent = /^\/?(pause|snooze|chill( mode)?|relax( mode)?|break mode|quiet mode|go quiet|be quiet|leave me alone|stop watching( me)?|stop blocking|take a break from me|turn (yourself )?off|shut (yourself )?off|switch off|go to sleep|sleep mode|off)\b/.test(t)
+    || /\b(pause|turn off|shut off|disable|snooze)\s+(synapse|yourself|the gate|blocking|the blocker|for)\b/.test(t);
+  if (!intent) return null;
+  let minutes = 60;
+  const h = t.match(/(\d+(?:\.\d+)?)\s*(h|hr|hrs|hour|hours)\b/);
+  const m = t.match(/(\d+)\s*(m|min|mins|minute|minutes)\b/);
+  const bare = t.match(/^\/?\w+(?: \w+)?\s+(\d{1,3})$/);           // "/pause 30"
+  if (h) minutes = Math.round(parseFloat(h[1]) * 60) + (m ? parseInt(m[1], 10) : 0);
+  else if (m) minutes = parseInt(m[1], 10);
+  else if (bare) minutes = parseInt(bare[1], 10);
+  else if (/\b(an|1|one) hour\b/.test(t)) minutes = 60;
+  else if (/\bhalf an hour\b/.test(t)) minutes = 30;
+  else if (/\b(tomorrow|tonight|the (rest of the )?(day|night)|today)\b/.test(t)) {
+    const d = new Date(now); d.setDate(d.getDate() + (d.getHours() >= 6 ? 1 : 0)); d.setHours(6, 0, 0, 0);
+    minutes = Math.round((d.getTime() - now) / 60_000);
+  }
+  return { pause: Math.max(1, Math.min(16 * 60, minutes)) };
+}
+
 export function createSynapse(opts: { storage: Storage; callModel: CallModel; now?: () => number }) {
   const now = opts.now ?? (() => Date.now());
   const brain = new Brain(opts.storage, now);
@@ -61,10 +88,13 @@ export function createSynapse(opts: { storage: Storage; callModel: CallModel; no
   function gateOpener(site: string): string {
     const name = siteName(site);
     const focus = brain.currentFocus();
-    const streak = brain.workStreakMinutes();
+    const streak = brain.workStats().sinceBreakMin;
     const today = brain.today();
     if (brain.offClock()) return `You said you were done for today. ${name} now — what's the plan?`;
-    if (focus?.source === "stated") return `Hold on. You're working on ${focus.text}. Why ${name}?`;
+    // Only lead with what they SAID if they said it recently; an old statement is probably stale.
+    const saidRecently = focus?.source === "stated" && now() - (brain.s.focus?.setAt ?? 0) < 60 * 60_000;
+    if (saidRecently) return `Hold on. You're working on ${focus!.text}. Why ${name}?`;
+    if (focus?.source === "stated") return streak >= 20 ? `Hold on — you've been at it for ${streak} minutes. Why ${name}?` : `Hold on. Why ${name} right now?`;
     if (focus) return `Hold on. You're in the middle of ${focus.text}. Why ${name}?`;
     if (streak >= 20) return `Hold on — you've been at it for ${streak} minutes. Why ${name}?`;
     if (today.passes >= 2) return `${name} again? That'd be pass number ${today.passes + 1} today. Why?`;
@@ -131,8 +161,21 @@ export function createSynapse(opts: { storage: Storage; callModel: CallModel; no
   }
 
   /** The clarity conversation. `screenshot` is a base64 JPEG of their screen, only when they allowed it. */
-  async function ask(message: string, o: { screenshot?: string | null; onboarding?: boolean } = {}): Promise<{ text: string; reachouts: Reachout[]; passChanges: PassChange[]; sawScreen: boolean }> {
+  async function ask(message: string, o: { screenshot?: string | null; onboarding?: boolean } = {}): Promise<{ text: string; reachouts: Reachout[]; passChanges: PassChange[]; sawScreen: boolean; pauseChanged?: boolean }> {
     const surface = o.onboarding ? "onboarding" : "ask";
+    const cmd = parsePauseCommand(message, now());
+    if (cmd) {
+      brain.addTurn("user", message, surface);
+      let text: string;
+      if (cmd.resume) { brain.resume(); text = "I'm back on. Go get it."; }
+      else {
+        const until = brain.pause(cmd.pause!);
+        const at = new Date(until).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
+        text = `Okay — I'm off until ${at}. No gates, no check-ins. Enjoy it. Say "resume" whenever you want me back.`;
+      }
+      brain.addTurn("synapse", text, surface);
+      return { text, reachouts: [], passChanges: [], sawScreen: false, pauseChanged: true };
+    }
     if (preGate(message).triggered) { brain.addTurn("user", message, surface); brain.addTurn("synapse", CRISIS_RESPONSE, surface); return { text: CRISIS_RESPONSE, reachouts: [], passChanges: [], sawScreen: false }; }
 
     if (saysDoneWorking(message)) brain.endWork(message);

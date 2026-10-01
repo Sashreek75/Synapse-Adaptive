@@ -54,6 +54,17 @@ export const DISTRACTION_CATALOG: DistractionSite[] = [
   { domain: "miniclip.com", names: ["Miniclip"], category: "games" },
   { domain: "store.steampowered.com", names: ["Steam"], category: "games" },
   { domain: "epicgames.com", names: ["Epic Games Store", "Epic Games"], category: "games" },
+  // Browser .io games (common on school laptops)
+  { domain: "deadshot.io", names: ["DEADSHOT .io", "Deadshot.io", "DEADSHOT"], category: "games" },
+  { domain: "krunker.io", names: ["Krunker", "Krunker.io"], category: "games" },
+  { domain: "shellshock.io", names: ["Shell Shockers", "Shellshock.io"], category: "games" },
+  { domain: "slither.io", names: ["slither.io"], category: "games" },
+  { domain: "agar.io", names: ["Agar.io"], category: "games" },
+  { domain: "diep.io", names: ["diep.io"], category: "games" },
+  { domain: "1v1.lol", names: ["1v1.LOL", "1v1.lol"], category: "games" },
+  { domain: "smashkarts.io", names: ["Smash Karts"], category: "games" },
+  { domain: "bloxd.io", names: ["Bloxd.io", "bloxd.io"], category: "games" },
+  { domain: "geometrydash.io", names: ["Geometry Dash"], category: "games" },
 
   // Shopping
   { domain: "amazon.com", names: ["Amazon", "Amazon.com"], category: "shopping" },
@@ -78,7 +89,7 @@ export const DISTRACTION_CATALOG: DistractionSite[] = [
 export const DEFAULT_DISTRACTIONS = DISTRACTION_CATALOG.map((s) => s.domain);
 
 /** Bump when the default list grows; existing installs get the new sites merged in once. */
-export const DEFAULTS_VERSION = 2;
+export const DEFAULTS_VERSION = 3;
 
 const byDomain = new Map(DISTRACTION_CATALOG.map((s) => [s.domain, s]));
 export function catalogEntry(domain: string) { return byDomain.get(domain); }

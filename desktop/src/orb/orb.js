@@ -11,7 +11,11 @@ function rich(t) {
   return esc(t).replace(/\*\*(.+?)\*\*/g, "<b>$1</b>").split("\n")
     .map((l) => /^\s*[-•*]\s+/.test(l) ? `<div class="li">${l.replace(/^\s*[-•*]\s+/, "")}</div>` : l ? `<div>${l}</div>` : "").join("");
 }
-const fmt = (ms) => { const s = Math.max(0, Math.ceil(ms / 1000)); return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`; };
+const fmt = (ms) => {
+  const s = Math.max(0, Math.ceil(ms / 1000));
+  if (s >= 3600) return `${Math.floor(s / 3600)}h ${String(Math.floor((s % 3600) / 60)).padStart(2, "0")}m`;
+  return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`;
+};
 
 let view = "dock";          // dock | gate | ask | notice
 let pass = null;
@@ -23,7 +27,8 @@ let unread = false;        // a reply arrived while the card was closed
 let hideTimer = null;
 
 /* ---------- sizing: the window hugs the card ---------- */
-new ResizeObserver(() => { if (!card.hidden) { const r = card.getBoundingClientRect(); S.size(Math.ceil(r.width), Math.ceil(r.height)); } }).observe(card);
+// offsetWidth/Height ignore the open/close scale animation, so the window is never sized to a shrunk card.
+new ResizeObserver(() => { if (!card.hidden) S.size(card.offsetWidth, card.offsetHeight); }).observe(card);
 
 /* ---------- dock ---------- */
 /* The docked orb sits half-tucked past the screen edge and slides out on hover — all in CSS, so
@@ -39,9 +44,10 @@ function renderDock(p) {
 
   if (p) {
     const left = p.expiresAt - Date.now();
-    chip.textContent = `${p.name} ${fmt(left)}`;
-    dockOrb.dataset.state = left < 60_000 ? "urgent" : "";
+    chip.textContent = p.paused ? `Paused · ${fmt(left)}` : `${p.name} ${fmt(left)}`;
+    dockOrb.dataset.state = !p.paused && left < 60_000 ? "urgent" : "";
   } else dockOrb.dataset.state = "";
+  dock.classList.toggle("paused", !!(p && p.paused));
 }
 
 function showCard(kind) {
@@ -104,8 +110,10 @@ function startClock() {
 function stopClock() { clearInterval(clock); clearTimeout(startTimer); clock = null; started = false; if (typingHeld) setTypingHeld(false); }
 function lockGate() { input.disabled = true; sendBtn.disabled = true; }
 
+let gateToken = 0;
 function openGate(m) {
   showCard("gate");
+  gateToken++;
   total = remaining = (m.seconds || 15) * 1000;
   paused = false; started = false; lastKey = 0; typingUsed = 0; typingHeld = false; count.classList.remove("held");
   count.hidden = false; count.textContent = m.seconds || 15;
@@ -237,6 +245,12 @@ S.on((m) => {
   else if (m.type === "verdict") onVerdict(m);
   else if (m.type === "timeout") { stopClock(); lockGate(); }
   else if (m.type === "close-card") { if (view === "gate") hideCard(); }
+  else if (m.type === "gate-ended") {
+    // The app says there's no gate any more: never leave a stale gate card on screen.
+    if (view !== "gate") return;
+    const tok = gateToken;
+    setTimeout(() => { if (view === "gate" && gateToken === tok) hideCard(); }, 1200);
+  }
   else if (m.type === "ask") openAsk(m);
   else if (m.type === "reply") onReply(m);
   else if (m.type === "notice") showNotice(m);
