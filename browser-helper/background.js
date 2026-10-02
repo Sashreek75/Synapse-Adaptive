@@ -56,7 +56,7 @@ async function report(tab, windowFocused) {
   if (!tab || !tab.url || !/^https?:/.test(tab.url)) return;
   // Veil instantly if this looks like a distraction without a pass; the app then decides.
   const site = matches(tab.url);
-  if (site && !(config.passes[site] > Date.now())) veil(tab.id, true);
+  if (site && !(config.passes[site] > Date.now() || config.passes['*'] > Date.now())) veil(tab.id, true);
   if (windowFocused === undefined) {
     const w = await chrome.windows.get(tab.windowId).catch(() => null);
     windowFocused = !!w?.focused;
@@ -79,7 +79,7 @@ chrome.runtime.onMessage.addListener((msg, sender, reply) => {
     const id = sender.tab?.id;
     const url = sender.tab?.url || "";
     const site = matches(url);
-    reply(held.has(id) || (!!site && !(config.passes[site] > Date.now())));
+    reply(held.has(id) || (!!site && !(config.passes[site] > Date.now() || config.passes['*'] > Date.now())));
   }
 });
 

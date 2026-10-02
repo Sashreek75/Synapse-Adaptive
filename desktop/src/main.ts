@@ -12,7 +12,7 @@
 import { app, BrowserWindow, Tray, Menu, ipcMain, screen, powerMonitor, globalShortcut, desktopCapturer, nativeImage, Notification, shell, systemPreferences } from "electron";
 import path from "node:path";
 import fs from "node:fs";
-import { createSynapse, relayTransport, geminiTransport, siteName, cleanSite, type Synapse, type GateTurn } from "../../core/synapse";
+import { createSynapse, relayTransport, geminiTransport, siteName, cleanSite, ANY_SITE, type Synapse, type GateTurn } from "../../core/synapse";
 import { Bridge, type TabInfo } from "./bridge";
 import { foreground, BROWSERS, bringToFront, nativeHandle, closeBrowserTab, minimize, type Foreground } from "./foreground";
 
@@ -182,7 +182,7 @@ function soonestPass() {
 function passView() {
   const until = syn.brain.paused();
   if (until) return { name: "Paused", expiresAt: until, paused: true };
-  const p = soonestPass(); return p ? { name: siteName(p.site), expiresAt: p.expiresAt } : null;
+  const p = soonestPass(); return p ? { name: siteName(p.site), expiresAt: p.expiresAt } : null;   // "Free time 14:59"
 }
 function chipShown() { return !!soonestPass() || !!syn.brain.paused(); }
 
@@ -229,9 +229,10 @@ function endGate() {
 
 function schedulePass(site: string) {
   const p = syn.brain.activePass(site);
-  clearTimeout(passTimers.get(site));
-  if (!p) return;
-  passTimers.set(site, setTimeout(() => expirePass(site), Math.max(0, p.expiresAt - Date.now())));
+  if (!p) { clearTimeout(passTimers.get(site)); return; }
+  const key = p.site;                       // may be free time ("*") covering this site
+  clearTimeout(passTimers.get(key));
+  passTimers.set(key, setTimeout(() => expirePass(key), Math.max(0, p.expiresAt - Date.now())));
 }
 
 function expirePass(site: string, early = false) {
@@ -239,15 +240,29 @@ function expirePass(site: string, early = false) {
   syn.brain.endPass(site, early ? "ended_early" : "expired");
   pushConfig();
   const focus = syn.brain.currentFocus();
-  notice(early ? `Done with ${siteName(site)}. Good.` : `That's your time on ${siteName(site)}.${focus ? ` Back to ${focus.text}.` : " Back to it."}`, 4000);
-  setTimeout(() => closeSite(site), early ? 600 : 3000);
+  const label = site === ANY_SITE ? "free time" : siteName(site);
+  notice(early ? `Done with ${label}. Good.` : `That's your ${label === "free time" ? "free time" : `time on ${label}`}.${focus ? ` Back to ${focus.text}.` : " Back to it."}`, 4000);
+  const target = lastBrowser && Date.now() - lastBrowser.at < 60_000 ? lastBrowser.fg : undefined;
+  const shownSite = target ? siteOf(target) : null;
+  const closeWhat = site === ANY_SITE ? shownSite : site;
+  if (closeWhat) {
+    cooldown.set(closeWhat, Date.now() + 8000);        // don't open a gate on it while it closes
+    setTimeout(() => closeSite(closeWhat, shownSite === closeWhat ? target : undefined), early ? 600 : 3000);
+  }
+  if (site === ANY_SITE && bridge.connected) for (const d of syn.brain.s.settings.distractions) bridge.closeSite(d);
   layout();
 }
 
 /* ---------------- the gate ---------------- */
 
 function tabsOf(site: string) {
-  return [...bridge.tabs.values()].filter((t) => { try { const h = new URL(t.url).hostname.replace(/^www\./, ""); return h === site || h.endsWith("." + site); } catch { return false; } }).map((t) => t.tabId);
+  return [...bridge.tabs.values()].filter((t) => {
+    try {
+      const host = new URL(t.url).hostname;
+      if (site === ANY_SITE) return !!syn.brain.matchDistraction(host);   // free time covers every distraction
+      const h = host.replace(/^www\./, ""); return h === site || h.endsWith("." + site);
+    } catch { return false; }
+  }).map((t) => t.tabId);
 }
 
 function onTab(t: TabInfo) {
@@ -457,7 +472,11 @@ async function ask(text: string, share: boolean) {
   // They may have changed a pass by talking ("make it 20 minutes").
   for (const c of (r as { passChanges?: { site: string; minutes: number }[] }).passChanges ?? []) {
     log(`pass changed in conversation: ${c.site} → ${c.minutes} min from now`);
-    if (c.minutes > 0) { schedulePass(c.site); bridge.release(tabsOf(c.site)); }
+    if (c.minutes > 0) {
+      schedulePass(c.site);
+      bridge.release(tabsOf(c.site));
+      if (gate && (c.site === ANY_SITE || c.site === gate.site)) { log(`gate ${gate.site} ended: pass granted in conversation`); endGate(); }
+    }
     else { clearTimeout(passTimers.get(c.site)); passTimers.delete(c.site); setTimeout(() => closeSite(c.site), 600); }
   }
   if ((r as { pauseChanged?: boolean }).pauseChanged) onPauseChanged();
@@ -493,6 +512,7 @@ function siteOf(fg: Foreground): string | null {
 }
 
 let watching = false;
+let lastBrowser: { fg: Foreground; at: number } | null = null;
 let lastObserve = 0;
 
 /**
@@ -508,6 +528,7 @@ async function watch() {
     const fg = await foreground();
     if (!fg || /synapse|electron/i.test(fg.app)) return;
     const isBrowser = BROWSERS.test(fg.app);
+    if (isBrowser) lastBrowser = { fg, at: Date.now() };
     const tab = isBrowser && helperSeesBrowser() ? bridge.activeTab() : null;
 
     if (Date.now() - lastObserve >= 5000) {

@@ -268,6 +268,27 @@ async function t(name: string, fn: () => Promise<void> | void) { await fn(); pas
     assert.equal(b.matchDistraction("m.youtube.com"), "youtube.com");
   });
 
+  await t("one brain: when the orb says yes, the gate already knows", async () => {
+    const comp = '{"intent":"question","responseMode":"ANSWER","explicitClaims":[],"explicitRequests":["play games"],"askedForAdvice":false,"askedToDecide":false,"askedForPlan":false,"constraints":[],"temporal":[],"unknowns":[],"contradictions":[]}';
+    script = (c) => c.system?.startsWith("You are the comprehension layer") ? comp : "Yes — you're in class with nothing due. Go for it, 20 minutes.\n[[free: 20]]";
+    const r = await syn.ask("I'm in physics with nothing to do, can I play games for a bit?");
+    assert.deepEqual(r.passChanges, [{ site: "*", minutes: 20 }]);
+    assert.ok(b.activePass("deadshot.io"), "free time covers games");
+    assert.ok(b.activePass("youtube.com"), "free time covers every distraction");
+    calls.length = 0;
+    const v = await syn.judge({ site: "deadshot.io", argument: "you said I could", transcript: [] });
+    assert.equal(v.decision, "allow"); assert.equal(calls.length, 0, "no AI call needed — it's already allowed");
+    assert.match(b.context({ purpose: "gate" }), /FREE TIME/);
+    assert.match(b.context({ purpose: "gate" }), /RECENT CONVERSATION[\s\S]*can I play games/);
+    b.endPass("*", "ended_early");
+    assert.equal(b.activePass("deadshot.io"), null);
+    // category names map to free time too
+    script = (c) => c.system?.startsWith("You are the comprehension layer") ? comp : "Sure, 15.\n[[pass: games | 15]]";
+    const r2 = await syn.ask("games for 15?");
+    assert.deepEqual(r2.passChanges, [{ site: "*", minutes: 15 }]);
+    b.endPass("*", "ended_early");
+  });
+
   await t("state survives a restart", () => {
     if (!b.activePass("youtube.com")) b.grantPass("youtube.com", 10, "restart test");
     b.flush();

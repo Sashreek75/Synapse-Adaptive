@@ -106,6 +106,12 @@ export function createSynapse(opts: { storage: Storage; callModel: CallModel; no
     brain.addTurn("user", `[${siteName(site)}] ${argument}`, "gate");
     if (saysDoneWorking(argument)) brain.endWork(argument);
     if (preGate(argument).triggered) return { decision: "crisis", minutes: null, reply: CRISIS_RESPONSE, source: "model" };
+    // Already allowed (a pass, or free time Synapse gave them in the orb)? Then the answer is yes.
+    const existing = brain.activePass(site);
+    if (existing) {
+      const left = Math.max(1, Math.ceil((existing.expiresAt - now()) / 60_000));
+      return { decision: "allow", minutes: left, reply: `You're already cleared — ${left} min left.`, source: "model", pass: existing };
+    }
 
     const max = brain.s.settings.maxMinutes;
     const user = [

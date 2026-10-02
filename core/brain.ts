@@ -90,7 +90,9 @@ function fresh(): BrainState {
 }
 
 const NAMES: Record<string, string> = { youtube: "YouTube", tiktok: "TikTok", x: "X", twitter: "Twitter", reddit: "Reddit", instagram: "Instagram", facebook: "Facebook", netflix: "Netflix", twitch: "Twitch", discord: "Discord", pinterest: "Pinterest" };
-export function siteName(site: string) { const c = catalogEntry(site); if (c) return c.names[0]; const n = site.split(".")[0]; return NAMES[n] || n.charAt(0).toUpperCase() + n.slice(1); }
+/** The "site" key for free time: every distracting site is open until it runs out. */
+export const ANY_SITE = "*";
+export function siteName(site: string) { if (site === ANY_SITE) return "Free time"; const c = catalogEntry(site); if (c) return c.names[0]; const n = site.split(".")[0]; return NAMES[n] || n.charAt(0).toUpperCase() + n.slice(1); }
 
 export function cleanSite(input: string): string {
   let s = input.trim().toLowerCase();
@@ -365,6 +367,9 @@ export class Brain {
 
   /** "youtube", "YouTube", "youtube.com", "https://youtube.com/…" → "youtube.com" (only listed sites). */
   resolveSite(name: string): string | null {
+    const n0 = name.trim().toLowerCase();
+    // "free time", "games", "anything", "*" → free time across every distracting site
+    if (/^(\*|any|all|anything|everything|free( time)?|games?|gaming|social( media)?|video|streaming|shopping|news|distractions?)$/.test(n0)) return ANY_SITE;
     const c = cleanSite(name);
     const direct = this.matchDistraction(c);
     if (direct) return direct;
@@ -372,9 +377,13 @@ export class Brain {
     return this.s.settings.distractions.find((d) => siteName(d).toLowerCase() === n || d.split(".")[0] === n) ?? null;
   }
 
+  /** A pass for this site — or free time, which covers every site. */
   activePass(site: string): Pass | null {
+    const t = this.now();
     const p = this.s.passes[site];
-    return p && p.expiresAt > this.now() ? p : null;
+    if (p && p.expiresAt > t) return p;
+    const any = this.s.passes[ANY_SITE];
+    return any && any.expiresAt > t ? any : null;
   }
 
   logGate(ev: Omit<GateEvent, "ts">) { this.s.gateLog.push({ ts: this.now(), ...ev }); this.touch(); }
@@ -437,6 +446,15 @@ export class Brain {
       else if (kind === "mindshift") this.s.memory.mindshifts.push({ text: a, ts: t });
       else if (kind === "observe") this.s.memory.observations.push({ key: a, text: parts[1] ?? a, ts: t });
       else if (kind === "rec") this.s.memory.calls.push({ text: a, ts: t });
+      else if (kind === "free") {
+        // [[free: minutes]] — free time: any distracting site, for that long.
+        const n = parseInt(a, 10);
+        if (Number.isNaN(n) || n < 0) continue;
+        if (n === 0) { if (this.s.passes[ANY_SITE]) { this.endPass(ANY_SITE, "ended_early"); passChanges.push({ site: ANY_SITE, minutes: 0 }); } continue; }
+        const minutes = Math.min(n, this.s.settings.maxMinutes);
+        this.grantPass(ANY_SITE, minutes, "free time, granted in conversation");
+        passChanges.push({ site: ANY_SITE, minutes });
+      }
       else if (kind === "pass") {
         // [[pass: site | minutes from now]] — change (or end, with 0) a timed pass from the conversation.
         const site = this.resolveSite(a);
@@ -444,7 +462,7 @@ export class Brain {
         if (!site || Number.isNaN(n) || n < 0) continue;
         if (n === 0) { if (this.s.passes[site]) { this.endPass(site, "ended_early"); passChanges.push({ site, minutes: 0 }); } continue; }
         const minutes = Math.min(n, this.s.settings.maxMinutes);
-        const existing = this.activePass(site);
+        const existing = this.s.passes[site] && this.s.passes[site].expiresAt > t ? this.s.passes[site] : null;
         if (existing) {
           const before = existing.minutes;
           existing.expiresAt = t + minutes * 60_000;
@@ -499,7 +517,9 @@ export class Brain {
     lines.push(`DISTRACTION GATE TODAY: ${d.passes} passes (${d.minutes} min), ${d.denials} denied or timed out, ${d.walkedAway} times they walked away on their own.` +
       (d.reasons.length ? `\nReasons that got them in today:\n- ${d.reasons.slice(-5).join("\n- ")}` : ""));
     const live = Object.values(this.s.passes).filter((p) => p.expiresAt > t);
-    if (live.length) lines.push(`ACTIVE PASS: ${live.map((p) => `${siteName(p.site)} (${p.site}), ${Math.ceil((p.expiresAt - t) / 60_000)} min left of ${p.minutes}`).join("; ")}`);
+    if (live.length) lines.push(`ACTIVE PASS: ${live.map((p) => p.site === ANY_SITE
+      ? `FREE TIME — every distracting site is open, ${Math.ceil((p.expiresAt - t) / 60_000)} min left of ${p.minutes}`
+      : `${siteName(p.site)} (${p.site}), ${Math.ceil((p.expiresAt - t) / 60_000)} min left of ${p.minutes}`).join("; ")}`);
     lines.push(`PASS LIMIT: the longest pass they've allowed is ${this.s.settings.maxMinutes} min.`);
 
     const mem = this.s.memory;
@@ -518,9 +538,11 @@ export class Brain {
       lines.push(opts.screen
         ? `THEIR SCREEN RIGHT NOW (they chose to share it):\n${opts.screen}`
         : "They did not share their screen for this message; if the question depends on it, say so.");
-      const convo = this.s.turns.filter((x) => t - x.ts < 6 * 3600_000).slice(-10);
-      if (convo.length) lines.push(`RECENT EXCHANGES WITH THE ORB:\n${convo.map((x) => `${x.role === "user" ? "Them" : "Synapse"}${x.surface === "gate" ? " (at the gate)" : ""}: ${x.text.slice(0, 400)}`).join("\n")}`);
     }
+    // ONE BRAIN: the gate and the orb read the same conversation. What they told the orb ("I'm in
+    // class, nothing to do") and what Synapse said back ("yes, go play") count at the gate too.
+    const convo = this.s.turns.filter((x) => t - x.ts < 4 * 3600_000).slice(opts.purpose === "gate" ? -12 : -10);
+    if (convo.length) lines.push(`RECENT CONVERSATION (orb and gate; newest last — this is YOU talking to them):\n${convo.map((x) => `[${new Date(x.ts).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}] ${x.role === "user" ? "Them" : "Synapse"}${x.surface === "gate" ? " (at the gate)" : ""}: ${x.text.slice(0, 400)}`).join("\n")}`);
     return lines.join("\n\n");
   }
 }
