@@ -11,11 +11,13 @@
  */
 
 export interface Goal { id: string; title: string; deadline?: string; createdAt: number; doneAt?: number }
-export interface Pass { site: string; minutes: number; grantedAt: number; expiresAt: number; reason: string }
-export type GateKind = "opened" | "pass" | "deny" | "ask" | "timeout" | "walked_away" | "expired" | "ended_early";
+/** "break" = rest/free time; "task" = a site they need for something specific (a lecture, a reply). */
+export type PassKind = "break" | "task";
+export interface Pass { site: string; minutes: number; grantedAt: number; expiresAt: number; reason: string; kind?: PassKind }
+export type GateKind = "opened" | "pass" | "extended" | "deny" | "ask" | "timeout" | "walked_away" | "expired" | "ended_early";
 export interface GateEvent { ts: number; site: string; kind: GateKind; minutes?: number; text?: string }
 export interface Turn { ts: number; role: "user" | "synapse"; text: string; surface: "ask" | "gate" | "onboarding" }
-export interface Segment { app: string; title: string; site?: string; start: number; end: number }
+export interface Segment { app: string; title: string; site?: string; start: number; end: number; onPass?: PassKind }
 export interface Reachout { id: string; at: number; text: string }
 export interface PassChange { site: string; minutes: number }
 
@@ -66,9 +68,11 @@ const SESSION_GAP_MS = 10 * 60_000;     // this long = a new work session
 /** Not work, not distraction: the OS itself. */
 const SYSTEM_APPS = /^(lockapp|explorer|searchhost|searchapp|shellexperiencehost|startmenuexperiencehost|applicationframehost|textinputhost|synapse|electron)(\.exe)?$/i;
 const FOCUS_IDLE_RESET_SEC = 30 * 60;   // away this long and "what they're working on" is stale
-const OFF_CLOCK_MS = 10 * 3600_000;          // idle this long = the work streak resets
+const OFF_CLOCK_MS = 10 * 3600_000;     // "done for the day" lasts this long at most (until the next day)
 const SEGMENT_GAP_MS = 20_000;          // samples further apart than this start a new segment
 const KEEP_ACTIVITY_MS = 24 * 3600_000;
+const BACK_TO_WORK_MS = 60_000;            // a solid minute back on real work during a break = the break is over
+const BREAK_MIN_BEFORE_RETURN_MS = 60_000; // …but not in the first minute of the break
 
 function rid() { return Math.random().toString(36).slice(2, 10) + Date.now().toString(36); }
 
@@ -92,6 +96,9 @@ function fresh(): BrainState {
 const NAMES: Record<string, string> = { youtube: "YouTube", tiktok: "TikTok", x: "X", twitter: "Twitter", reddit: "Reddit", instagram: "Instagram", facebook: "Facebook", netflix: "Netflix", twitch: "Twitch", discord: "Discord", pinterest: "Pinterest" };
 /** The "site" key for free time: every distracting site is open until it runs out. */
 export const ANY_SITE = "*";
+/** Domains that are the same site (twitter.com redirects to x.com). A pass for one covers the other. */
+const SAME_SITE: Record<string, string[]> = { "x.com": ["twitter.com"], "twitter.com": ["x.com"], "threads.net": ["threads.com"], "threads.com": ["threads.net"] };
+export function sameSite(site: string): string[] { return [site, ...(SAME_SITE[site] ?? [])]; }
 export function siteName(site: string) { if (site === ANY_SITE) return "Free time"; const c = catalogEntry(site); if (c) return c.names[0]; const n = site.split(".")[0]; return NAMES[n] || n.charAt(0).toUpperCase() + n.slice(1); }
 
 export function cleanSite(input: string): string {
@@ -111,13 +118,17 @@ export function cleanTitle(title: string): string {
  * "I'm finished for today", "going to bed"). A plain break ("quick break") is NOT this.
  */
 export function saysDoneWorking(text: string): boolean {
-  const t = text.toLowerCase();
+  const t = text.toLowerCase().replace(/[’']/g, "'");
   if (/\b(quick|short|small|\d+[- ]?min(ute)?s?)\s+break\b/.test(t)) return false;
+  // "I'm NOT done studying", "not finished yet"
+  if (/\b(not|n't|never|almost|nearly|barely)\s+(really\s+|quite\s+|yet\s+)?(done|finished|through)\b/.test(t)) return false;
+  // "done with math, starting chem now", "finished the intro, onto the body" — moving on, not stopping
+  if (/\b(done|finished|through)\b[\s\S]{0,60}\b(now (i'?m |i |gonna |going to )?(start|do|work|move)|starting|start on|onto|on to|moving on|next (up|is)|then (i'?ll|gonna|going to)|time for (my|the) (next|other))\b/.test(t)) return false;
   return /\b(done|finished|through|wrapping up|wrapped up|stopping|calling it)\b[^.!?]{0,30}\b(studying|study|working|work|homework|hw|school ?work|coding|for (the|to)(day|night|nite)|for today|for tonight|for the day|for the night)\b/.test(t)
     || /\bcalling it (a )?(night|day)\b/.test(t)
     || /\b(i'?m|im|i am) (done|finished)( for (now|today|tonight|the day|the night))?\s*[,.!]*\s*(gn|good ?night|bye)?\s*$/.test(t)
     || /(^\s*gn\b|\bgn[\s!.]*$)/.test(t)
-    || /\b(good ?night|nighty? ?night)\b/.test(t)
+    || /\b(good ?night|nighty? ?night)\b(?!'s)(?! sleep)/.test(t) && t.split(/\s+/).length <= 8
     || /\b(going|heading|off) to (bed|sleep)\b/.test(t)
     || /\bday'?s (done|over)\b/.test(t);
 }
@@ -242,11 +253,13 @@ export class Brain {
     if (sample.url) { try { site = this.matchDistraction(new URL(sample.url).hostname) ?? undefined; } catch { /* ignore */ } }
     else site = this.matchTitle(sample.title || "") ?? undefined;
     const title = cleanTitle(sample.title || "");
+    // Time on a site they were let into FOR A TASK (a lecture for class) is work, not distraction.
+    const onPass = site ? this.activePass(site)?.kind : undefined;
     const last = this.s.activity[this.s.activity.length - 1];
-    if (last && last.app === sample.app && last.title === title && t - last.end < SEGMENT_GAP_MS) last.end = t;
-    else this.s.activity.push({ app: sample.app, title, site, start: t, end: t });
+    if (last && last.app === sample.app && last.title === title && last.onPass === onPass && t - last.end < SEGMENT_GAP_MS) last.end = t;
+    else this.s.activity.push({ app: sample.app, title, site, start: t, end: t, ...(onPass ? { onPass } : {}) });
 
-    if (site) this.s.workStreakStart = undefined;                      // a distraction breaks the streak
+    if (site && onPass !== "task") this.s.workStreakStart = undefined;                      // a distraction breaks the streak
     else if (!this.s.workStreakStart || (this.s.lastActiveAt && t - this.s.lastActiveAt > IDLE_BREAK_SEC * 1000)) this.s.workStreakStart = t;
     this.s.lastActiveAt = t;
     this.touch();
@@ -265,23 +278,25 @@ export class Brain {
     const now = this.now();
     const from = dayStart(now);
     // The OS itself and empty browser tabs are neither work nor distraction.
-    const segs = this.s.activity.filter((a) => a.end >= from && !SYSTEM_APPS.test(a.app) && !/^(New Tab|Untitled|Task Switching)?$/i.test(a.title.trim())).sort((a, b) => a.start - b.start);
+    const segs = this.s.activity.filter((a) => !SYSTEM_APPS.test(a.app) && !/^(New Tab|Untitled|Task Switching)?$/i.test(a.title.trim())).sort((a, b) => a.start - b.start);
     let workToday = 0, distractToday = 0;
     let sessionStart: number | null = null, sessionWork = 0, sessionDistract = 0;
     let sinceBreak = 0, distractRun = 0, prevEnd = 0;
     for (const a of segs) {
-      const start = Math.max(a.start, from);
-      const dur = Math.min(a.end - start + SAMPLE_MS, a.end - start + SAMPLE_MS);
+      const start = a.start;
+      const dur = a.end - start + SAMPLE_MS;
+      // Only the part of a segment after midnight counts toward TODAY; sessions and breaks run across midnight.
+      const durToday = a.end < from ? 0 : a.end - Math.max(start, from) + SAMPLE_MS;
       const gap = prevEnd ? start - prevEnd - SAMPLE_MS : Infinity;
       if (gap >= SESSION_GAP_MS) { sessionStart = start; sessionWork = 0; sessionDistract = 0; sinceBreak = 0; distractRun = 0; }
       else if (gap >= BREAK_GAP_MS) sinceBreak = 0;
-      if (a.site) {
-        distractToday += dur; sessionDistract += dur; distractRun += dur;
+      if (a.site && a.onPass !== "task") {
+        distractToday += durToday; sessionDistract += dur; distractRun += dur;
         if (distractRun >= SESSION_GAP_MS) { sessionStart = a.end; sessionWork = 0; sessionDistract = 0; sinceBreak = 0; }
         else if (distractRun >= BREAK_GAP_MS) sinceBreak = 0;
       } else {
         distractRun = 0;
-        workToday += dur; sessionWork += dur; sinceBreak += dur;
+        workToday += durToday; sessionWork += dur; sinceBreak += dur;
       }
       prevEnd = a.end;
     }
@@ -374,27 +389,63 @@ export class Brain {
     const direct = this.matchDistraction(c);
     if (direct) return direct;
     const n = name.trim().toLowerCase();
+    if (n === "x" || n === "twitter") return this.s.settings.distractions.includes("x.com") ? "x.com" : "twitter.com";
     return this.s.settings.distractions.find((d) => siteName(d).toLowerCase() === n || d.split(".")[0] === n) ?? null;
   }
 
   /** A pass for this site — or free time, which covers every site. */
   activePass(site: string): Pass | null {
     const t = this.now();
-    const p = this.s.passes[site];
-    if (p && p.expiresAt > t) return p;
+    for (const k of sameSite(site)) { const p = this.s.passes[k]; if (p && p.expiresAt > t) return p; }
     const any = this.s.passes[ANY_SITE];
     return any && any.expiresAt > t ? any : null;
   }
 
   logGate(ev: Omit<GateEvent, "ts">) { this.s.gateLog.push({ ts: this.now(), ...ev }); this.touch(); }
 
-  grantPass(site: string, minutes: number, reason: string): Pass {
+  grantPass(site: string, minutes: number, reason: string, kind: PassKind = site === ANY_SITE ? "break" : "task"): Pass {
     const t = this.now();
-    const p: Pass = { site, minutes, reason: reason.slice(0, 240), grantedAt: t, expiresAt: t + minutes * 60_000 };
+    const prev = this.s.passes[site] && this.s.passes[site].expiresAt > t ? this.s.passes[site] : null;
+    if (prev) {
+      // Already have one: this is an extension (or a change), not another pass for the day's count.
+      const before = prev.expiresAt;
+      prev.expiresAt = t + minutes * 60_000;
+      prev.minutes = Math.round((prev.expiresAt - prev.grantedAt) / 60_000);
+      if (kind === "break") prev.kind = "break";
+      this.logGate({ site, kind: "extended", minutes: Math.round((prev.expiresAt - before) / 60_000), text: reason.slice(0, 240) });
+      return prev;
+    }
+    const p: Pass = { site, minutes, reason: reason.slice(0, 240), grantedAt: t, expiresAt: t + minutes * 60_000, kind };
     this.s.passes[site] = p;
     this.logGate({ site, kind: "pass", minutes, text: reason.slice(0, 240) });
     return p;
   }
+
+  /**
+   * BACK TO WORK DURING A BREAK. Called on every look at the screen. If they're on a break and have
+   * been on real work (not a distraction, not the desktop, not an empty tab) for a solid minute, the
+   * break is over: returns the pass to end. Glancing at a doc for a few seconds doesn't count, and
+   * neither does the first minute of the break. Task passes (a lecture for class) are left alone —
+   * switching to notes during a lecture is part of the task.
+   */
+  backToWork(sample: { app: string; title: string; url?: string }): string | null {
+    const t = this.now();
+    const live = Object.values(this.s.passes).filter((p) => p.expiresAt > t && (p.kind === "break" || (!p.kind && p.site === ANY_SITE)));
+    if (!live.length) { this.backSince = null; return null; }
+    let site: string | null = null;
+    if (sample.url) { try { site = this.matchDistraction(new URL(sample.url).hostname); } catch { site = null; } }
+    else site = this.matchTitle(sample.title || "");
+    const title = cleanTitle(sample.title || "");
+    const working = !site && !SYSTEM_APPS.test(sample.app) && !!title && !/^(New Tab|Untitled|Task Switching|Start)$/i.test(title);
+    if (!working) { this.backSince = null; return null; }
+    const p = live.sort((a, b) => b.expiresAt - a.expiresAt)[0];
+    if (t - p.grantedAt < BREAK_MIN_BEFORE_RETURN_MS) return null;
+    if (this.backSince == null) this.backSince = t;
+    if (t - this.backSince < BACK_TO_WORK_MS) return null;
+    this.backSince = null;
+    return p.site;
+  }
+  private backSince: number | null = null;
 
   endPass(site: string, kind: "expired" | "ended_early") {
     if (!this.s.passes[site]) return;
@@ -408,7 +459,7 @@ export class Brain {
     const passes = ev.filter((e) => e.kind === "pass");
     return {
       passes: passes.length,
-      minutes: passes.reduce((a, e) => a + (e.minutes ?? 0), 0),
+      minutes: passes.reduce((a, e) => a + (e.minutes ?? 0), 0) + ev.filter((e) => e.kind === "extended").reduce((a, e) => a + Math.max(0, e.minutes ?? 0), 0),
       denials: ev.filter((e) => e.kind === "deny" || e.kind === "timeout").length,
       walkedAway: ev.filter((e) => e.kind === "walked_away").length,
       reasons: passes.map((e) => `${siteName(e.site)} ${e.minutes}m: "${e.text ?? ""}"`),
@@ -452,7 +503,7 @@ export class Brain {
         if (Number.isNaN(n) || n < 0) continue;
         if (n === 0) { if (this.s.passes[ANY_SITE]) { this.endPass(ANY_SITE, "ended_early"); passChanges.push({ site: ANY_SITE, minutes: 0 }); } continue; }
         const minutes = Math.min(n, this.s.settings.maxMinutes);
-        this.grantPass(ANY_SITE, minutes, "free time, granted in conversation");
+        this.grantPass(ANY_SITE, minutes, "free time, granted in conversation", "break");
         passChanges.push({ site: ANY_SITE, minutes });
       }
       else if (kind === "pass") {
@@ -460,17 +511,17 @@ export class Brain {
         const site = this.resolveSite(a);
         const n = parseInt(parts[1] ?? "", 10);
         if (!site || Number.isNaN(n) || n < 0) continue;
-        if (n === 0) { if (this.s.passes[site]) { this.endPass(site, "ended_early"); passChanges.push({ site, minutes: 0 }); } continue; }
-        const minutes = Math.min(n, this.s.settings.maxMinutes);
-        const existing = this.s.passes[site] && this.s.passes[site].expiresAt > t ? this.s.passes[site] : null;
-        if (existing) {
-          const before = existing.minutes;
-          existing.expiresAt = t + minutes * 60_000;
-          existing.minutes = Math.round((existing.expiresAt - existing.grantedAt) / 60_000);
-          this.logGate({ site, kind: "pass", minutes: Math.max(0, existing.minutes - before), text: `pass changed: ${minutes} min from now` });
+        if (n === 0) {
+          // "End my YouTube time" when what they have is free time: end the free time.
+          const key = site !== ANY_SITE && !this.s.passes[site] && this.s.passes[ANY_SITE] ? ANY_SITE : site;
+          if (this.s.passes[key]) { this.endPass(key, "ended_early"); passChanges.push({ site: key, minutes: 0 }); }
+          continue;
         }
-        else this.grantPass(site, minutes, "granted in conversation");
-        passChanges.push({ site, minutes });
+        const minutes = Math.min(n, this.s.settings.maxMinutes);
+        // Changing "the pass" while what they have is free time changes the free time.
+        const key = site !== ANY_SITE && !((this.s.passes[site]?.expiresAt ?? 0) > t) && (this.s.passes[ANY_SITE]?.expiresAt ?? 0) > t ? ANY_SITE : site;
+        this.grantPass(key, minutes, "changed in conversation", key === ANY_SITE ? "break" : "task");
+        passChanges.push({ site: key, minutes });
       }
     }
     this.touch();

@@ -175,9 +175,11 @@ function closeCard() { if (!gate && mode === "card") resizeHidden(() => layout("
 
 /* ---------------- passes ---------------- */
 
+/** The pass the chip shows: free time if they have it (it covers everything), else the one ending soonest. */
 function soonestPass() {
   const now = Date.now();
-  return Object.values(syn.brain.s.passes).filter((p) => p.expiresAt > now).sort((a, b) => a.expiresAt - b.expiresAt)[0] ?? null;
+  const live = Object.values(syn.brain.s.passes).filter((p) => p.expiresAt > now);
+  return live.find((p) => p.site === ANY_SITE) ?? live.sort((a, b) => a.expiresAt - b.expiresAt)[0] ?? null;
 }
 function passView() {
   const until = syn.brain.paused();
@@ -212,6 +214,7 @@ function onPauseChanged(announce = true) {
   buildTray();
   layout();
   if (announce && mode !== "card") orb.webContents.send("orb", { type: "mode", mode, pass: passView() });
+  if (!until) recheckSoon(800);   // back on: the tab they're sitting on gets its gate now
 }
 function pauseFor(minutes: number) {
   const until = syn.brain.pause(minutes);
@@ -239,18 +242,57 @@ function expirePass(site: string, early = false) {
   clearTimeout(passTimers.get(site)); passTimers.delete(site);
   syn.brain.endPass(site, early ? "ended_early" : "expired");
   pushConfig();
+  layout();
+  // Paused: they asked to be left alone. The pass just ends quietly.
+  if (syn.brain.paused()) return;
+  // Still covered by another pass (free time, or a site pass during free time)? Then nothing ends for them.
+  const stillCovered = site !== ANY_SITE && !!syn.brain.activePass(site);
+  if (stillCovered) return;
   const focus = syn.brain.currentFocus();
   const label = site === ANY_SITE ? "free time" : siteName(site);
   notice(early ? `Done with ${label}. Good.` : `That's your ${label === "free time" ? "free time" : `time on ${label}`}.${focus ? ` Back to ${focus.text}.` : " Back to it."}`, 4000);
-  const target = lastBrowser && Date.now() - lastBrowser.at < 60_000 ? lastBrowser.fg : undefined;
-  const shownSite = target ? siteOf(target) : null;
-  const closeWhat = site === ANY_SITE ? shownSite : site;
-  if (closeWhat) {
-    cooldown.set(closeWhat, Date.now() + 8000);        // don't open a gate on it while it closes
-    setTimeout(() => closeSite(closeWhat, shownSite === closeWhat ? target : undefined), early ? 600 : 3000);
-  }
-  if (site === ANY_SITE && bridge.connected) for (const d of syn.brain.s.settings.distractions) bridge.closeSite(d);
+  // Time's up means the tab closes — don't open a fresh gate on it in the moments before it does.
+  const delay = early ? 600 : 3000;
+  for (const d of site === ANY_SITE ? syn.brain.s.settings.distractions : [site]) if (!syn.brain.activePass(d)) cooldown.set(d, Date.now() + delay + 2500);
+  closeIfShowing(site, delay);
+}
+
+/** They went back to work before their break ran out: stop the timer, quietly. Nothing to close. */
+function endBreakEarly(site: string, fg: Foreground) {
+  const p = syn.brain.s.passes[site];
+  const left = p ? Math.max(0, Math.round((p.expiresAt - Date.now()) / 60_000)) : 0;
+  clearTimeout(passTimers.get(site)); passTimers.delete(site);
+  syn.brain.endPass(site, "ended_early");
+  syn.brain.noteAppEvent(`they went back to work (${cleanTitleForLog(fg.title)}) with ${left} min of break left, so Synapse ended the break`);
+  log(`break ended early: back to work in ${fg.app} with ${left} min left`);
+  pushConfig();
   layout();
+  if (mode !== "card") orb.webContents.send("orb", { type: "mode", mode, pass: passView() });
+  notice("Back at it — I stopped your break timer.", 2200);
+}
+function cleanTitleForLog(t: string) { return (t || "").replace(/\s+[-–—]\s+(Google Chrome|Microsoft.*Edge|Mozilla Firefox)$/i, "").slice(0, 60); }
+
+/**
+ * When a pass ends, close the distracting tab they're LOOKING AT (if the pass covered it and nothing
+ * else still does). Tabs in the background aren't touched: they get a gate the next time they're
+ * opened. And nothing is pulled to the front if they've already moved on to something else.
+ */
+function closeIfShowing(passSite: string, delay: number) {
+  setTimeout(async () => {
+    if (syn.brain.paused()) return;
+    const covers = (d: string | null) => !!d && (passSite === ANY_SITE || d === passSite) && !syn.brain.activePass(d);
+    const tab = helperSeesBrowser() ? bridge.activeTab() : null;
+    if (tab) {
+      let host = ""; try { host = new URL(tab.url).hostname; } catch { /* ignore */ }
+      const d = syn.brain.matchDistraction(host);
+      if (covers(d)) { cooldown.set(d!, Date.now() + 8000); bridge.close([tab.tabId]); log(`pass over: closed ${d} (helper)`); }
+      return;
+    }
+    const fg = await foreground();
+    if (!fg || !BROWSERS.test(fg.app)) return;          // they're elsewhere: nothing to close, nothing stolen
+    const d = siteOf(fg);
+    if (covers(d)) { cooldown.set(d!, Date.now() + 8000); closeSite(d!, fg); }
+  }, delay);
 }
 
 /* ---------------- the gate ---------------- */
@@ -273,6 +315,7 @@ function onTab(t: TabInfo) {
   const looking = t.active && t.focused;
 
   if (!site) {
+    bridge.release([t.tabId]);   // never leave a veil on a page that isn't a distraction (e.g. studio.youtube.com)
     // They left for something else while being asked — that's walking away, and it counts.
     if (gate && looking && !gate.judging) {
       clearTimeout(gate.backstop);
@@ -285,10 +328,21 @@ function onTab(t: TabInfo) {
   }
   if (syn.brain.activePass(site)) { bridge.release([t.tabId]); return; }
   bridge.hold([t.tabId]);
+  if (looking && gate && !gate.judging && site !== gate.site) { moveGate(site, t.title); return; }
   if (looking && !gate) {
     if (!coolingDown(site)) startGate(site, t.title, "helper");
     else recheckAfterCooldown(site);
   }
+}
+
+/** The gate follows them to the next distraction, keeping the time they had left. */
+function moveGate(site: string, pageTitle: string | undefined, target?: Foreground) {
+  if (!gate) return;
+  log(`gate moved: ${gate.site} → ${site}`);
+  syn.brain.logGate({ site, kind: "opened", text: pageTitle?.slice(0, 120) });
+  gate.site = site;
+  if (target) gate.target = target;
+  orb.webContents.send("orb", { type: "gate-site", site, name: siteName(site) });
 }
 
 function startGate(site: string, pageTitle: string | undefined, via: Gate["via"], target?: Foreground) {
@@ -339,7 +393,7 @@ async function closeSite(site: string, target?: Foreground) {
     else log(`close ${site}: no browser window to close (front app: ${fg?.app ?? "unknown"})`);
     return;
   }
-  const result = await closeBrowserTab(fg, (now) => siteOf(now) === site, (m) => log(`${site} ${m}`));
+  const result = await closeBrowserTab(fg, (now) => siteOf(now) === site, (m) => log(`${site} ${m}`), site);
   log(`close ${site}: ${result} (${fg.app})`);
   // Closed: a moment's grace for the browser to settle. Not closed: wait a bit before asking again.
   cooldown.set(site, Date.now() + (result === "closed" || result === "gone" ? 1500 : 5000));
@@ -362,7 +416,11 @@ async function argue(text: string) {
   log(`gate verdict: ${g.site} ${v.decision}${v.minutes ? ` ${v.minutes}m` : ""} (${v.source})`);
   g.transcript.push({ role: "user", text }, { role: "synapse", text: v.reply });
   g.judging = false;
-  if (gate !== g) return; // they walked away while I was thinking
+  if (gate !== g) {
+    // They walked away while I was thinking. If I said yes, the pass is real: track it anyway.
+    if (v.decision === "allow" && v.pass) { schedulePass(v.pass.site); pushConfig(); }
+    return;
+  }
   orb.webContents.send("orb", { type: "verdict", ...v });
   if (v.decision === "ask") armBackstop();
   else clearTimeout(g.backstop);
@@ -374,14 +432,17 @@ async function argue(text: string) {
     log(`gate deny: closing ${g.site}`);
     setTimeout(() => closeSite(g.site, g.target), 1600);
     setTimeout(() => { if (!gate && mode === "card") orb.webContents.send("orb", { type: "close-card" }); }, 3200);
+    recheckSoon(3600);
     return;
   }
   if (v.decision === "allow") {
     gate = null;
-    schedulePass(g.site);
+    const key = v.pass?.site ?? g.site;              // a break is free time ("*"), not just this site
+    schedulePass(key);
     pushConfig();
-    bridge.release(tabsOf(g.site));
-    setTimeout(() => layout("dock"), 2200);
+    bridge.release(tabsOf(key));
+    setTimeout(() => { if (!gate) layout("dock"); }, 2200);
+    recheckSoon(2400);
   } else if (v.decision === "crisis") {
     gate = null;
     bridge.release(tabsOf(g.site));
@@ -397,6 +458,12 @@ function gateTimeout() {
   gate = null;
   closeSite(site, target);
   notice(`Time's up. Closed ${siteName(site)}.`, 2500);
+  recheckSoon(3000);
+}
+
+/** After a gate ends: if they're sitting on another held distraction (helper), gate that one now. */
+function recheckSoon(ms: number) {
+  setTimeout(() => { const t = bridge.connected ? bridge.activeTab() : null; if (t && !gate) onTab(t); }, ms);
 }
 
 function gateLeave() {
@@ -423,8 +490,8 @@ function scheduleReachouts() {
     reachTimers.set(r.id, setTimeout(() => {
       reachTimers.delete(r.id);
       syn.brain.s.reachouts = syn.brain.s.reachouts.filter((x) => x.id !== r.id);
+      if (syn.brain.paused()) { syn.brain.s.reachouts.push({ ...r, at: (syn.brain.paused() ?? Date.now()) + 60_000 }); scheduleReachouts(); return; }
       syn.brain.addTurn("synapse", r.text, "ask");
-      if (syn.brain.paused()) { reachTimers.delete(r.id); syn.brain.s.reachouts.push({ ...r, at: (syn.brain.paused() ?? Date.now()) + 60_000 }); scheduleReachouts(); return; }
       if (!gate) notice(r.text, 9000);
       if (Notification.isSupported()) new Notification({ title: "Synapse", body: r.text, silent: true }).show();
     }, Math.max(1000, r.at - Date.now())));
@@ -477,7 +544,7 @@ async function ask(text: string, share: boolean) {
       bridge.release(tabsOf(c.site));
       if (gate && (c.site === ANY_SITE || c.site === gate.site)) { log(`gate ${gate.site} ended: pass granted in conversation`); endGate(); }
     }
-    else { clearTimeout(passTimers.get(c.site)); passTimers.delete(c.site); setTimeout(() => closeSite(c.site), 600); }
+    else { clearTimeout(passTimers.get(c.site)); passTimers.delete(c.site); closeIfShowing(c.site, 600); }
   }
   if ((r as { pauseChanged?: boolean }).pauseChanged) onPauseChanged();
   layout();
@@ -511,6 +578,9 @@ function siteOf(fg: Foreground): string | null {
   return syn.brain.matchTitle(fg.title);
 }
 
+/** Seconds since the last keyboard/mouse input. (Tests that fake the foreground window also fake "active".) */
+function idleSeconds() { return process.env.SYNAPSE_FAKE_FG ? 0 : powerMonitor.getSystemIdleTime(); }
+
 let watching = false;
 let lastBrowser: { fg: Foreground; at: number } | null = null;
 let lastObserve = 0;
@@ -533,11 +603,20 @@ async function watch() {
 
     if (Date.now() - lastObserve >= 5000) {
       lastObserve = Date.now();
-      syn.brain.observe({ app: fg.app, title: tab?.title || fg.title, url: tab?.url || fg.url, idleSec: powerMonitor.getSystemIdleTime() });
+      syn.brain.observe({ app: fg.app, title: tab?.title || fg.title, url: tab?.url || fg.url, idleSec: idleSeconds() });
     }
+    // On a break but back at real work for a solid minute? Then the break is over — end it and tuck away.
+    const idle = idleSeconds();
+    const back = idle < 180 ? syn.brain.backToWork({ app: fg.app, title: tab?.title || fg.title, url: tab?.url || fg.url }) : null;
+    if (back) endBreakEarly(back, fg);
     if (!isBrowser || helperSeesBrowser()) return;
 
     const site = siteOf(fg);
+    if (gate?.via === "window" && !gate.judging && site && site !== gate.site && !syn.brain.activePass(site)) {
+      // Hopped from one distraction to another: same gate, same clock — not "walking away".
+      moveGate(site, fg.title, fg);
+      return;
+    }
     if (gate?.via === "window" && !gate.judging && site !== gate.site) {
       // Same browser, different page now — they switched away on their own.
       clearTimeout(gate.backstop);

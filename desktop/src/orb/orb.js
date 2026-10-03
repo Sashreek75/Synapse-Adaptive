@@ -120,6 +120,7 @@ function openGate(m) {
   say(esc(m.opener));
   compose.hidden = actions.hidden = hint.hidden = false;
   input.disabled = false; sendBtn.disabled = false; sendBtn.textContent = "Make my case";
+  sendBtn.onclick = null; $("leave").hidden = false;     // undo a previous crisis card
   input.placeholder = `Why do you need ${m.name}, and for how long?`;
   hint.textContent = "The clock pauses while you type and while I think · Enter to send";
   setTimeout(() => input.focus(), 30);
@@ -150,6 +151,7 @@ function onVerdict(v) {
     barFill.style.width = "0";
     say(`${v.minutes}:00`, "big");
     say(esc(v.reply));
+    if (v.pass && v.pass.site === "*") { hint.hidden = false; hint.textContent = "Break time: every site is open until it runs out."; }
   } else if (v.decision === "crisis") {
     stopClock();
     compose.hidden = hint.hidden = count.hidden = true;
@@ -240,9 +242,10 @@ $("x").addEventListener("click", () => { if (view === "gate") { stopClock(); loc
 
 /* ---------- messages from the app ---------- */
 S.on((m) => {
-  if (m.type === "mode") { if (m.mode !== "card" && view !== "dock") { card.hidden = true; dock.hidden = false; view = "dock"; } if (view === "dock") renderDock(m.pass); }
+  if (m.type === "mode") { if (m.mode !== "card" && view !== "dock") { stopClock(); card.hidden = true; dock.hidden = false; view = "dock"; } if (view === "dock") renderDock(m.pass); }
   else if (m.type === "gate") openGate(m);
   else if (m.type === "verdict") onVerdict(m);
+  else if (m.type === "gate-site") { if (view === "gate") { input.placeholder = `Why do you need ${m.name}, and for how long?`; say(esc(`${m.name} now? Same clock.`)); } }
   else if (m.type === "timeout") { stopClock(); lockGate(); }
   else if (m.type === "close-card") { if (view === "gate") hideCard(); }
   else if (m.type === "gate-ended") {

@@ -59,5 +59,6 @@ export class Bridge extends EventEmitter {
   hold(tabIds: number[]) { if (tabIds.length) this.send({ cmd: "hold", tabIds }); }
   release(tabIds: number[]) { if (tabIds.length) this.send({ cmd: "release", tabIds }); }
   closeSite(site: string) { this.send({ cmd: "closeSite", site }); }
+  close(tabIds: number[]) { if (tabIds.length) this.send({ cmd: "close", tabIds }); }
   config(distractions: string[], passes: Record<string, number>) { this.send({ cmd: "config", distractions, passes }); }
 }

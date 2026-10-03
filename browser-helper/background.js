@@ -29,10 +29,14 @@ function retry() { setTimeout(connect, backoff); backoff = Math.min(backoff * 2,
 setInterval(() => send({ type: "ping" }), 20_000);
 
 function hostOf(url) { try { return new URL(url).hostname.replace(/^www\./, "").toLowerCase(); } catch { return ""; } }
-function matches(url) {
-  const h = hostOf(url);
-  return config.distractions.find((d) => h === d || h.endsWith("." + d)) || null;
+// The work-facing parts of distracting companies (studio.youtube.com, developers.facebook.com, …) are
+// not distractions. Must match WORK_SUBDOMAIN in the app's core/brain.ts.
+const WORK_SUBDOMAIN = /^(developers?|dev|docs|api|status|aws|help|support|business|ads|studio|creators?|partner|press|careers|investor|engineering)\./;
+function siteOfHost(h, list) {
+  if (!h || WORK_SUBDOMAIN.test(h)) return null;
+  return list.find((d) => h === d || h.endsWith("." + d)) || null;
 }
+function matches(url) { return siteOfHost(hostOf(url), config.distractions); }
 
 function veil(tabId, on) {
   if (on) held.add(tabId); else held.delete(tabId);
@@ -47,7 +51,7 @@ async function handle(m) {
   if (m.cmd === "close") await chrome.tabs.remove(m.tabIds || []).catch(() => {});
   if (m.cmd === "closeSite") {
     const tabs = await chrome.tabs.query({});
-    const ids = tabs.filter((t) => { const h = hostOf(t.url || ""); return h === m.site || h.endsWith("." + m.site); }).map((t) => t.id);
+    const ids = tabs.filter((t) => siteOfHost(hostOf(t.url || ""), [m.site])).map((t) => t.id);
     if (ids.length) await chrome.tabs.remove(ids).catch(() => {});
   }
 }

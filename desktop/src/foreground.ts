@@ -190,7 +190,7 @@ const wait = (ms: number) => new Promise((r) => setTimeout(r, ms));
  * macOS: ask the browser through AppleScript to close its active tab.
  * `stillThere` guards against closing the wrong tab if the user switched in the meantime.
  */
-export async function closeBrowserTab(target: Foreground, stillThere: (fg: Foreground) => boolean, log: (m: string) => void = () => {}): Promise<CloseResult> {
+export async function closeBrowserTab(target: Foreground, stillThere: (fg: Foreground) => boolean, log: (m: string) => void = () => {}, site?: string): Promise<CloseResult> {
   if (FAKE) {
     const now = fakeFg();
     if (!now || !stillThere(now)) return "gone";
@@ -219,9 +219,30 @@ export async function closeBrowserTab(target: Foreground, stillThere: (fg: Foreg
     return "minimized";
   }
   if (process.platform === "darwin") {
+    // The browser usually ISN'T frontmost here (the gate card has focus), so don't require it:
+    // ask that browser directly for the active tab of its front window, and close it only if it's
+    // still showing the site.
+    const app = target.appName;
+    if (!app) return "failed";
+    if (site && /^[a-z0-9.-]+$/i.test(site)) {
+      const tab = /^safari$/i.test(app) ? "current tab of front window" : "active tab of front window";
+      const out = await osa([
+        `tell application "${app}"`,
+        `  if (count of windows) is 0 then return "gone"`,
+        `  set t to ${tab}`,
+        `  if (URL of t) contains "${site}" then`,
+        `    close t`,
+        `    return "closed"`,
+        `  end if`,
+        `  return "gone"`,
+        `end tell`,
+      ].join("\n"));
+      if (out === "closed" || out === "gone") return out;
+      log(`close: AppleScript failed for ${app} (Automation permission?)`);
+      return "failed";
+    }
     const now = await foregroundMac();
-    const app = now && now.app === target.app ? now.appName ?? null : null;
-    if (!now || !app || !stillThere(now)) return "gone";
+    if (!now || now.app !== target.app || !stillThere(now)) return "gone";
     const script = /^safari$/i.test(app)
       ? `tell application "Safari" to close current tab of front window`
       : `tell application "${app}" to close active tab of front window`;

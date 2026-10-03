@@ -1,5 +1,6 @@
 /* Core tests with a scripted model — no network. `npm test` */
 import assert from "node:assert/strict";
+import { asksPermission, grantsPermission, claimsPermission } from "../../core/permission";
 import { createSynapse, saysDoneWorking, parsePauseCommand, Brain, type ModelCall } from "../../core/synapse";
 
 let clock = new Date("2026-09-30T14:00:00").getTime();
@@ -77,7 +78,7 @@ async function t(name: string, fn: () => Promise<void> | void) { await fn(); pas
   });
 
   await t("gate opener names what they're doing", () => {
-    assert.match(syn.gateOpener("youtube.com"), /Hold on\. You're in the middle of Research paper draft - Google Docs\. Why YouTube\?/);
+    assert.match(syn.gateOpener("youtube.com"), /in the middle of Research paper draft - Google Docs[\s\S]*YouTube/);
   });
 
   await t("a quick distraction visit does NOT erase the work before it", () => {
@@ -93,6 +94,9 @@ async function t(name: string, fn: () => Promise<void> | void) { await fn(); pas
     const v = await syn.judge({ site: "youtube.com", argument: "I've been working for an hour and I'm fried, need 60 minutes", transcript: [] });
     assert.equal(v.decision, "allow"); assert.equal(v.minutes, 30); assert.match(v.reply, /limit is 30/);
     assert.ok(b.activePass("youtube.com"));
+    assert.equal(v.pass?.site, "*", "a break covers every distracting site, not just YouTube");
+    assert.ok(b.activePass("deadshot.io"));
+    b.endPass("*", "ended_early");
     const prompt = calls[0].user;
     assert.match(prompt, /Research paper draft/); assert.match(prompt, /Goals:/); assert.match(prompt, /DISTRACTION GATE TODAY/);
     assert.match(prompt, /untrusted text/);
@@ -131,7 +135,7 @@ async function t(name: string, fn: () => Promise<void> | void) { await fn(); pas
   });
 
   await t("the gate and the conversation read the same picture", () => {
-    assert.match(syn.gateOpener("x.com"), /You're working on the research paper\. Why X\?/);
+    assert.match(syn.gateOpener("x.com"), /working on the research paper/); assert.match(syn.gateOpener("x.com"), /\bX\b/);
     const ctx = b.context({ purpose: "gate" });
     assert.match(ctx, /Finish the research paper/); assert.match(ctx, /I recommended: finish section 3 first/);
   });
@@ -163,7 +167,7 @@ async function t(name: string, fn: () => Promise<void> | void) { await fn(); pas
       : "Good work today. Sleep well.";
     await syn.ask("I'm done studying, gn");
     assert.equal(b.currentFocus(), null);
-    assert.match(syn.gateOpener("youtube.com"), /You said you were done for today/);
+    assert.match(syn.gateOpener("youtube.com"), /done for today|off the clock/);
     assert.match(b.context({ purpose: "gate" }), /OFF THE CLOCK/);
     assert.doesNotMatch(b.context({ purpose: "gate" }), /WORKING ON/);
     // ...until they start something again
@@ -179,6 +183,7 @@ async function t(name: string, fn: () => Promise<void> | void) { await fn(); pas
   });
 
   await t("the orb can change a pass when you ask", async () => {
+    for (const k of Object.keys(b.s.passes)) b.endPass(k, "ended_early");
     const yt = b.grantPass("youtube.com", 10, "break");
     const comp = '{"intent":"question","responseMode":"ANSWER","explicitClaims":[],"explicitRequests":["change pass"],"askedForAdvice":false,"askedToDecide":false,"askedForPlan":false,"constraints":[],"temporal":[],"unknowns":[],"contradictions":[]}';
     let reply = "Done — 20 minutes from now.\n[[pass: YouTube | 20]]";
@@ -239,8 +244,8 @@ async function t(name: string, fn: () => Promise<void> | void) { await fn(); pas
     assert.deepEqual(parsePauseCommand("chill mode for 45 min", at), { pause: 45 });
     assert.deepEqual(parsePauseCommand("turn off until tomorrow", at), { pause: 600 });
     assert.deepEqual(parsePauseCommand("pause", at), { pause: 60 });
-    assert.deepEqual(parsePauseCommand("resume", at), { resume: true });
-    assert.deepEqual(parsePauseCommand("I'm back", at), { resume: true });
+    assert.deepEqual(parsePauseCommand("resume", at, true), { resume: true });
+    assert.deepEqual(parsePauseCommand("I'm back", at, true), { resume: true });
     for (const no of ["should I pause my essay and do math?", "what's a good break length?", "i paused the video", "the off-by-one bug"]) assert.equal(parsePauseCommand(no, at), null, no);
   });
 
@@ -287,6 +292,175 @@ async function t(name: string, fn: () => Promise<void> | void) { await fn(); pas
     const r2 = await syn.ask("games for 15?");
     assert.deepEqual(r2.passChanges, [{ site: "*", minutes: 15 }]);
     b.endPass("*", "ended_early");
+  });
+
+
+  await t("a yes in the orb is a real yes, even when the model forgets the tag", async () => {
+    const comp = '{"intent":"question","responseMode":"ANSWER","explicitClaims":[],"explicitRequests":["play"],"askedForAdvice":false,"askedToDecide":false,"askedForPlan":false,"constraints":[],"temporal":[],"unknowns":[],"contradictions":[]}';
+    for (const k of Object.keys(b.s.passes)) b.endPass(k, "ended_early");
+    clock += 3 * 3600_000;
+    // Real transcript 1: "Yes, you can." with no tag → free time anyway
+    script = (c) => c.system?.startsWith("You are the comprehension layer") ? comp : "Yes, you can. It's your call—if there's nothing pressing you need to get done right now, go for it.";
+    const r = await syn.ask("so can I play games during the limited time I have?");
+    assert.deepEqual(r.passChanges, [{ site: "*", minutes: 20 }]);
+    assert.match(r.text, /Free time: 20 minutes/);
+    calls.length = 0;
+    const v = await syn.judge({ site: "deadshot.io", argument: "You said I could play games like a minute ago", transcript: [] });
+    assert.equal(v.decision, "allow"); assert.equal(calls.length, 0);
+    b.endPass("*", "ended_early");
+
+    // Real transcript 2: conditional yes about one named game → a pass for that game
+    clock += 3600_000;
+    script = (c) => c.system?.startsWith("You are the comprehension layer") ? comp : "You've worked for 20 minutes since your last break.\n\nIf you're truly clear on schoolwork and deadlines, and the FRQ is done, then yes, you can play Deadshot. If you're unsure about any lingering school tasks, it might be worth a quick check first.";
+    const r2 = await syn.ask("Hey, I'm in AP Stats now. We're just reviewing. I want to play deadshot. can I now?");
+    assert.deepEqual(r2.passChanges, [{ site: "deadshot.io", minutes: 20 }]);
+    calls.length = 0;
+    const v2 = await syn.judge({ site: "deadshot.io", argument: "OMG!! YOU JUST SAID I COULD PLAY!! DON'T SAY U DIDN'T", transcript: [] });
+    assert.equal(v2.decision, "allow"); assert.equal(calls.length, 0);
+    b.endPass("deadshot.io", "ended_early");
+
+    // An old yes the model never tagged (installed before this fix) is still honored once at the gate
+    clock += 3600_000;
+    b.addTurn("user", "can I watch youtube?", "ask"); b.addTurn("synapse", "Go for it.", "ask");
+    const v3 = await syn.judge({ site: "youtube.com", argument: "u said I can", transcript: [] });
+    assert.equal(v3.decision, "allow"); assert.match(v3.reply, /I said yes in the orb/);
+    b.endPass("youtube.com", "expired");
+    // …but once that pass is used up, the same yes doesn't open it again
+    const v4 = await syn.judge({ site: "youtube.com", argument: "you said I could", transcript: [] });
+    assert.equal(v4.decision, "deny");
+
+    // A false claim gets the actual quote, never "I didn't say that"
+    clock += 3600_000;
+    b.addTurn("user", "can I play roblox?", "ask"); b.addTurn("synapse", "Not yet — finish the FRQ first, then you can play.", "ask");
+    calls.length = 0;
+    script = () => '{"decision":"deny","minutes":null,"kind":null,"reply":"What I said was finish the FRQ first. Is it done?"}';
+    const v5 = await syn.judge({ site: "roblox.com", argument: "you said I could play", transcript: [] });
+    assert.equal(v5.decision, "deny"); assert.equal(calls.length, 1, "no yes on record → the judge decides, with the real quote");
+    assert.match(calls[0].user, /Your last orb reply \(exact\): "Not yet — finish the FRQ first/);
+
+    // The detectors themselves
+    for (const y of ["Yes, you can.", "Sure — 15 minutes.", "Go for it, 20 minutes.", "Okay, go ahead.", "You've earned it. Go ahead and play for 15."]) assert.ok(grantsPermission(y), y);
+    for (const n of ["No. Finish the paper.", "Not yet — finish the FRQ first, then you can play.", "After you submit it, you can play.", "You can't, you have a test tomorrow.", "Hold on — why now?"]) assert.ok(!grantsPermission(n), n);
+    for (const a of ["can I play games?", "is it ok if I watch youtube", "can I hop on deadshot", "I want to play deadshot. can I now?"]) assert.ok(asksPermission(a, ["deadshot", "YouTube"]), a);
+    for (const a of ["can I ask you something about my essay", "how do I fix this bug"]) assert.ok(!asksPermission(a), a);
+    for (const c of ["you said I could", "U JUST SAID I COULD PLAY", "you literally told me I can", "you let me earlier"]) assert.ok(claimsPermission(c), c);
+    assert.ok(!claimsPermission("I need this video for class"));
+  });
+
+  await t("audit: breaks, follow-ups, pauses, done-working and pass counting behave like a person expects", async () => {
+    const comp = '{"intent":"question","responseMode":"ANSWER","explicitClaims":[],"explicitRequests":["x"],"askedForAdvice":false,"askedToDecide":false,"askedForPlan":false,"constraints":[],"temporal":[],"unknowns":[],"contradictions":[]}';
+    for (const k of Object.keys(b.s.passes)) b.endPass(k, "ended_early");
+    clock += 3 * 3600_000;
+
+    // A break at the gate covers every distracting site, not just the one they opened
+    script = () => '{"decision":"allow","minutes":15,"kind":"break","reply":"You earned it. 15 minutes."}';
+    let v = await syn.judge({ site: "youtube.com", argument: "I need a break, I'm gonna go on youtube", transcript: [] });
+    assert.equal(v.pass?.site, "*"); assert.ok(b.activePass("roblox.com")); assert.ok(b.activePass("reddit.com"));
+    b.endPass("*", "ended_early");
+    // ...even when the model leaves out the kind
+    script = () => '{"decision":"allow","minutes":10,"reply":"Okay. Ten."}';
+    v = await syn.judge({ site: "youtube.com", argument: "my brain is fried, I need a quick break", transcript: [] });
+    assert.equal(v.pass?.site, "*");
+    b.endPass("*", "ended_early");
+    // A task stays one site
+    script = () => '{"decision":"allow","minutes":20,"kind":"task","reply":"Go watch it."}';
+    v = await syn.judge({ site: "youtube.com", argument: "my teacher assigned a 20 min lecture video for class", transcript: [] });
+    assert.equal(v.pass?.site, "youtube.com"); assert.equal(b.activePass("reddit.com"), null);
+    // Time on a task pass is work, not a break
+    const before = b.workStats().sinceBreakMin;
+    for (let i = 0; i < 80; i++) { clock += 5000; b.observe({ app: "chrome.exe", title: "Lecture 4 - YouTube - Google Chrome", idleSec: 1 }); }
+    assert.ok(b.workStats().sinceBreakMin >= before + 6, "lecture time counts as work");
+    b.endPass("youtube.com", "ended_early");
+
+    // Orb: "I need a break, I'll go on YouTube" → free time, not a YouTube-only pass
+    script = (c) => c.system?.startsWith("You are the comprehension layer") ? comp : "Yeah, take 15 minutes — you've earned it.";
+    let r = await syn.ask("I need a break, can I go on youtube for a bit?");
+    assert.deepEqual(r.passChanges, [{ site: "*", minutes: 15 }]);
+    b.endPass("*", "ended_early");
+
+    // Orb asks a follow-up first, then says yes → still a real yes
+    clock += 3600_000;
+    script = (c) => c.system?.startsWith("You are the comprehension layer") ? comp : "How long have you been working?";
+    await syn.ask("can I play deadshot?");
+    script = (c) => c.system?.startsWith("You are the comprehension layer") ? comp : "Okay, go for it — 20 minutes.";
+    r = await syn.ask("like an hour on my essay");
+    assert.deepEqual(r.passChanges, [{ site: "deadshot.io", minutes: 20 }]);
+    b.endPass("deadshot.io", "ended_early");
+
+    // The minutes Synapse said, not the minutes they worked
+    script = (c) => c.system?.startsWith("You are the comprehension layer") ? comp : "Yes — you've worked 50 min. Take 10.";
+    r = await syn.ask("should I take a break?");
+    assert.deepEqual(r.passChanges, [{ site: "*", minutes: 10 }]);
+    assert.doesNotMatch(r.text, /Free time: \d+ minutes/, "it already said the time");
+    b.endPass("*", "ended_early");
+
+    // Asking about work tools isn't a request to be let onto a distraction
+    script = (c) => c.system?.startsWith("You are the comprehension layer") ? comp : "Of course — that's work.";
+    r = await syn.ask("Can I go on Google Docs to finish my essay?");
+    assert.deepEqual(r.passChanges, []);
+
+    // Extending a pass is not a second pass
+    const p0 = b.today().passes;
+    b.grantPass("youtube.com", 10, "lecture"); b.grantPass("youtube.com", 20, "longer than I thought");
+    assert.equal(b.today().passes, p0 + 1);
+    b.endPass("youtube.com", "ended_early");
+
+    // twitter.com and x.com are the same site
+    b.grantPass("twitter.com", 5, "reply to my teacher"); assert.ok(b.activePass("x.com")); b.endPass("twitter.com", "ended_early");
+
+    // Everyday phrases don't pause Synapse
+    for (const no of ["chill I'm literally doing my homework", "relax, I'm doing it", "off topic but how do I cite a website", "Off to finish my essay",
+      "pause the video, i need to ask something", "stop blocking youtube, I need it for class", "I need to pause for a sec and think"])
+      assert.equal(parsePauseCommand(no, clock), null, no);
+    // ...and "I'm back, what was I doing?" is a question, not a resume, especially when not paused
+    assert.equal(parsePauseCommand("I'm back, what was I working on?", clock, true), null);
+    assert.equal(parsePauseCommand("I'm back", clock, false), null);
+    assert.ok(parsePauseCommand("pause synapse", clock)?.pause);
+    const nine = new Date(clock); nine.setHours(21, 0, 0, 0); if (nine.getTime() <= clock) nine.setDate(nine.getDate() + 1);
+    assert.equal(parsePauseCommand("pause until 9pm", clock)?.pause, Math.min(16 * 60, Math.round((nine.getTime() - clock) / 60000)));
+
+    // "Done" that isn't done for the day
+    for (const no of ["I'm done with my math homework, starting chem now", "done working on the intro, onto the body", "I'm not done studying but I need a break", "I want a good night's sleep so let me finish fast"])
+      assert.equal(saysDoneWorking(no), false, no);
+    for (const yes of ["done studying, gn", "I'm done for today", "calling it a night", "good night synapse"]) assert.equal(saysDoneWorking(yes), true, yes);
+
+    // At the gate, normal phrasing isn't a "you said I could" claim
+    for (const no of ["could you let me watch the AP Bio lecture? it's assigned", "like you said, I've been working an hour", "you told me to take breaks when I'm tired"])
+      assert.equal(claimsPermission(no), false, no);
+
+    // Offline judge reads the whole exchange ("How many minutes?" → "15 minutes")
+    script = () => null; clock += 24 * 3600_000;
+    v = await syn.judge({ site: "reddit.com", argument: "15 minutes", transcript: [{ role: "user", text: "I studied for two hours for my chem test and I'm exhausted, I need a break" }, { role: "synapse", text: "How many minutes, exactly?" }] });
+    assert.equal(v.decision, "allow"); assert.equal(v.minutes, 15);
+    for (const k of Object.keys(b.s.passes)) b.endPass(k, "ended_early");
+  });
+
+  await t("work that runs past midnight still counts toward the streak", () => {
+    let c = new Date("2026-10-01T23:30:00").getTime();
+    const m2 = { json: null as string | null };
+    const bb = new Brain({ load: () => m2.json, save: (j) => { m2.json = j; } }, () => c);
+    for (let i = 0; i < 12 * 50; i++) { c += 5000; bb.observe({ app: "winword.exe", title: "Essay.docx - Word", idleSec: 1 }); }
+    const w = bb.workStats();
+    assert.ok(w.sinceBreakMin >= 45, `since break ${w.sinceBreakMin}`);
+    assert.ok(w.todayMin <= 25, `today ${w.todayMin}`);
+  });
+
+  await t("going back to work during a break ends the break", () => {
+    for (const k of Object.keys(b.s.passes)) b.endPass(k, "ended_early");
+    clock += 3600_000;
+    b.grantPass("*", 15, "need a break", "break");
+    const look = (app: string, title: string, secs: number) => { let r: string | null = null; for (let i = 0; i < secs; i++) { clock += 1000; r = b.backToWork({ app, title }) ?? r; } return r; };
+    assert.equal(look("winword.exe", "Essay.docx - Word", 50), null, "not in the first minute of a break");
+    assert.equal(look("chrome.exe", "Lofi - YouTube - Google Chrome", 120), null, "on a distraction: still on break");
+    assert.equal(look("winword.exe", "Essay.docx - Word", 30), null, "a quick glance at work doesn't end it");
+    assert.equal(look("chrome.exe", "Lofi - YouTube - Google Chrome", 5), null);
+    assert.equal(look("explorer.exe", "", 90), null, "the desktop isn't work");
+    assert.equal(look("chrome.exe", "Essay - Google Docs - Google Chrome", 65), "*", "a solid minute back on work ends the break");
+    b.endPass("*", "ended_early");
+    // A lecture pass isn't a break: switching to notes doesn't end it
+    b.grantPass("youtube.com", 20, "lecture for class", "task");
+    assert.equal(look("winword.exe", "Lecture notes.docx - Word", 180), null);
+    b.endPass("youtube.com", "ended_early");
   });
 
   await t("state survives a restart", () => {
