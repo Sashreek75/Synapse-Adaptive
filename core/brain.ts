@@ -13,9 +13,9 @@
 export interface Goal { id: string; title: string; deadline?: string; createdAt: number; doneAt?: number }
 /** "break" = rest/free time; "task" = a site they need for something specific (a lecture, a reply). */
 export type PassKind = "break" | "task";
-export interface Pass { site: string; minutes: number; grantedAt: number; expiresAt: number; reason: string; kind?: PassKind }
+export interface Pass { site: string; minutes: number; grantedAt: number; expiresAt: number; reason: string; kind?: PassKind; /** Synapse saw they were working and let them in by itself. */ auto?: boolean }
 export type GateKind = "opened" | "pass" | "extended" | "deny" | "ask" | "timeout" | "walked_away" | "expired" | "ended_early";
-export interface GateEvent { ts: number; site: string; kind: GateKind; minutes?: number; text?: string }
+export interface GateEvent { ts: number; site: string; kind: GateKind; minutes?: number; text?: string; passKind?: PassKind }
 export interface Turn { ts: number; role: "user" | "synapse"; text: string; surface: "ask" | "gate" | "onboarding" }
 export interface Segment { app: string; title: string; site?: string; start: number; end: number; onPass?: PassKind }
 export interface Reachout { id: string; at: number; text: string }
@@ -25,6 +25,8 @@ export interface Settings {
   distractions: string[];
   windowSeconds: number;
   maxMinutes: number;
+  /** Longest pass for USING a site for work (study videos, a lecture). Breaks use maxMinutes. */
+  maxTaskMinutes?: number;
   shareScreen: boolean;
   defaultsVersion?: number;
 }
@@ -36,8 +38,11 @@ export interface BrainState {
   settings: Settings;
   goals: Goal[];
   focus?: { text: string; setAt: number };
+  /** Things they said they plan or might do ("also might study for the PSAT"). */
+  plans?: { text: string; ts: number }[];
   /** They told us they're done working ("done studying, gn"). Synapse treats them as off the clock. */
-  offClock?: { since: number; said: string };
+  /** Their work is done: Synapse stops gating entirely until they start working again (or the next morning). */
+  offClock?: { since: number; said: string; until?: number };
   /** They asked Synapse to leave them alone for a while. No gates, no watching, no check-ins. */
   pausedUntil?: number;
   memory: {
@@ -71,6 +76,7 @@ const FOCUS_IDLE_RESET_SEC = 30 * 60;   // away this long and "what they're work
 const OFF_CLOCK_MS = 10 * 3600_000;     // "done for the day" lasts this long at most (until the next day)
 const SEGMENT_GAP_MS = 20_000;          // samples further apart than this start a new segment
 const KEEP_ACTIVITY_MS = 24 * 3600_000;
+const INDEFINITE_MS = 365 * 24 * 3600_000;   // "/pause" with no time: until they /reset
 const BACK_TO_WORK_MS = 60_000;            // a solid minute back on real work during a break = the break is over
 const BREAK_MIN_BEFORE_RETURN_MS = 60_000; // …but not in the first minute of the break
 
@@ -130,7 +136,19 @@ export function saysDoneWorking(text: string): boolean {
     || /(^\s*gn\b|\bgn[\s!.]*$)/.test(t)
     || /\b(good ?night|nighty? ?night)\b(?!'s)(?! sleep)/.test(t) && t.split(/\s+/).length <= 8
     || /\b(going|heading|off) to (bed|sleep)\b/.test(t)
-    || /\bday'?s (done|over)\b/.test(t);
+    || /\bday'?s (done|over)\b/.test(t)
+    // "all my work is done", "finished all my homework", "done with everything", "nothing left to do", "no homework tonight"
+    || /\b(all|everything)\b[^.!?]{0,25}\b(done|finished|submitted|turned in|complete)\b/.test(t) && /\b(work|homework|hw|assignments?|everything|all of it|stuff|tasks?)\b/.test(t)
+    || /\b(done|finished)\s+(with\s+)?(all|everything|all my (work|homework|hw|assignments|stuff))\b/.test(t)
+    || /\bnothing\s+(else\s+|left\s+|more\s+)?(to do|due|left)\b/.test(t) && !/\b(in class|right now|for now|till|until)\b/.test(t)
+    || /\bno\s+(more\s+)?(homework|hw|work|assignments)\s*(left|today|tonight|due|to do)?\b/.test(t) && !/\bno (homework|work) (for|in) (this|the) (class|period)\b/.test(t);
+}
+
+/** "ok back to work", "starting my essay now", "time to study" — they're working again. */
+export function saysBackToWork(text: string): boolean {
+  const t = text.toLowerCase().replace(/[’']/g, "'");
+  if (/(\bnot\b|n't\b|\blater\b|\btomorrow\b)/.test(t)) return false;
+  return /\b(back to work|back to studying|get(ting)? back to (it|work)|time to (work|study|start)|let'?s (work|study|get to work|start)|starting (on |my |the )|gonna (start|work|study)|going to (start|work|study)|about to (start|work|study)|abt to (start|work|study|kick off)|kick(ing)? off)\b/.test(t);
 }
 
 /** Remove the browser's own name (and Edge's profile name) from the end of a window title. */
@@ -210,6 +228,7 @@ export class Brain {
     this.s.activity = this.s.activity.filter((a) => t - a.end < KEEP_ACTIVITY_MS);
     this.s.gateLog = this.s.gateLog.filter((e) => t - e.ts < 14 * 86400_000).slice(-500);
     this.s.turns = this.s.turns.slice(-60);
+    this.s.plans = (this.s.plans ?? []).filter((p) => t - p.ts < 16 * 3600_000).slice(-12);
     this.s.appEvents = this.s.appEvents.slice(-50);
     for (const [k, p] of Object.entries(this.s.passes)) if (p.expiresAt < t) delete this.s.passes[k];
     for (const key of ["principles", "mindshifts", "observations", "calls"] as const) (this.s.memory[key] as unknown[]) = this.s.memory[key].slice(-40);
@@ -342,12 +361,27 @@ export class Brain {
     if (u <= this.now()) { this.s.pausedUntil = undefined; this.noteAppEvent("pause ended"); return null; }
     return u;
   }
-  pause(minutes: number) {
-    this.s.pausedUntil = this.now() + Math.max(1, Math.min(16 * 60, Math.round(minutes))) * 60_000;
-    this.noteAppEvent(`they paused Synapse until ${new Date(this.s.pausedUntil).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}`);
+  /** `null` = paused until they turn it back on (/reset). */
+  pause(minutes: number | null) {
+    this.s.pausedUntil = minutes == null ? this.now() + INDEFINITE_MS : this.now() + Math.max(1, Math.min(16 * 60, Math.round(minutes))) * 60_000;
+    this.noteAppEvent(minutes == null ? "they paused Synapse until they turn it back on (/pause)" : `they paused Synapse until ${new Date(this.s.pausedUntil).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}`);
     this.touch();
     return this.s.pausedUntil;
   }
+  /** Paused with no end time (only /reset turns it back on). */
+  pausedIndefinitely(): boolean { const u = this.paused(); return !!u && u - this.now() > 24 * 3600_000; }
+
+  /** /reset: Synapse takes back control — unpaused, not in "work's done", no passes or free time running. */
+  reset(): string[] {
+    this.s.pausedUntil = undefined;
+    this.s.offClock = undefined;
+    const ended = Object.keys(this.s.passes);
+    for (const k of ended) this.endPass(k, "ended_early");
+    this.noteAppEvent("they used /reset: Synapse is fully back on (no pause, no free time, no passes)");
+    this.touch();
+    return ended;
+  }
+
   resume() {
     if (!this.s.pausedUntil) return;
     this.s.pausedUntil = undefined;
@@ -355,11 +389,11 @@ export class Brain {
     this.touch();
   }
 
-  /** Off the clock until they start something new, or ~10 hours pass (the next day). */
-  offClock(): { since: number; said: string } | null {
+  /** Work's done: free until they start something new, or 5 AM the next day. */
+  offClock(): { since: number; said: string; until?: number } | null {
     const o = this.s.offClock;
     if (!o) return null;
-    if (this.now() - o.since > OFF_CLOCK_MS) { this.s.offClock = undefined; return null; }
+    if (this.now() > (o.until ?? o.since + OFF_CLOCK_MS)) { this.s.offClock = undefined; return null; }
     return o;
   }
 
@@ -367,7 +401,17 @@ export class Brain {
   endWork(said: string) {
     this.s.focus = undefined;
     this.s.workStreakStart = undefined;
-    this.s.offClock = { since: this.now(), said: said.slice(0, 160) };
+    const until = new Date(this.now()); if (until.getHours() >= 5) until.setDate(until.getDate() + 1); until.setHours(5, 0, 0, 0);
+    this.s.offClock = { since: this.now(), said: said.slice(0, 160), until: until.getTime() };
+    this.noteAppEvent(`they said their work was done ("${said.slice(0, 80)}"), so Synapse stopped gating until they start working again`);
+    this.touch();
+  }
+
+  /** "OK back to work" — free time is over; the gate is back on. */
+  clockBackIn(said: string) {
+    if (!this.s.offClock) return;
+    this.s.offClock = undefined;
+    this.noteAppEvent(`they started working again ("${said.slice(0, 80)}")`);
     this.touch();
   }
 
@@ -393,6 +437,8 @@ export class Brain {
     return this.s.settings.distractions.find((d) => siteName(d).toLowerCase() === n || d.split(".")[0] === n) ?? null;
   }
 
+  taskLimit() { return Math.max(this.s.settings.maxMinutes, this.s.settings.maxTaskMinutes ?? 60); }
+
   /** A pass for this site — or free time, which covers every site. */
   activePass(site: string): Pass | null {
     const t = this.now();
@@ -403,7 +449,8 @@ export class Brain {
 
   logGate(ev: Omit<GateEvent, "ts">) { this.s.gateLog.push({ ts: this.now(), ...ev }); this.touch(); }
 
-  grantPass(site: string, minutes: number, reason: string, kind: PassKind = site === ANY_SITE ? "break" : "task"): Pass {
+  /** `auto`: Synapse saw they were working and let them be — quiet, not logged as a pass they asked for. */
+  grantPass(site: string, minutes: number, reason: string, kind: PassKind = site === ANY_SITE ? "break" : "task", auto = false): Pass {
     const t = this.now();
     const prev = this.s.passes[site] && this.s.passes[site].expiresAt > t ? this.s.passes[site] : null;
     if (prev) {
@@ -412,12 +459,15 @@ export class Brain {
       prev.expiresAt = t + minutes * 60_000;
       prev.minutes = Math.round((prev.expiresAt - prev.grantedAt) / 60_000);
       if (kind === "break") prev.kind = "break";
-      this.logGate({ site, kind: "extended", minutes: Math.round((prev.expiresAt - before) / 60_000), text: reason.slice(0, 240) });
+      if (!auto && prev.auto) { prev.auto = false; prev.reason = reason.slice(0, 240); }   // they asked for it now: a real pass
+      if (auto) return prev;
+      this.logGate({ site, kind: "extended", minutes: Math.round((prev.expiresAt - before) / 60_000), text: reason.slice(0, 240), passKind: prev.kind });
       return prev;
     }
-    const p: Pass = { site, minutes, reason: reason.slice(0, 240), grantedAt: t, expiresAt: t + minutes * 60_000, kind };
+    const p: Pass = { site, minutes, reason: reason.slice(0, 240), grantedAt: t, expiresAt: t + minutes * 60_000, kind, ...(auto ? { auto: true } : {}) };
     this.s.passes[site] = p;
-    this.logGate({ site, kind: "pass", minutes, text: reason.slice(0, 240) });
+    if (auto) { this.touch(); return p; }
+    this.logGate({ site, kind: "pass", minutes, text: reason.slice(0, 240), passKind: kind });
     return p;
   }
 
@@ -453,16 +503,31 @@ export class Brain {
     this.logGate({ site, kind });
   }
 
+  /** Was there any real work on this computer today before `ts`? (A pass before the work day started isn't a break from work.) */
+  workedBefore(ts: number): boolean {
+    const from = dayStart(this.now());
+    return this.s.activity.some((a) => a.start >= from && a.start < ts && (!a.site || a.onPass === "task") && !SYSTEM_APPS.test(a.app) && a.end - a.start >= 60_000);
+  }
+
   today() {
     const from = dayStart(this.now());
     const ev = this.s.gateLog.filter((e) => e.ts >= from);
     const passes = ev.filter((e) => e.kind === "pass");
+    const kindOf = (e: GateEvent): PassKind => e.passKind ?? (e.site === ANY_SITE ? "break" : "task");
+    const isBreak = (e: GateEvent) => kindOf(e) === "break";
+    const breaks = passes.filter(isBreak);
+    const counted = breaks.filter((e) => this.workedBefore(e.ts));           // breaks before the work day don't raise the bar
+    const ext = (pred: (e: GateEvent) => boolean) => ev.filter((e) => e.kind === "extended" && pred(e)).reduce((a, e) => a + Math.max(0, e.minutes ?? 0), 0);
+    const at = (ts: number) => new Date(ts).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
     return {
       passes: passes.length,
-      minutes: passes.reduce((a, e) => a + (e.minutes ?? 0), 0) + ev.filter((e) => e.kind === "extended").reduce((a, e) => a + Math.max(0, e.minutes ?? 0), 0),
+      minutes: passes.reduce((a, e) => a + (e.minutes ?? 0), 0) + ext(() => true),
+      breakPasses: counted.length,
+      breakMinutes: counted.reduce((a, e) => a + (e.minutes ?? 0), 0) + ext(isBreak),
+      taskPasses: passes.length - breaks.length,
       denials: ev.filter((e) => e.kind === "deny" || e.kind === "timeout").length,
       walkedAway: ev.filter((e) => e.kind === "walked_away").length,
-      reasons: passes.map((e) => `${siteName(e.site)} ${e.minutes}m: "${e.text ?? ""}"`),
+      reasons: passes.map((e) => `${at(e.ts)} ${siteName(e.site)} ${e.minutes}m, ${isBreak(e) ? (this.workedBefore(e.ts) ? "break" : "free time before their work day started") : "task (using the site for work)"}: "${e.text ?? ""}"`),
     };
   }
 
@@ -488,6 +553,7 @@ export class Brain {
         const g = this.s.goals.find((g) => !g.doneAt && (g.title.toLowerCase().includes(a.toLowerCase()) || a.toLowerCase().includes(g.title.toLowerCase())));
         if (g) g.doneAt = t;
       } else if (kind === "focus") this.startWork(a);
+      else if (kind === "plan") { this.s.plans = [...(this.s.plans ?? []).filter((p) => p.text.toLowerCase() !== a.toLowerCase()), { text: a.slice(0, 160), ts: t }]; }
       else if (kind === "done-working") this.endWork(a);
       else if (kind === "distraction") { const d = cleanSite(a); if (d.includes(".") && !this.s.settings.distractions.includes(d)) this.s.settings.distractions.push(d); }
       else if (kind === "reachout") {
@@ -517,9 +583,10 @@ export class Brain {
           if (this.s.passes[key]) { this.endPass(key, "ended_early"); passChanges.push({ site: key, minutes: 0 }); }
           continue;
         }
-        const minutes = Math.min(n, this.s.settings.maxMinutes);
         // Changing "the pass" while what they have is free time changes the free time.
         const key = site !== ANY_SITE && !((this.s.passes[site]?.expiresAt ?? 0) > t) && (this.s.passes[ANY_SITE]?.expiresAt ?? 0) > t ? ANY_SITE : site;
+        const isTask = key !== ANY_SITE && (this.s.passes[key]?.kind ?? "task") === "task";
+        const minutes = Math.min(n, isTask ? this.taskLimit() : this.s.settings.maxMinutes);
         this.grantPass(key, minutes, "changed in conversation", key === ANY_SITE ? "break" : "task");
         passChanges.push({ site: key, minutes });
       }
@@ -547,13 +614,21 @@ export class Brain {
       : "Goals: none captured yet.");
 
     const pausedUntil = this.paused();
-    if (pausedUntil) lines.push(`PAUSED: they turned Synapse off until ${new Date(pausedUntil).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })} to relax. Don't push work on them.`);
+    if (pausedUntil) lines.push(this.pausedIndefinitely()
+      ? `PAUSED: they turned Synapse off with /pause, until they turn it back on with /reset. No gates, no pushing work. If they want you back on, tell them to type /reset.`
+      : `PAUSED: they turned Synapse off until ${new Date(pausedUntil).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })} to relax. Don't push work on them.`);
     const off = this.offClock();
-    if (off) lines.push(`OFF THE CLOCK: at ${new Date(off.since).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })} they said they were done working ("${off.said}"). Don't treat them as mid-task; they're winding down unless they say otherwise.`);
+    if (off) {
+      const due = this.s.goals.filter((g) => !g.doneAt && g.deadline && new Date(g.deadline + "T23:59").getTime() - t < 36 * 3600_000);
+      lines.push(`WORK'S DONE — FREE TIME: at ${new Date(off.since).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })} they said their work was done ("${off.said}"). Synapse is not stopping them on any site until they start working again (or 5 AM). Don't push work on them; let them enjoy it.` +
+        (due.length ? ` Goals due soon that aren't marked done: ${due.map((g) => g.title).join("; ")} — if it comes up naturally, you can check once, lightly; never nag.` : ""));
+    }
     const focus = this.currentFocus();
     if (focus) lines.push(focus.source === "stated"
       ? `WORKING ON (they told you, ${mins(t - (this.s.focus?.setAt ?? t))} min ago): ${focus.text}`
       : `WORKING ON (inferred from their screen, not stated): ${focus.text}`);
+    const plans = (this.s.plans ?? []).filter((p) => t - p.ts < 16 * 3600_000);
+    if (plans.length) lines.push(`PLANNED TODAY (they told you; tentative ones count): ${plans.map((p) => `${p.text} (said ${new Date(p.ts).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })})`).join("; ")}`);
 
     const w = this.workStats();
     const hm = (m: number) => (m >= 60 ? `${Math.floor(m / 60)}h ${m % 60}m` : `${m} min`);
@@ -565,13 +640,13 @@ export class Brain {
       (windows.length ? `\nLast hour, by time:\n${windows.map((w) => `- ${w.label}: ${w.minutes} min${w.distraction ? " [distraction]" : ""}`).join("\n")}` : "\nNo activity recorded in the last hour."));
 
     const d = this.today();
-    lines.push(`DISTRACTION GATE TODAY: ${d.passes} passes (${d.minutes} min), ${d.denials} denied or timed out, ${d.walkedAway} times they walked away on their own.` +
-      (d.reasons.length ? `\nReasons that got them in today:\n- ${d.reasons.slice(-5).join("\n- ")}` : ""));
+    lines.push(`DISTRACTION GATE TODAY: ${d.breakPasses} break passes during their work day (${d.breakMinutes} min), ${d.taskPasses} task passes (using a site for work — not breaks), ${d.denials} denied or timed out, ${d.walkedAway} times they walked away on their own.` +
+      (d.reasons.length ? `\nPasses today:\n- ${d.reasons.slice(-6).join("\n- ")}` : ""));
     const live = Object.values(this.s.passes).filter((p) => p.expiresAt > t);
     if (live.length) lines.push(`ACTIVE PASS: ${live.map((p) => p.site === ANY_SITE
       ? `FREE TIME — every distracting site is open, ${Math.ceil((p.expiresAt - t) / 60_000)} min left of ${p.minutes}`
       : `${siteName(p.site)} (${p.site}), ${Math.ceil((p.expiresAt - t) / 60_000)} min left of ${p.minutes}`).join("; ")}`);
-    lines.push(`PASS LIMIT: the longest pass they've allowed is ${this.s.settings.maxMinutes} min.`);
+    lines.push(`PASS LIMIT: breaks up to ${this.s.settings.maxMinutes} min; using a site for work (a task) up to ${this.taskLimit()} min.`);
 
     const mem = this.s.memory;
     const memLines = [

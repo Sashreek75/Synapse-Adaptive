@@ -44,8 +44,8 @@ function renderDock(p) {
 
   if (p) {
     const left = p.expiresAt - Date.now();
-    chip.textContent = p.paused ? `Paused · ${fmt(left)}` : `${p.name} ${fmt(left)}`;
-    dockOrb.dataset.state = !p.paused && left < 60_000 ? "urgent" : "";
+    chip.textContent = p.label ? p.name : p.paused ? (p.name === "Paused" && !p.open ? `Paused · ${fmt(left)}` : p.name) : `${p.name} ${fmt(left)}`;
+    dockOrb.dataset.state = !p.paused && !p.label && left < 60_000 ? "urgent" : "";
   } else dockOrb.dataset.state = "";
   dock.classList.toggle("paused", !!(p && p.paused));
 }
@@ -149,7 +149,7 @@ function onVerdict(v) {
     stopClock(); lockGate();
     compose.hidden = actions.hidden = hint.hidden = count.hidden = true;
     barFill.style.width = "0";
-    say(`${v.minutes}:00`, "big");
+    say(v.free ? "Free" : `${v.minutes}:00`, "big");
     say(esc(v.reply));
     if (v.pass && v.pass.site === "*") { hint.hidden = false; hint.textContent = "Break time: every site is open until it runs out."; }
   } else if (v.decision === "crisis") {

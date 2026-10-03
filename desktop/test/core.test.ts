@@ -1,7 +1,8 @@
 /* Core tests with a scripted model — no network. `npm test` */
 import assert from "node:assert/strict";
+import { useClaim } from "../../core/intent";
 import { asksPermission, grantsPermission, claimsPermission } from "../../core/permission";
-import { createSynapse, saysDoneWorking, parsePauseCommand, Brain, type ModelCall } from "../../core/synapse";
+import { createSynapse, saysDoneWorking, parsePauseCommand, Brain, offlineJudge, pageOnly, isGenericPage, type ModelCall } from "../../core/synapse";
 
 let clock = new Date("2026-09-30T14:00:00").getTime();
 const now = () => clock;
@@ -105,7 +106,9 @@ async function t(name: string, fn: () => Promise<void> | void) { await fn(); pas
   await t("offline: vague denied, specific allowed with a cap", async () => {
     script = () => null;
     let v = await syn.judge({ site: "reddit.com", argument: "just for a sec", transcript: [] });
-    assert.equal(v.decision, "deny"); assert.equal(v.source, "offline");
+    assert.equal(v.decision, "ask", "offline, a vague reason gets one follow-up question first"); assert.equal(v.source, "offline");
+    v = await syn.judge({ site: "reddit.com", argument: "just for a sec", transcript: [{ role: "synapse", text: v.reply }] });
+    assert.equal(v.decision, "deny");
     v = await syn.judge({ site: "reddit.com", argument: "I've been studying for two hours and I'm exhausted, I need a 10 minute break", transcript: [] });
     assert.equal(v.decision, "allow"); assert.equal(v.minutes, 10);
   });
@@ -130,7 +133,7 @@ async function t(name: string, fn: () => Promise<void> | void) { await fn(); pas
     assert.equal(r.reachouts.length, 1);
     const mainCall = calls.find((c) => c.system?.includes("THIS TURN HAS A RESPONSE MODE"))!;
     assert.match(mainCall.user, /THEIR SCREEN RIGHT NOW/); assert.match(mainCall.user, /section 3 half written/);
-    assert.match(mainCall.user, /Reasons that got them in today/);
+    assert.match(mainCall.user, /Passes today/);
     assert.equal(calls.find((c) => c.images)?.images?.[0].data, "AAAA");
   });
 
@@ -168,7 +171,7 @@ async function t(name: string, fn: () => Promise<void> | void) { await fn(); pas
     await syn.ask("I'm done studying, gn");
     assert.equal(b.currentFocus(), null);
     assert.match(syn.gateOpener("youtube.com"), /done for today|off the clock/);
-    assert.match(b.context({ purpose: "gate" }), /OFF THE CLOCK/);
+    assert.match(b.context({ purpose: "gate" }), /WORK'S DONE/);
     assert.doesNotMatch(b.context({ purpose: "gate" }), /WORKING ON/);
     // ...until they start something again
     script = (c) => c.system?.startsWith("You are the comprehension layer") ? null : "Let's go.\n[[focus: the stats homework]]";
@@ -184,6 +187,7 @@ async function t(name: string, fn: () => Promise<void> | void) { await fn(); pas
 
   await t("the orb can change a pass when you ask", async () => {
     for (const k of Object.keys(b.s.passes)) b.endPass(k, "ended_early");
+    b.clockBackIn("next test");
     const yt = b.grantPass("youtube.com", 10, "break");
     const comp = '{"intent":"question","responseMode":"ANSWER","explicitClaims":[],"explicitRequests":["change pass"],"askedForAdvice":false,"askedToDecide":false,"askedForPlan":false,"constraints":[],"temporal":[],"unknowns":[],"contradictions":[]}';
     let reply = "Done — 20 minutes from now.\n[[pass: YouTube | 20]]";
@@ -195,14 +199,14 @@ async function t(name: string, fn: () => Promise<void> | void) { await fn(); pas
     assert.ok(yt);
     reply = "Capped at your limit.\n[[pass: youtube.com | 90]]";
     r = await syn.ask("make it 90");
-    assert.equal(Math.round((b.activePass("youtube.com")!.expiresAt - clock) / 60_000), 30);
+    assert.equal(Math.round((b.activePass("youtube.com")!.expiresAt - clock) / 60_000), 60, "a lecture (task) can run up to the task limit, not the 30-min break limit");
     reply = "Ended.\n[[pass: youtube.com | 0]]";
     r = await syn.ask("actually end it, I'm good");
     assert.equal(b.activePass("youtube.com"), null);
     reply = "No.\n[[pass: notlisted.com | 20]]";
     r = await syn.ask("x");
     assert.deepEqual(r.passChanges, []);
-    assert.match(b.context({ purpose: "ask" }), /PASS LIMIT: the longest pass they've allowed is 30 min/);
+    assert.match(b.context({ purpose: "ask" }), /PASS LIMIT: breaks up to 30 min; using a site for work \(a task\) up to 60 min/);
     b.grantPass("youtube.com", 10, "for the restart test");
   });
 
@@ -298,6 +302,7 @@ async function t(name: string, fn: () => Promise<void> | void) { await fn(); pas
   await t("a yes in the orb is a real yes, even when the model forgets the tag", async () => {
     const comp = '{"intent":"question","responseMode":"ANSWER","explicitClaims":[],"explicitRequests":["play"],"askedForAdvice":false,"askedToDecide":false,"askedForPlan":false,"constraints":[],"temporal":[],"unknowns":[],"contradictions":[]}';
     for (const k of Object.keys(b.s.passes)) b.endPass(k, "ended_early");
+    b.clockBackIn("next test");
     clock += 3 * 3600_000;
     // Real transcript 1: "Yes, you can." with no tag → free time anyway
     script = (c) => c.system?.startsWith("You are the comprehension layer") ? comp : "Yes, you can. It's your call—if there's nothing pressing you need to get done right now, go for it.";
@@ -326,6 +331,7 @@ async function t(name: string, fn: () => Promise<void> | void) { await fn(); pas
     assert.equal(v3.decision, "allow"); assert.match(v3.reply, /I said yes in the orb/);
     b.endPass("youtube.com", "expired");
     // …but once that pass is used up, the same yes doesn't open it again
+    script = () => '{"decision":"deny","minutes":null,"kind":null,"reply":"That yes was for earlier, and it ran out."}';
     const v4 = await syn.judge({ site: "youtube.com", argument: "you said I could", transcript: [] });
     assert.equal(v4.decision, "deny");
 
@@ -350,6 +356,7 @@ async function t(name: string, fn: () => Promise<void> | void) { await fn(); pas
   await t("audit: breaks, follow-ups, pauses, done-working and pass counting behave like a person expects", async () => {
     const comp = '{"intent":"question","responseMode":"ANSWER","explicitClaims":[],"explicitRequests":["x"],"askedForAdvice":false,"askedToDecide":false,"askedForPlan":false,"constraints":[],"temporal":[],"unknowns":[],"contradictions":[]}';
     for (const k of Object.keys(b.s.passes)) b.endPass(k, "ended_early");
+    b.clockBackIn("next test");
     clock += 3 * 3600_000;
 
     // A break at the gate covers every distracting site, not just the one they opened
@@ -433,6 +440,7 @@ async function t(name: string, fn: () => Promise<void> | void) { await fn(); pas
     v = await syn.judge({ site: "reddit.com", argument: "15 minutes", transcript: [{ role: "user", text: "I studied for two hours for my chem test and I'm exhausted, I need a break" }, { role: "synapse", text: "How many minutes, exactly?" }] });
     assert.equal(v.decision, "allow"); assert.equal(v.minutes, 15);
     for (const k of Object.keys(b.s.passes)) b.endPass(k, "ended_early");
+    b.clockBackIn("next test");
   });
 
   await t("work that runs past midnight still counts toward the streak", () => {
@@ -447,6 +455,7 @@ async function t(name: string, fn: () => Promise<void> | void) { await fn(); pas
 
   await t("going back to work during a break ends the break", () => {
     for (const k of Object.keys(b.s.passes)) b.endPass(k, "ended_early");
+    b.clockBackIn("next test");
     clock += 3600_000;
     b.grantPass("*", 15, "need a break", "break");
     const look = (app: string, title: string, secs: number) => { let r: string | null = null; for (let i = 0; i < secs; i++) { clock += 1000; r = b.backToWork({ app, title }) ?? r; } return r; };
@@ -461,6 +470,172 @@ async function t(name: string, fn: () => Promise<void> | void) { await fn(); pas
     b.grantPass("youtube.com", 20, "lecture for class", "task");
     assert.equal(look("winword.exe", "Lecture notes.docx - Word", 180), null);
     b.endPass("youtube.com", "ended_early");
+  });
+
+  await t("intent: using a site FOR work is understood — the real PSAT transcript", async () => {
+    for (const k of Object.keys(b.s.passes)) b.endPass(k, "ended_early");
+    b.clockBackIn("next test");
+    clock += 24 * 3600_000;
+    const comp = '{"intent":"statement","responseMode":"ACKNOWLEDGE","explicitClaims":[],"explicitRequests":[],"askedForAdvice":false,"askedToDecide":false,"askedForPlan":false,"constraints":[],"temporal":[],"unknowns":[],"contradictions":[]}';
+    script = (c) => c.system?.startsWith("You are the comprehension layer") ? comp : "Sounds good. Go knock them out.\n[[focus: emails and the Congress app project]]\n[[plan: might study for the PSAT]]";
+    await syn.ask("Nah. I'm ready. Abt to kick off a work session on emails and my congress app project. also might study for the psat");
+    assert.match(b.context({ purpose: "gate" }), /PLANNED TODAY[^\n]*PSAT/);
+    clock += 16 * 60_000;
+    // a morning pass before work started doesn't count as a break against them
+    // (and the USE request is judged without any AI call: it matches what they said)
+    calls.length = 0;
+    script = () => '{"decision":"deny","minutes":null,"kind":null,"reply":"You only have 17 minutes of work."}';
+    const v = await syn.judge({ site: "youtube.com", argument: "I'm using youtube to watch PSAT prep videos", transcript: [] });
+    assert.equal(v.decision, "allow"); assert.equal(calls.length, 0);
+    assert.equal(v.pass?.site, "youtube.com"); assert.equal(v.pass?.kind, "task");
+    assert.ok((v.minutes ?? 0) >= 30, `minutes ${v.minutes}`);
+    assert.match(v.reply, /psat/i);
+    assert.equal(b.activePass("roblox.com"), null, "a task pass is for that site, not free time");
+    b.endPass("youtube.com", "ended_early");
+
+    // even if the orb never wrote a [[plan]] tag, what they SAID in the orb counts
+    b.s.plans = [];
+    clock += 5 * 60_000;
+    const v2 = await syn.judge({ site: "youtube.com", argument: "watching psat practice problems", transcript: [] });
+    assert.equal(v2.decision, "allow");
+    b.endPass("youtube.com", "ended_early");
+
+    // A USE request about something new goes to the judge as USE, not as a break
+    calls.length = 0;
+    script = () => '{"decision":"allow","minutes":40,"kind":"task","reply":"Go learn it."}';
+    const v3 = await syn.judge({ site: "youtube.com", argument: "my teacher assigned a calculus lecture video for tomorrow", transcript: [] });
+    assert.equal(calls.length, 1); assert.match(calls[0].user, /USE REQUEST/); assert.match(calls[0].user, /MAX_TASK_MINUTES/);
+    assert.equal(v3.minutes, 40, "tasks can be longer than the 30-min break limit");
+    b.endPass("youtube.com", "ended_early");
+
+    // Not USE: breaks and fun
+    for (const no of ["I need a break, gonna watch youtube", "just one video then back to my essay", "i'm bored", "can I play some games, I finished my homework"])
+      assert.equal(useClaim(no), null, no);
+    for (const yes of ["I'm using youtube to watch PSAT prep videos", "need reddit to research for my essay", "my group project chat is on discord", "lofi music to focus while I study"])
+      assert.ok(useClaim(yes), yes);
+
+    // The day's passes are split: a task isn't a break
+    const d = b.today();
+    assert.ok(d.taskPasses >= 3); assert.equal(d.breakPasses, 0);
+    assert.match(b.context({ purpose: "gate" }), /0 break passes during their work day/);
+
+    // On-task checks read the model's verdict safely
+    script = () => '{"fits":"no","why":"a chess video, not PSAT prep"}';
+    let r = await syn.checkOnTask("youtube.com", "CHESS SPEEDRUN IS BACK", "PSAT prep videos");
+    assert.equal(r.fits, "no");
+    script = () => "garbage";
+    r = await syn.checkOnTask("youtube.com", "Digital SAT Math - Hardest Questions", "PSAT prep videos");
+    assert.equal(r.fits, "unsure", "anything unclear never interrupts");
+  });
+
+  await t("work's done = their computer is theirs (no gates until they start working again)", async () => {
+    for (const k of Object.keys(b.s.passes)) b.endPass(k, "ended_early");
+    b.clockBackIn("next test");
+    clock += 24 * 3600_000;
+    for (const yes of ["I finished all my homework", "all my work is done", "done with everything for today", "nothing left to do tonight", "no homework tonight!", "I'm done for today"])
+      assert.equal(saysDoneWorking(yes), true, yes);
+    for (const no of ["I'm in class with nothing to do right now", "done with math, starting chem now", "I'm not done with my homework", "all done with the intro, onto the body"])
+      assert.equal(saysDoneWorking(no), false, no);
+
+    const comp = '{"intent":"statement","responseMode":"ACKNOWLEDGE","explicitClaims":[],"explicitRequests":[],"askedForAdvice":false,"askedToDecide":false,"askedForPlan":false,"constraints":[],"temporal":[],"unknowns":[],"contradictions":[]}';
+    script = (c) => c.system?.startsWith("You are the comprehension layer") ? comp : "Nice work. Your computer's yours — go enjoy it.";
+    await syn.ask("I finished all my homework and nothing's due tomorrow");
+    assert.ok(b.offClock());
+    assert.match(b.context({ purpose: "gate" }), /WORK'S DONE — FREE TIME/);
+    calls.length = 0;
+    const v = await syn.judge({ site: "roblox.com", argument: "can I play?", transcript: [] });
+    assert.equal(v.decision, "allow"); assert.equal(v.free, true); assert.equal(calls.length, 0);
+    // Saying it at the gate works too
+    b.clockBackIn("test");
+    const v2 = await syn.judge({ site: "youtube.com", argument: "I'm done with all my work for today", transcript: [] });
+    assert.equal(v2.free, true);
+    // "ok back to work" turns the gate back on
+    script = (c) => c.system?.startsWith("You are the comprehension layer") ? comp : "Let's go.";
+    await syn.ask("ok back to work, starting my essay");
+    assert.equal(b.offClock(), null);
+    // ...and it lasts until 5 AM at most
+    await syn.ask("all my work is done");
+    const until = b.offClock()!.until!;
+    assert.equal(new Date(until).getHours(), 5);
+    clock = until + 1000; assert.equal(b.offClock(), null);
+  });
+
+  await t("/pause lets go completely until /reset takes control back", async () => {
+    b.clockBackIn("test");
+    assert.deepEqual(parsePauseCommand("/pause", clock), { pause: null });
+    assert.deepEqual(parsePauseCommand("/reset", clock), { reset: true });
+    assert.deepEqual(parsePauseCommand("/pause 30", clock), { pause: 30 });
+    calls.length = 0;
+    let r = await syn.ask("/pause");
+    assert.equal(calls.length, 0); assert.equal(r.pauseChanged, true);
+    assert.ok(b.paused()); assert.ok(b.pausedIndefinitely());
+    clock += 3 * 24 * 3600_000;
+    assert.ok(b.paused(), "an open-ended pause doesn't wear off on its own");
+    assert.match(b.context({ purpose: "ask" }), /until they turn it back on with \/reset/);
+    // /reset: back on, and any free time / passes are gone too
+    b.grantPass("*", 20, "free time", "break"); b.endWork("all my work is done");
+    r = await syn.ask("/reset");
+    assert.equal(r.reset, true);
+    assert.equal(b.paused(), null); assert.equal(b.offClock(), null); assert.equal(b.activePass("youtube.com"), null);
+    // From the gate card too
+    const v = await syn.judge({ site: "youtube.com", argument: "/pause", transcript: [] });
+    assert.equal(v.command, "pause"); assert.ok(b.pausedIndefinitely());
+    const v2 = await syn.judge({ site: "youtube.com", argument: "/reset", transcript: [] });
+    assert.equal(v2.command, "reset"); assert.equal(v2.decision, "ask"); assert.equal(b.paused(), null);
+  });
+
+  await t("watch first: what's ON the page decides, not the site's name", async () => {
+    b.clockBackIn("test");
+    for (const k of Object.keys(b.s.passes)) b.endPass(k, "ended_early");
+    clock += 24 * 3600_000;
+    assert.equal(pageOnly("SAT Math: Hardest Questions - YouTube - Google Chrome", "youtube.com"), "SAT Math: Hardest Questions");
+    assert.equal(pageOnly("(3) YouTube - Google Chrome", "youtube.com"), "");
+    assert.ok(isGenericPage(pageOnly("Instagram - Google Chrome", "instagram.com"), "instagram.com"));
+    assert.ok(isGenericPage("Inbox • Direct", "instagram.com"));
+    assert.ok(!isGenericPage("SAT Math: Hardest Questions", "youtube.com"));
+
+    calls.length = 0;
+    let r = await syn.assessPage({ site: "deadshot.io", title: "DEADSHOT .io - Google Chrome" });
+    assert.equal(r.verdict, "distracting"); assert.equal(calls.length, 0, "game sites need no AI");
+    r = await syn.assessPage({ site: "youtube.com", title: "lofi hip hop radio 📚 beats to relax/study to - YouTube - Google Chrome" });
+    assert.equal(r.verdict, "productive"); assert.equal(calls.length, 0, "focus music is recognised by its title");
+    r = await syn.assessPage({ site: "youtube.com", title: "YouTube - Google Chrome" });
+    assert.equal(r.verdict, "unclear"); assert.equal(calls.length, 0, "a home page: keep watching, no AI call");
+
+    // A title that matches what they told Synapse is productive, no AI needed
+    b.s.plans = [{ text: "study for the SAT", ts: clock }];
+    r = await syn.assessPage({ site: "youtube.com", title: "Digital SAT Reading - 10 Hardest Questions - YouTube - Google Chrome" });
+    assert.equal(r.verdict, "productive"); assert.equal(calls.length, 0);
+
+    // Otherwise the model judges the content, with what they've said as context
+    script = () => '{"verdict":"distracting","what":"a chess stream","confidence":0.9}';
+    r = await syn.assessPage({ site: "youtube.com", title: "GothamChess - YouTube - Google Chrome" });
+    assert.equal(r.verdict, "distracting"); assert.match(calls[0].user, /PLANNED TODAY: study for the SAT/);
+    script = () => '{"verdict":"distracting","what":"maybe a video","confidence":0.4}';
+    r = await syn.assessPage({ site: "youtube.com", title: "Some video - YouTube" });
+    assert.equal(r.verdict, "unclear", "not sure → keep watching, never flag");
+    // Instagram DMs with a screenshot: the model reads the chat
+    script = (c) => c.images?.length ? '{"verdict":"productive","what":"messaging a business client","confidence":0.85}' : null;
+    r = await syn.assessPage({ site: "instagram.com", title: "Inbox • Direct - Instagram - Google Chrome", screenshot: "AAAA" });
+    assert.equal(r.verdict, "productive");
+    // AI down → "unclear" (keep watching), never a wrong flag
+    script = () => null;
+    r = await syn.assessPage({ site: "youtube.com", title: "Random video title - YouTube" });
+    assert.equal(r.verdict, "unclear");
+
+    // Auto passes are quiet: not counted as passes they asked for
+    const before = b.today().passes;
+    const p = b.grantPass("youtube.com", 20, "SAT prep video", "task", true);
+    assert.ok(p.auto); assert.equal(b.today().passes, before);
+    b.endPass("youtube.com", "expired");
+
+    // Offline judging is fair and never cryptic
+    let o = offlineJudge("I'm watching SAT youtube videos to study for my SAT exam this friday", 30, 4);
+    assert.equal(o.decision, "allow"); assert.equal(o.kind, "task");
+    o = offlineJudge("idk", 30, 0);
+    assert.equal(o.decision, "ask");
+    o = offlineJudge("idk", 30, 0, true);
+    assert.equal(o.decision, "deny"); assert.doesNotMatch(o.reply, /brain/i);
   });
 
   await t("state survives a restart", () => {

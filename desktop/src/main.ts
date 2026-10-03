@@ -12,7 +12,7 @@
 import { app, BrowserWindow, Tray, Menu, ipcMain, screen, powerMonitor, globalShortcut, desktopCapturer, nativeImage, Notification, shell, systemPreferences } from "electron";
 import path from "node:path";
 import fs from "node:fs";
-import { createSynapse, relayTransport, geminiTransport, siteName, cleanSite, ANY_SITE, type Synapse, type GateTurn } from "../../core/synapse";
+import { createSynapse, relayTransport, geminiTransport, siteName, cleanSite, ANY_SITE, pageOnly, isGenericPage, type Synapse, type GateTurn } from "../../core/synapse";
 import { Bridge, type TabInfo } from "./bridge";
 import { foreground, BROWSERS, bringToFront, nativeHandle, closeBrowserTab, minimize, type Foreground } from "./foreground";
 
@@ -183,16 +183,24 @@ function soonestPass() {
 }
 function passView() {
   const until = syn.brain.paused();
-  if (until) return { name: "Paused", expiresAt: until, paused: true };
-  const p = soonestPass(); return p ? { name: siteName(p.site), expiresAt: p.expiresAt } : null;   // "Free time 14:59"
+  if (until) return { name: "Paused", expiresAt: until, paused: true, open: syn.brain.pausedIndefinitely() };
+  const off = syn.brain.offClock();
+  if (off) return { name: "Work's done", expiresAt: off.until ?? off.since + 10 * 3600_000, paused: true };
+  const p = soonestPass();
+  if (p?.auto) return { name: `${siteName(p.site)} · on task`, expiresAt: p.expiresAt, paused: false, label: true };
+  return p ? { name: siteName(p.site), expiresAt: p.expiresAt } : null;   // "Free time 14:59"
 }
-function chipShown() { return !!soonestPass() || !!syn.brain.paused(); }
+function chipShown() { return !!soonestPass() || !!syn.brain.paused() || !!syn.brain.offClock(); }
+/** Not gating right now: they paused Synapse, or their work is done for the day. */
+function standingDown() { return !!syn.brain.paused() || !!syn.brain.offClock(); }
 
 function pushConfig() {
   const passes: Record<string, number> = {};
   for (const p of Object.values(syn.brain.s.passes)) passes[p.site] = p.expiresAt;
   // While paused the helper has nothing to veil.
-  bridge.config(syn.brain.paused() ? [] : syn.brain.s.settings.distractions, passes);
+  // The helper never veils on its own any more: Synapse watches what they're doing first, and holds a
+  // tab only when it decides to ask (see observeTick).
+  bridge.config([], passes);
 }
 
 /* ---------------- pause: "leave me alone for a bit" ---------------- */
@@ -202,7 +210,8 @@ function schedulePause() {
   if (pauseTimer) clearTimeout(pauseTimer);
   pauseTimer = null;
   const until = syn.brain.paused();
-  if (until) pauseTimer = setTimeout(() => { syn.brain.paused(); onPauseChanged(false); notice("I'm back on.", 2500); }, Math.max(0, until - Date.now()) + 200);
+  // An open-ended /pause has no timer (and setTimeout can't wait a year: it would fire immediately).
+  if (until && !syn.brain.pausedIndefinitely()) pauseTimer = setTimeout(() => { syn.brain.paused(); onPauseChanged(false); notice("I'm back on.", 2500); }, Math.max(0, until - Date.now()) + 200);
 }
 /** Called after pausing or resuming from anywhere (tray, the orb, or the pause running out). */
 function onPauseChanged(announce = true) {
@@ -221,6 +230,28 @@ function pauseFor(minutes: number) {
   onPauseChanged();
   notice(`I'm off until ${new Date(until).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}. Relax.`, 2500);
 }
+/** Entering or leaving "work's done": release everything / start gating again, and update the chip and tray. */
+let wasFree = false;
+function syncFreeState() {
+  const free = !!syn.brain.offClock();
+  if (free === wasFree) return;
+  wasFree = free;
+  log(free ? "work's done: not gating until they start working again" : "back to work: gating again");
+  if (free) { if (gate) endGate(); bridge.release([...bridge.tabs.keys()]); }
+  pushConfig(); buildTray(); layout();
+  if (mode !== "card") orb.webContents.send("orb", { type: "mode", mode, pass: passView() });
+  if (!free) recheckSoon(800);
+}
+function clockBackIn() { syn.brain.clockBackIn("from the tray menu"); syncFreeState(); notice("Back on. Let's go.", 2000); }
+
+function resetFromTray() {
+  syn.brain.reset();
+  for (const t of passTimers.values()) clearTimeout(t);
+  passTimers.clear();
+  onPauseChanged(); syncFreeState();
+  notice("Reset. I'm fully back on.", 2200);
+}
+
 function resumeNow() { syn.brain.resume(); onPauseChanged(); notice("I'm back on.", 2000); }
 
 /** Every way a gate ends goes through here, so the orb always learns the gate is over. */
@@ -240,7 +271,9 @@ function schedulePass(site: string) {
 
 function expirePass(site: string, early = false) {
   clearTimeout(passTimers.get(site)); passTimers.delete(site);
+  const wasAuto = !!syn.brain.s.passes[site]?.auto;
   syn.brain.endPass(site, early ? "ended_early" : "expired");
+  if (wasAuto) { pushConfig(); layout(); log(`on-task window for ${site} lapsed; watching again`); return; }   // the watcher looks again
   pushConfig();
   layout();
   // Paused: they asked to be left alone. The pass just ends quietly.
@@ -308,7 +341,7 @@ function tabsOf(site: string) {
 }
 
 function onTab(t: TabInfo) {
-  if (syn.brain.paused()) { bridge.release([t.tabId]); return; }
+  if (standingDown()) { bridge.release([t.tabId]); return; }
   let host = "";
   try { host = new URL(t.url).hostname; } catch { return; }
   const site = syn.brain.matchDistraction(host);
@@ -326,13 +359,127 @@ function onTab(t: TabInfo) {
     }
     return;
   }
-  if (syn.brain.activePass(site)) { bridge.release([t.tabId]); return; }
-  bridge.hold([t.tabId]);
-  if (looking && gate && !gate.judging && site !== gate.site) { moveGate(site, t.title); return; }
+  if (syn.brain.activePass(site)) { bridge.release([t.tabId]); if (looking) driftCheck(site, t.title, "helper"); return; }
+  if (looking && gate && !gate.judging && site !== gate.site) { bridge.hold([t.tabId]); moveGate(site, t.title); return; }
   if (looking && !gate) {
-    if (!coolingDown(site)) startGate(site, t.title, "helper");
-    else recheckAfterCooldown(site);
+    if (!coolingDown(site)) observeTick(site, t.title, "helper");
+    else { bridge.hold([t.tabId]); recheckAfterCooldown(site); }
   }
+}
+
+/**
+ * WATCH FIRST, THEN DECIDE. Opening YouTube or Instagram isn't a crime: what matters is what they DO
+ * there. So instead of stopping them the moment a "distracting" site appears, Synapse looks at what's
+ * actually on the page — the page title, and (if they allow it) a look at the screen — and:
+ *   productive (SAT prep videos, focus music, a business chat) → lets them be, quietly, and keeps watching;
+ *   distracting (a game, a chess stream, reels) → gives them a few seconds to leave on their own, then asks;
+ *   can't tell (a home page, a feed) → keeps watching, and asks only if that goes on for a minute.
+ * Sites they were just turned away from, and game sites, get asked straight away.
+ */
+interface Observation { site: string; via: Gate["via"]; target?: Foreground; since: number; lastTitle: string; busy: boolean; shotAt: number; flagAt?: number; flagWhat?: string }
+let observing: Observation | null = null;
+const OBSERVE_GRACE_MS = 60_000;   // still can't tell after this long (scrolling a feed) → ask
+const CONFIRM_MS = 6_000;          // looks like a distraction → a few seconds to leave on their own first
+
+function recentlyTurnedAway(site: string) {
+  const t = Date.now();
+  return syn.brain.s.gateLog.some((e) => e.site === site && (e.kind === "deny" || e.kind === "timeout") && t - e.ts < 10 * 60_000);
+}
+
+function observeTick(site: string | null, title: string, via: Gate["via"], target?: Foreground) {
+  if (observing && observing.site !== site) { log(`watch ${observing.site}: they left`); observing = null; }
+  if (!site || gate || standingDown()) return;
+  if (syn.brain.activePass(site)) { observing = null; return; }
+  const now = Date.now();
+  if (!observing) {
+    if (recentlyTurnedAway(site)) { startGate(site, title, via, target); return; }
+    observing = { site, via, target, since: now, lastTitle: "", busy: false, shotAt: 0 };
+    log(`watch ${site}: looking before deciding — "${title.slice(0, 70)}"`);
+  }
+  const o = observing;
+  if (target) o.target = target;
+  if (o.flagAt && now >= o.flagAt) { flag(o, `That looks like ${o.flagWhat}. What's going on?`); return; }
+  if (o.busy) return;
+  const page = pageOnly(title, site);
+  const generic = isGenericPage(page, site);
+  const wantShot = generic && syn.brain.s.settings.shareScreen && now - o.since > 8000 && now - o.shotAt > 20_000;
+  if (title !== o.lastTitle || wantShot) { void assess(o, title, wantShot); return; }
+  if (!o.flagAt && now - o.since > OBSERVE_GRACE_MS) flag(o, `You've been on ${siteName(site)} for a bit. What are you up to?`);
+}
+
+async function assess(o: Observation, title: string, withShot: boolean) {
+  o.busy = true;
+  o.lastTitle = title;
+  let r: Awaited<ReturnType<Synapse["assessPage"]>>;
+  try {
+    const shot = withShot ? await captureScreen(true) : null;
+    if (withShot) o.shotAt = Date.now();
+    r = await syn.assessPage({ site: o.site, title, screenshot: shot, seconds: (Date.now() - o.since) / 1000 });
+  } catch (e) { r = { verdict: "unclear", what: siteName(o.site), source: "offline" }; log(`watch ${o.site}: check failed ${String(e).slice(0, 120)}`); }
+  o.busy = false;
+  if (observing !== o || gate) return;
+  log(`watch ${o.site}: "${pageOnly(title, o.site).slice(0, 60)}"${withShot ? " +screen" : ""} → ${r.verdict} (${r.what}; ${r.source})`);
+  if (r.verdict === "productive") {
+    observing = null;
+    const p = syn.brain.grantPass(o.site, 20, r.what, "task", true);
+    syn.brain.noteAppEvent(`Synapse saw them working on ${siteName(o.site)} (${r.what}) and let them be`);
+    schedulePass(p.site); pushConfig(); layout();
+  } else if (r.verdict === "distracting") {
+    if (!o.flagAt) { o.flagAt = Date.now() + CONFIRM_MS; o.flagWhat = r.what; }
+  } else if (o.flagAt && title !== o.flagWhat) {
+    o.flagAt = undefined;   // moved on to something that isn't clearly a distraction: keep watching
+  }
+}
+
+function flag(o: Observation, opener: string) {
+  observing = null;
+  log(`watch ${o.site}: asking — ${opener}`);
+  syn.brain.noteAppEvent(`Synapse watched them on ${siteName(o.site)} ("${pageOnly(o.lastTitle, o.site).slice(0, 60)}") and decided to ask`);
+  if (o.via === "helper") bridge.hold(tabsOf(o.site));
+  startGate(o.site, o.lastTitle, o.via, o.target, opener);
+}
+
+/**
+ * ON-TASK CHECK. A task pass ("PSAT prep on YouTube") is trust, not a free pass: each new page they
+ * open on that site is checked against what they said it was for. A clear mismatch ("CHESS SPEEDRUN
+ * IS BACK") ends the pass and asks them about it. Home pages, searches and anything ambiguous never
+ * interrupt them.
+ */
+const taskChecks = new Map<string, "pending" | "yes" | "no" | "unsure">();
+function driftCheck(site: string, rawTitle: string, via: Gate["via"], target?: Foreground) {
+  const p = syn.brain.activePass(site);
+  if (!p || p.kind !== "task" || p.site === ANY_SITE) return;
+  const title = (rawTitle || "").replace(/\s+[-–—]\s+(Google Chrome|Microsoft.*Edge|Mozilla Firefox|Brave|Opera|Safari|Arc)$/i, "").replace(/^\(\d+\+?\)\s*/, "").trim();
+  // Nothing specific to judge yet: the site's home page, a bare site name, a search page.
+  if (!title || title.length < 6 || /^(youtube|reddit|x|twitter|instagram|tiktok|twitch|netflix)$/i.test(title) || /^(home|search|results)\b/i.test(title)) return;
+  const key = `${p.grantedAt}|${site}|${title}`;
+  if (taskChecks.has(key)) return;
+  taskChecks.set(key, "pending");
+  if (taskChecks.size > 300) taskChecks.delete(taskChecks.keys().next().value!);
+  // A window Synapse opened on its own (it saw them working): judge each new page fresh — switching
+  // from SAT prep to a chem lecture is still work. A pass they asked for: does the page fit what they said?
+  const check: Promise<{ fits: "yes" | "no" | "unsure"; why: string }> = p.auto
+    ? syn.assessPage({ site, title: rawTitle }).then((a) => {
+        if (a.verdict === "productive") { const q = syn.brain.s.passes[p.site]; if (q?.auto) { q.reason = a.what; syn.brain.grantPass(site, 20, a.what, "task", true); schedulePass(site); } }
+        return { fits: a.verdict === "distracting" ? "no" : a.verdict === "productive" ? "yes" : "unsure", why: a.what };
+      })
+    : syn.checkOnTask(site, title, p.reason);
+  check.then((r) => {
+    taskChecks.set(key, r.fits);
+    log(`on-task check ${site}: "${title.slice(0, 60)}" → ${r.fits}${r.why ? ` (${r.why})` : ""}`);
+    if (r.fits !== "no" || gate || syn.brain.paused()) return;
+    const still = syn.brain.activePass(site);
+    if (!still || still.grantedAt !== p.grantedAt) return;
+    // Off task: the pass ends and they're asked about it, gently.
+    clearTimeout(passTimers.get(site)); passTimers.delete(site);
+    syn.brain.endPass(site, "ended_early");
+    syn.brain.noteAppEvent(`during a ${siteName(site)} pass for "${p.reason.slice(0, 80)}" they opened "${title.slice(0, 80)}", which didn't fit, so Synapse ended the pass`);
+    pushConfig(); layout();
+    if (via === "helper") bridge.hold(tabsOf(site));
+    const bare = title.replace(new RegExp(`\\s+[-–—|]\\s+${siteName(site).replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}$`, "i"), "");
+    const short = bare.length > 50 ? bare.slice(0, 50) + "…" : bare;
+    startGate(site, title, via, target, p.auto ? `"${short}" — that doesn't look like work. What's going on?` : `"${short}" doesn't look like what you came here for. What's going on?`);
+  }).catch(() => taskChecks.set(key, "unsure"));
 }
 
 /** The gate follows them to the next distraction, keeping the time they had left. */
@@ -345,15 +492,15 @@ function moveGate(site: string, pageTitle: string | undefined, target?: Foregrou
   orb.webContents.send("orb", { type: "gate-site", site, name: siteName(site) });
 }
 
-function startGate(site: string, pageTitle: string | undefined, via: Gate["via"], target?: Foreground) {
-  if (syn.brain.paused()) return;
+function startGate(site: string, pageTitle: string | undefined, via: Gate["via"], target?: Foreground, openerOverride?: string) {
+  if (standingDown()) return;
   log(`gate open: ${site} via ${via}${pageTitle ? ` — "${pageTitle.slice(0, 80)}"` : ""}`);
   // Main owns a backstop deadline (the orb's own clock normally fires first). It allows a short
   // grace for the card to appear, and pauses while Synapse is thinking.
   gate = { site, transcript: [], judging: false, via, target, budgetMs: (syn.brain.s.settings.windowSeconds + 3) * 1000, resumedAt: Date.now(), running: false, typingUsedMs: 0 };
   armBackstop();
   syn.brain.logGate({ site, kind: "opened", text: pageTitle?.slice(0, 120) });
-  const opener = syn.gateOpener(site);
+  const opener = openerOverride ?? syn.gateOpener(site);
   gate.transcript.push({ role: "synapse", text: opener });
   openCard();
   orb.webContents.send("orb", { type: "gate", site, name: siteName(site), opener, seconds: syn.brain.s.settings.windowSeconds });
@@ -406,7 +553,8 @@ async function argue(text: string) {
   if (g.typingSince != null) { g.typingUsedMs += Date.now() - g.typingSince; g.typingSince = undefined; }
   g.judging = true;
   pauseBackstop();
-  const pageTitle = [...bridge.tabs.values()].find((t) => tabsOf(g.site).includes(t.tabId))?.title;
+  const pageTitle = [...bridge.tabs.values()].find((t) => tabsOf(g.site).includes(t.tabId))?.title
+    ?? (g.target?.title ? g.target.title.replace(/\s+[-–—]\s+(Google Chrome|Microsoft.*Edge|Mozilla Firefox|Brave|Opera|Safari|Arc)$/i, "") : undefined);
   let v: Awaited<ReturnType<Synapse["judge"]>>;
   try { v = await syn.judge({ site: g.site, argument: text, transcript: g.transcript, pageTitle }); }
   catch (e) {
@@ -433,6 +581,13 @@ async function argue(text: string) {
     setTimeout(() => closeSite(g.site, g.target), 1600);
     setTimeout(() => { if (!gate && mode === "card") orb.webContents.send("orb", { type: "close-card" }); }, 3200);
     recheckSoon(3600);
+    return;
+  }
+  if (v.decision === "allow" && v.free) {
+    gate = null;
+    if (v.command === "pause") { bridge.release([...bridge.tabs.keys()]); onPauseChanged(false); }
+    syncFreeState();
+    setTimeout(() => { if (!gate) layout("dock"); }, 2600);
     return;
   }
   if (v.decision === "allow") {
@@ -487,30 +642,37 @@ function notice(text: string, ms = 4000) {
 function scheduleReachouts() {
   for (const r of syn.brain.s.reachouts) {
     if (reachTimers.has(r.id)) continue;
+    // Timers can't wait more than ~24 days (longer ones fire at once), so long waits re-arm in steps.
     reachTimers.set(r.id, setTimeout(() => {
       reachTimers.delete(r.id);
+      if (Date.now() < r.at - 500) { scheduleReachouts(); return; }
       syn.brain.s.reachouts = syn.brain.s.reachouts.filter((x) => x.id !== r.id);
-      if (syn.brain.paused()) { syn.brain.s.reachouts.push({ ...r, at: (syn.brain.paused() ?? Date.now()) + 60_000 }); scheduleReachouts(); return; }
+      if (syn.brain.paused()) {
+        // Open-ended /pause: they asked to be left alone, so the check-in is dropped. A timed pause: after it.
+        if (!syn.brain.pausedIndefinitely()) { syn.brain.s.reachouts.push({ ...r, at: (syn.brain.paused() ?? Date.now()) + 60_000 }); scheduleReachouts(); }
+        return;
+      }
       syn.brain.addTurn("synapse", r.text, "ask");
       if (!gate) notice(r.text, 9000);
       if (Notification.isSupported()) new Notification({ title: "Synapse", body: r.text, silent: true }).show();
-    }, Math.max(1000, r.at - Date.now())));
+    }, Math.min(6 * 3600_000, Math.max(1000, r.at - Date.now()))));
   }
 }
 
 /* ---------------- clarity: ask ---------------- */
 
-async function captureScreen(): Promise<string | null> {
+async function captureScreen(background = false): Promise<string | null> {
   // macOS needs Screen Recording permission; without it the capture is just the wallpaper.
   if (isMac && systemPreferences.getMediaAccessStatus("screen") !== "granted") {
+    if (background) return null;            // never pop a permission prompt from a background check
     screenPermissionMissing = true;
     desktopCapturer.getSources({ types: ["screen"], thumbnailSize: { width: 1, height: 1 } }).catch(() => {}); // triggers the system prompt once
     return null;
   }
-  screenPermissionMissing = false;
+  if (!background) screenPermissionMissing = false;
+  // Asking about the screen: hide the orb for the shot. A background look leaves it alone (no flicker).
   const prev = orb.getOpacity();
-  orb.setOpacity(0);
-  await new Promise((r) => setTimeout(r, 120));
+  if (!background) { orb.setOpacity(0); await new Promise((r) => setTimeout(r, 120)); }
   try {
     const cursor = screen.getCursorScreenPoint();
     const display = screen.getDisplayNearestPoint(cursor);
@@ -518,7 +680,7 @@ async function captureScreen(): Promise<string | null> {
     const sources = await desktopCapturer.getSources({ types: ["screen"], thumbnailSize: { width: Math.round(display.size.width * scale), height: Math.round(display.size.height * scale) } });
     const src = sources.find((s) => s.display_id === String(display.id)) ?? sources[0];
     return src ? src.thumbnail.toJPEG(72).toString("base64") : null;
-  } catch { return null; } finally { orb.setOpacity(prev || 1); }
+  } catch { return null; } finally { if (!background) orb.setOpacity(prev || 1); }
 }
 
 let askPending = false;
@@ -526,7 +688,7 @@ let askPending = false;
 async function ask(text: string, share: boolean) {
   const onboarding = !syn.brain.s.profile.onboardedAt;
   askPending = true;
-  let r: { text: string; sawScreen: boolean; passChanges?: { site: string; minutes: number }[]; pauseChanged?: boolean };
+  let r: { text: string; sawScreen: boolean; passChanges?: { site: string; minutes: number }[]; pauseChanged?: boolean; reset?: boolean };
   try {
     const shot = share ? await captureScreen() : null;
     r = await syn.ask(text, { screenshot: shot, onboarding });
@@ -546,7 +708,14 @@ async function ask(text: string, share: boolean) {
     }
     else { clearTimeout(passTimers.get(c.site)); passTimers.delete(c.site); closeIfShowing(c.site, 600); }
   }
+  if ((r as { reset?: boolean }).reset) {
+    // /reset: Synapse takes back control. Every pass and free-time timer is gone; the tab they're on gets a gate.
+    for (const t of passTimers.values()) clearTimeout(t);
+    passTimers.clear();
+    log("reset: fully back on");
+  }
   if ((r as { pauseChanged?: boolean }).pauseChanged) onPauseChanged();
+  syncFreeState();
   layout();
   pushConfig(); // they may have added a distraction by talking
   const note = share && screenPermissionMissing
@@ -609,7 +778,14 @@ async function watch() {
     const idle = idleSeconds();
     const back = idle < 180 ? syn.brain.backToWork({ app: fg.app, title: tab?.title || fg.title, url: tab?.url || fg.url }) : null;
     if (back) endBreakEarly(back, fg);
-    if (!isBrowser || helperSeesBrowser()) return;
+    if (syn.brain.offClock()) { if (gate) { endGate(); bridge.release([...bridge.tabs.keys()]); } observing = null; return; }   // work's done: no gates
+    if (!isBrowser) { if (observing) { log(`watch ${observing.site}: they left`); observing = null; } return; }
+    if (helperSeesBrowser()) {
+      let site: string | null = null;
+      try { site = tab ? syn.brain.matchDistraction(new URL(tab.url).hostname) : null; } catch { site = null; }
+      if (!gate) observeTick(site, tab?.title || fg.title, "helper");
+      return;
+    }
 
     const site = siteOf(fg);
     if (gate?.via === "window" && !gate.judging && site && site !== gate.site && !syn.brain.activePass(site)) {
@@ -627,8 +803,9 @@ async function watch() {
       return;
     }
     if (site && !gate && coolingDown(site) && !syn.brain.activePass(site)) { recheckAfterCooldown(site); return; }
-    if (!site || gate || syn.brain.activePass(site)) return;
-    startGate(site, fg.title, "window", fg);
+    if (site && !gate && syn.brain.activePass(site)) { observing = null; driftCheck(site, fg.title, "window", fg); return; }
+    if (gate) return;
+    observeTick(site, fg.title, "window", fg);
   } finally {
     watching = false;
   }
@@ -646,13 +823,15 @@ function buildTray() {
     { type: "separator" },
     { label: bridge.connected ? "Browser helper: connected" : "Browser helper: not connected — set up…", click: () => openSettings("helper") },
     syn.brain.paused()
-      ? { label: `Paused until ${new Date(syn.brain.paused()!).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })} — resume now`, click: resumeNow }
+      ? { label: syn.brain.pausedIndefinitely() ? "Paused (/pause) — turn back on (/reset)" : `Paused until ${new Date(syn.brain.paused()!).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })} — resume now`, click: resetFromTray }
       : { label: "Pause Synapse", submenu: [
+          { label: "Until I turn it back on (/pause)", click: () => { syn.brain.pause(null); onPauseChanged(); notice("Paused until you type /reset.", 2500); } },
           { label: "30 minutes", click: () => pauseFor(30) },
           { label: "1 hour", click: () => pauseFor(60) },
           { label: "2 hours", click: () => pauseFor(120) },
           { label: "Until tomorrow morning", click: () => { const d = new Date(); d.setDate(d.getDate() + (d.getHours() >= 6 ? 1 : 0)); d.setHours(6, 0, 0, 0); pauseFor((d.getTime() - Date.now()) / 60_000); } },
         ] },
+    ...(syn.brain.offClock() ? [{ label: "Work's done — I'm back to work", click: clockBackIn }] : []),
     { label: "Distracting sites & limits…", click: () => openSettings("sites") },
     { label: "Open diagnostics log", click: () => { log("log opened"); shell.openPath(logFile); } },
     { label: isMac ? "Open at login" : "Start with Windows", type: "checkbox", checked: app.getLoginItemSettings().openAtLogin, click: (i) => app.setLoginItemSettings({ openAtLogin: i.checked }) },
@@ -716,7 +895,7 @@ app.whenReady().then(() => {
   const installIdHolder = { id: "" };
   syn = createSynapse({
     storage,
-    callModel: key ? geminiTransport(key) : (c) => relayTransport(process.env.SYNAPSE_RELAY_URL || __RELAY_URL__, installIdHolder.id)(c),
+    callModel: key ? geminiTransport(key) : (c) => relayTransport(process.env.SYNAPSE_RELAY_URL || __RELAY_URL__, installIdHolder.id, fetch, (m) => log(m))(c),
   });
   installIdHolder.id = syn.brain.s.installId;
 
@@ -738,7 +917,7 @@ app.whenReady().then(() => {
   for (const site of Object.keys(syn.brain.s.passes)) schedulePass(site);
   scheduleReachouts();
   setInterval(watch, isMac ? 1200 : 600);
-  setInterval(() => { if (mode !== "card" && chipShown()) orb.webContents.send("orb", { type: "mode", mode, pass: passView() }); }, 1000);
+  setInterval(() => { syncFreeState(); if (mode !== "card" && chipShown()) orb.webContents.send("orb", { type: "mode", mode, pass: passView() }); }, 1000);
   // Safety net: if the orb is still showing a gate that no longer exists, close it.
   setInterval(() => { if (!gate && mode === "card") orb.webContents.send("orb", { type: "gate-ended" }); }, 4000);
   schedulePause();

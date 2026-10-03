@@ -17,22 +17,36 @@ async function withTimeout<T>(ms: number, fn: (signal: AbortSignal) => Promise<T
   try { return await fn(ctrl.signal); } finally { clearTimeout(t); }
 }
 
-/** Production: the Synapse relay. */
-export function relayTransport(url: string, installId: string, f: Fetch = fetch): CallModel {
-  return async (c) => {
+/**
+ * Production: the Synapse relay. One retry on a hiccup (rate limit, server error, dropped
+ * connection), and every failure is reported through `onError` so it shows up in the diagnostics log.
+ */
+export function relayTransport(url: string, installId: string, f: Fetch = fetch, onError: (m: string) => void = () => {}): CallModel {
+  const once = async (c: ModelCall): Promise<{ text: string | null; retry: boolean }> => {
     try {
-      return await withTimeout(c.images?.length ? 45_000 : 20_000, async (signal) => {
+      return await withTimeout(c.images?.length ? 45_000 : 25_000, async (signal) => {
         const res = await f(url, {
           method: "POST",
           headers: { "content-type": "application/json", "x-synapse-install": installId },
           body: JSON.stringify(c),
           signal,
         });
-        if (!res.ok) return null;
+        if (!res.ok) {
+          let detail = ""; try { detail = (await res.text()).slice(0, 120); } catch { /* ignore */ }
+          onError(`relay HTTP ${res.status}${detail ? ` ${detail}` : ""}`);
+          return { text: null, retry: res.status === 429 || res.status >= 500 };
+        }
         const d = (await res.json()) as { text?: string | null };
-        return d.text?.trim() || null;
+        if (!d.text) onError("relay returned no text");
+        return { text: d.text?.trim() || null, retry: false };
       });
-    } catch { return null; }
+    } catch (e) { onError(`relay unreachable: ${String((e as Error)?.name === "AbortError" ? "timed out" : e).slice(0, 120)}`); return { text: null, retry: true }; }
+  };
+  return async (c) => {
+    const first = await once(c);
+    if (first.text || !first.retry) return first.text;
+    await new Promise((r) => setTimeout(r, 1200));
+    return (await once(c)).text;
   };
 }
 

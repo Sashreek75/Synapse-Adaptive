@@ -84,7 +84,7 @@ export function permissionMinutes(...texts: string[]): number | null {
 }
 
 const BREAK_WORDS = /\b(break|rest|breather|recharge|decompress|unwind|relax|chill|free time|fried|exhausted|tired|burn(ed|t)? out|brain is (dead|mush|fried)|need a minute|clear my head|do other stuff|do whatever|done (for|with) (today|the day|tonight|school|studying|homework))\b/i;
-const TASK_WORDS = /\b(lecture|tutorial|lesson|for (class|school|my class|homework|hw|my assignment|the assignment|a project|my project|research)|assignment|assigned|teacher|professor|need (it|this) (for|to)|to (learn|study|research)|reply to|message (my|the)|group chat about|instructions)\b/i;
+const TASK_WORDS = /\b(lecture|tutorial|lesson|for (class|school|my class|homework|hw|my assignment|the assignment|a project|my project|research)|assignment|assigned|teacher|professor|need (it|this) (for|to)|to (learn|study|research)|reply to|message (my|the)|group chat about|instructions|lo-?fi|study music|focus music|music (to|while i'?m?|for) (focus|study|studying|work|working))\b/i;
 
 /** A break / rest / free time — which should cover every distracting site, not one. */
 export function isBreak(text: string): boolean {
