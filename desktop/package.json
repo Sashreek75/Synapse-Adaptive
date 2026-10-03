@@ -1,7 +1,7 @@
 {
   "name": "synapse",
   "productName": "Synapse",
-  "version": "0.1.9",
+  "version": "0.1.10",
   "description": "Synapse \u2014 the layer between what you intend to do and what you actually do.",
   "author": "Synapse",
   "private": true,
@@ -13,7 +13,7 @@
     "test": "node build.mjs --test && node dist/core.test.js",
     "dist": "node build.mjs && electron-builder",
     "dist:win": "node build.mjs && electron-builder --win nsis --x64",
-    "dist:mac": "node build.mjs && electron-builder --mac"
+    "dist:mac": "node build.mjs && electron-builder --mac zip --arm64 --x64 --publish never && node build/mac-dmg.mjs"
   },
   "dependencies": {
     "koffi": "^2.9.0",
@@ -66,6 +66,13 @@
     "afterPack": "build/afterPack.cjs",
     "mac": {
       "target": [
+        {
+          "target": "zip",
+          "arch": [
+            "arm64",
+            "x64"
+          ]
+        },
         {
           "target": "dmg",
           "arch": [

@@ -27,7 +27,9 @@ jobs:
             artifact: desktop/release/SynapseSetup.exe
           - os: macos-latest
             dist: dist:mac
-            artifact: desktop/release/Synapse-mac-*.dmg
+            artifact: |
+              desktop/release/Synapse-mac-*.zip
+              desktop/release/Synapse-mac-*.dmg
     runs-on: ${{ matrix.os }}
     defaults:
       run:
@@ -41,6 +43,10 @@ jobs:
           cache-dependency-path: desktop/package-lock.json
       - run: npm ci
       - run: npm test
+      # Spotlight grabs freshly mounted disk images and makes `hdiutil detach` fail ("resource busy").
+      - name: Turn off Spotlight indexing (Mac build machine only)
+        if: runner.os == 'macOS'
+        run: sudo mdutil -a -i off || true
       - run: npm run ${{ matrix.dist }}
         env:
           CSC_IDENTITY_AUTO_DISCOVERY: "false"
@@ -71,3 +77,5 @@ jobs:
             out/SynapseSetup.exe
             out/Synapse-mac-arm64.dmg
             out/Synapse-mac-x64.dmg
+            out/Synapse-mac-arm64.zip
+            out/Synapse-mac-x64.zip

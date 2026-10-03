@@ -5,6 +5,7 @@ const { execSync } = require("node:child_process");
 const path = require("node:path");
 exports.default = async function afterPack(ctx) {
   if (ctx.electronPlatformName !== "darwin") return;
+  if (process.platform !== "darwin") { console.warn("  • afterPack: not on a Mac, skipping ad-hoc signing (test build only)"); return; }
   const app = path.join(ctx.appOutDir, `${ctx.packager.appInfo.productFilename}.app`);
   execSync(`codesign --force --deep --sign - "${app}"`, { stdio: "inherit" });
 };
