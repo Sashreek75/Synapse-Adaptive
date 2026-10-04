@@ -291,17 +291,18 @@ function expirePass(site: string, early = false) {
 }
 
 /** They went back to work before their break ran out: stop the timer, quietly. Nothing to close. */
-function endBreakEarly(site: string, fg: Foreground) {
+function endPassOnLeave(site: string, fg: Foreground) {
   const p = syn.brain.s.passes[site];
   const left = p ? Math.max(0, Math.round((p.expiresAt - Date.now()) / 60_000)) : 0;
   clearTimeout(passTimers.get(site)); passTimers.delete(site);
   syn.brain.endPass(site, "ended_early");
-  syn.brain.noteAppEvent(`they went back to work (${cleanTitleForLog(fg.title)}) with ${left} min of break left, so Synapse ended the break`);
-  log(`break ended early: back to work in ${fg.app} with ${left} min left`);
+  if (!p?.auto) syn.brain.noteAppEvent(`they left ${site === ANY_SITE ? "their break" : siteName(site)} for "${cleanTitleForLog(fg.title)}" with ${left} min left, so Synapse stopped the timer`);
+  log(`left ${site === ANY_SITE ? "break" : site} for ${fg.app} "${cleanTitleForLog(fg.title)}" with ${left} min left: timer stopped`);
   pushConfig();
+  // Tuck away: no card, no message — the chip just disappears.
+  if (mode === "card" && !gate) orb.webContents.send("orb", { type: "close-card" });
   layout();
   if (mode !== "card") orb.webContents.send("orb", { type: "mode", mode, pass: passView() });
-  notice("Back at it — I stopped your break timer.", 2200);
 }
 function cleanTitleForLog(t: string) { return (t || "").replace(/\s+[-–—]\s+(Google Chrome|Microsoft.*Edge|Mozilla Firefox)$/i, "").slice(0, 60); }
 
@@ -776,8 +777,7 @@ async function watch() {
     }
     // On a break but back at real work for a solid minute? Then the break is over — end it and tuck away.
     const idle = idleSeconds();
-    const back = idle < 180 ? syn.brain.backToWork({ app: fg.app, title: tab?.title || fg.title, url: tab?.url || fg.url }) : null;
-    if (back) endBreakEarly(back, fg);
+    if (idle < 180) for (const k of syn.brain.leftPass({ app: fg.app, title: tab?.title || fg.title, url: tab?.url || fg.url })) endPassOnLeave(k, fg);
     if (syn.brain.offClock()) { if (gate) { endGate(); bridge.release([...bridge.tabs.keys()]); } observing = null; return; }   // work's done: no gates
     if (!isBrowser) { if (observing) { log(`watch ${observing.site}: they left`); observing = null; } return; }
     if (helperSeesBrowser()) {

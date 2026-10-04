@@ -247,7 +247,7 @@ S.on((m) => {
   else if (m.type === "verdict") onVerdict(m);
   else if (m.type === "gate-site") { if (view === "gate") { input.placeholder = `Why do you need ${m.name}, and for how long?`; say(esc(`${m.name} now? Same clock.`)); } }
   else if (m.type === "timeout") { stopClock(); lockGate(); }
-  else if (m.type === "close-card") { if (view === "gate") hideCard(); }
+  else if (m.type === "close-card") { if (view === "gate" || view === "notice") hideCard(); }
   else if (m.type === "gate-ended") {
     // The app says there's no gate any more: never leave a stale gate card on screen.
     if (view !== "gate") return;

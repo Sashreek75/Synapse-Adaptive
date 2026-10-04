@@ -77,8 +77,8 @@ const OFF_CLOCK_MS = 10 * 3600_000;     // "done for the day" lasts this long at
 const SEGMENT_GAP_MS = 20_000;          // samples further apart than this start a new segment
 const KEEP_ACTIVITY_MS = 24 * 3600_000;
 const INDEFINITE_MS = 365 * 24 * 3600_000;   // "/pause" with no time: until they /reset
-const BACK_TO_WORK_MS = 60_000;            // a solid minute back on real work during a break = the break is over
-const BREAK_MIN_BEFORE_RETURN_MS = 60_000; // …but not in the first minute of the break
+const LEAVE_AFTER_MS = 10_000;      // away from the site this long (on something else) = the pass is over
+const LEAVE_MIN_AGE_MS = 15_000;    // …but not in the first moments, while windows are still settling
 
 function rid() { return Math.random().toString(36).slice(2, 10) + Date.now().toString(36); }
 
@@ -472,30 +472,34 @@ export class Brain {
   }
 
   /**
-   * BACK TO WORK DURING A BREAK. Called on every look at the screen. If they're on a break and have
-   * been on real work (not a distraction, not the desktop, not an empty tab) for a solid minute, the
-   * break is over: returns the pass to end. Glancing at a doc for a few seconds doesn't count, and
-   * neither does the first minute of the break. Task passes (a lecture for class) are left alone —
-   * switching to notes during a lecture is part of the task.
+   * LEAVING ENDS IT. Called on every look at the screen. A pass is for being ON that site — a break
+   * covers every distracting site, a site pass covers that one site. When they leave for something
+   * else (another tab, another app) for a few seconds, the timer stops and Synapse tucks away; if
+   * they come back later, it looks at what they're doing then. Returns the passes to end.
+   * Neutral screens (a new tab, the desktop, Synapse itself) neither count as leaving nor as staying.
    */
-  backToWork(sample: { app: string; title: string; url?: string }): string | null {
+  leftPass(sample: { app: string; title: string; url?: string }): string[] {
     const t = this.now();
-    const live = Object.values(this.s.passes).filter((p) => p.expiresAt > t && (p.kind === "break" || (!p.kind && p.site === ANY_SITE)));
-    if (!live.length) { this.backSince = null; return null; }
+    const live = Object.values(this.s.passes).filter((p) => p.expiresAt > t);
+    if (!live.length) { this.awaySince.clear(); return []; }
     let site: string | null = null;
     if (sample.url) { try { site = this.matchDistraction(new URL(sample.url).hostname); } catch { site = null; } }
     else site = this.matchTitle(sample.title || "");
     const title = cleanTitle(sample.title || "");
-    const working = !site && !SYSTEM_APPS.test(sample.app) && !!title && !/^(New Tab|Untitled|Task Switching|Start)$/i.test(title);
-    if (!working) { this.backSince = null; return null; }
-    const p = live.sort((a, b) => b.expiresAt - a.expiresAt)[0];
-    if (t - p.grantedAt < BREAK_MIN_BEFORE_RETURN_MS) return null;
-    if (this.backSince == null) this.backSince = t;
-    if (t - this.backSince < BACK_TO_WORK_MS) return null;
-    this.backSince = null;
-    return p.site;
+    const neutral = !site && (SYSTEM_APPS.test(sample.app) || !title || /^(New Tab|Untitled|Task Switching|Start|Search)$/i.test(title));
+    const out: string[] = [];
+    for (const p of live) {
+      const covers = p.site === ANY_SITE ? !!site : !!site && sameSite(p.site).includes(site);
+      if (covers) { this.awaySince.delete(p.site); continue; }
+      if (neutral) continue;
+      if (t - p.grantedAt < LEAVE_MIN_AGE_MS) continue;          // the moment it starts, focus can bounce around
+      const since = this.awaySince.get(p.site) ?? t;
+      this.awaySince.set(p.site, since);
+      if (t - since >= LEAVE_AFTER_MS) { this.awaySince.delete(p.site); out.push(p.site); }
+    }
+    return out;
   }
-  private backSince: number | null = null;
+  private awaySince = new Map<string, number>();
 
   endPass(site: string, kind: "expired" | "ended_early") {
     if (!this.s.passes[site]) return;

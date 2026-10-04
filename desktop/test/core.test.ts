@@ -453,23 +453,29 @@ async function t(name: string, fn: () => Promise<void> | void) { await fn(); pas
     assert.ok(w.todayMin <= 25, `today ${w.todayMin}`);
   });
 
-  await t("going back to work during a break ends the break", () => {
+  await t("leaving a break or a site pass for something else stops the timer", () => {
     for (const k of Object.keys(b.s.passes)) b.endPass(k, "ended_early");
-    b.clockBackIn("next test");
     clock += 3600_000;
+    const look = (app: string, title: string, secs: number) => { let r: string[] = []; for (let i = 0; i < secs; i++) { clock += 1000; const x = b.leftPass({ app, title }); if (x.length) r = x; } return r; };
     b.grantPass("*", 15, "need a break", "break");
-    const look = (app: string, title: string, secs: number) => { let r: string | null = null; for (let i = 0; i < secs; i++) { clock += 1000; r = b.backToWork({ app, title }) ?? r; } return r; };
-    assert.equal(look("winword.exe", "Essay.docx - Word", 50), null, "not in the first minute of a break");
-    assert.equal(look("chrome.exe", "Lofi - YouTube - Google Chrome", 120), null, "on a distraction: still on break");
-    assert.equal(look("winword.exe", "Essay.docx - Word", 30), null, "a quick glance at work doesn't end it");
-    assert.equal(look("chrome.exe", "Lofi - YouTube - Google Chrome", 5), null);
-    assert.equal(look("explorer.exe", "", 90), null, "the desktop isn't work");
-    assert.equal(look("chrome.exe", "Essay - Google Docs - Google Chrome", 65), "*", "a solid minute back on work ends the break");
+    assert.deepEqual(look("chrome.exe", "Lofi - YouTube - Google Chrome", 20), [], "on a distraction: still on the break");
+    assert.deepEqual(look("chrome.exe", "r/funny - Google Chrome", 20), [], "another distraction is still the break");
+    assert.deepEqual(look("chrome.exe", "Essay - Google Docs - Google Chrome", 5), [], "a few seconds doesn't end it");
+    assert.deepEqual(look("chrome.exe", "Lofi - YouTube - Google Chrome", 3), []);
+    assert.deepEqual(look("chrome.exe", "New Tab - Google Chrome", 30), [], "a new tab is neutral");
+    assert.deepEqual(look("explorer.exe", "", 30), [], "so is the desktop");
+    assert.deepEqual(look("chrome.exe", "Essay - Google Docs - Google Chrome", 11), ["*"], "10 seconds on something else ends the break");
     b.endPass("*", "ended_early");
-    // A lecture pass isn't a break: switching to notes doesn't end it
-    b.grantPass("youtube.com", 20, "lecture for class", "task");
-    assert.equal(look("winword.exe", "Lecture notes.docx - Word", 180), null);
+    // A YouTube pass ends when they leave YouTube — even for another distracting site
+    b.grantPass("youtube.com", 20, "SAT prep", "task");
+    assert.deepEqual(look("chrome.exe", "SAT Math - YouTube - Google Chrome", 20), []);
+    assert.deepEqual(look("chrome.exe", "r/funny - Google Chrome", 11), ["youtube.com"]);
     b.endPass("youtube.com", "ended_early");
+    // Not in the first moments of a pass
+    b.grantPass("*", 15, "need a break", "break");
+    assert.deepEqual(look("winword.exe", "Essay.docx - Word", 12), [], "too soon after it started");
+    assert.deepEqual(look("winword.exe", "Essay.docx - Word", 15), ["*"]);
+    b.endPass("*", "ended_early");
   });
 
   await t("intent: using a site FOR work is understood — the real PSAT transcript", async () => {
